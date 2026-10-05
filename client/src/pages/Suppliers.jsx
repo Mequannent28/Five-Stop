@@ -37,7 +37,6 @@ const Suppliers = () => {
     await api.delete(`/suppliers/${id}`);
     load();
   };
-
   const exportData = useMemo(() => {
     return suppliers.map(s => ({
       'Supplier Name': s.name,
@@ -71,7 +70,6 @@ const Suppliers = () => {
       ),
     },
   ];
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
