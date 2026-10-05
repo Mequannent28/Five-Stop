@@ -179,26 +179,69 @@ export default function Analytics() {
     return [];
   }, [activeTab, plData, consumptionData, predictionData, recordsData]);
 
+  // ── Filtered items and totals for Menu Engineering & Profit Matrix ──
+  const filteredMatrixItems = useMemo(() => {
+    return (plData?.productBreakdown || []).filter((p) => {
+      if (productFilter && !p.productName.toLowerCase().includes(productFilter.toLowerCase())) return false;
+      if (matrixFilter !== 'ALL' && p.matrixClass !== matrixFilter) return false;
+      return true;
+    });
+  }, [plData, productFilter, matrixFilter]);
+
+  const matrixTotals = useMemo(() => {
+    const count = filteredMatrixItems.length;
+    const totalQty = filteredMatrixItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
+    const totalRevenue = filteredMatrixItems.reduce((s, i) => s + (Number(i.revenue) || 0), 0);
+    const totalCOGS = filteredMatrixItems.reduce((s, i) => s + (Number(i.cogs) || 0), 0);
+    const totalProfit = totalRevenue - totalCOGS;
+    const avgSellingPrice = totalQty > 0 ? totalRevenue / totalQty : 0;
+    const avgUnitCogs = totalQty > 0 ? totalCOGS / totalQty : 0;
+    const overallFoodCostPct = totalRevenue > 0 ? (totalCOGS / totalRevenue) * 100 : 0;
+    const overallMarginPct = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+    return {
+      count,
+      totalQty,
+      avgSellingPrice,
+      avgUnitCogs,
+      totalRevenue,
+      totalCOGS,
+      totalProfit,
+      overallFoodCostPct,
+      overallMarginPct,
+    };
+  }, [filteredMatrixItems]);
+
   // ── Dedicated export for Menu Engineering & Profit Matrix ──
   const matrixExportData = useMemo(() => {
-    return (plData?.productBreakdown || [])
-      .filter((p) => {
-        if (productFilter && !p.productName.toLowerCase().includes(productFilter.toLowerCase())) return false;
-        if (matrixFilter !== 'ALL' && p.matrixClass !== matrixFilter) return false;
-        return true;
-      })
-      .map((item) => ({
-        'Product Name': item.productName,
-        'Category': item.matrixClass,
-        'Qty Sold': item.qty,
-        'Avg Selling Price (ETB)': Number(item.avgPrice || 0).toFixed(2),
-        'Recipe COGS (ETB)': Number(item.unitCogs || 0).toFixed(2),
-        'Total Revenue (ETB)': Number(item.revenue || 0).toFixed(2),
-        'Gross Profit (ETB)': Number(item.profit || 0).toFixed(2),
-        'Food Cost %': pct(item.costRatio),
-        'Margin %': pct(item.margin),
-      }));
-  }, [plData, productFilter, matrixFilter]);
+    const rows = filteredMatrixItems.map((item) => ({
+      'Product Name': item.productName,
+      'Category': item.matrixClass,
+      'Qty Sold': item.qty,
+      'Avg Selling Price (ETB)': Number(item.avgPrice || 0).toFixed(2),
+      'Recipe COGS (ETB)': Number(item.unitCogs || 0).toFixed(2),
+      'Total Revenue (ETB)': Number(item.revenue || 0).toFixed(2),
+      'Gross Profit (ETB)': Number(item.profit || 0).toFixed(2),
+      'Food Cost %': pct(item.costRatio),
+      'Margin %': pct(item.margin),
+    }));
+
+    if (rows.length > 0) {
+      rows.push({
+        'Product Name': `TOTAL SUMMARY (${matrixTotals.count} Products)`,
+        'Category': 'TOTAL',
+        'Qty Sold': matrixTotals.totalQty,
+        'Avg Selling Price (ETB)': Number(matrixTotals.avgSellingPrice || 0).toFixed(2),
+        'Recipe COGS (ETB)': Number(matrixTotals.totalCOGS || 0).toFixed(2),
+        'Total Revenue (ETB)': Number(matrixTotals.totalRevenue || 0).toFixed(2),
+        'Gross Profit (ETB)': Number(matrixTotals.totalProfit || 0).toFixed(2),
+        'Food Cost %': pct(matrixTotals.overallFoodCostPct),
+        'Margin %': pct(matrixTotals.overallMarginPct),
+      });
+    }
+
+    return rows;
+  }, [filteredMatrixItems, matrixTotals]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -766,49 +809,43 @@ export default function Analytics() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-50 text-ink-700">
-                  {plData?.productBreakdown
-                    ?.filter((p) => {
-                      if (productFilter && !p.productName.toLowerCase().includes(productFilter.toLowerCase())) return false;
-                      if (matrixFilter !== 'ALL' && p.matrixClass !== matrixFilter) return false;
-                      return true;
-                    })
-                    .map((item, idx) => {
-                      const badgeMap = {
-                        Star: { bg: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: '⭐', label: 'Star' },
-                        Workhorse: { bg: 'bg-blue-100 text-blue-800 border-blue-200', icon: '🐎', label: 'Workhorse' },
-                        Puzzle: { bg: 'bg-amber-100 text-amber-800 border-amber-200', icon: '🧩', label: 'Puzzle' },
-                        Dog: { bg: 'bg-rose-100 text-rose-800 border-rose-200', icon: '🐕', label: 'Dog' },
-                      };
-                      const b = badgeMap[item.matrixClass] || badgeMap.Dog;
-                      return (
-                        <tr key={idx} className="hover:bg-ink-50/40 transition">
-                          <td className="py-3 px-3 font-bold text-ink-900">{item.productName}</td>
-                          <td className="py-3 px-3">
-                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${b.bg}`}>
-                              <span>{b.icon}</span> {b.label}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-right font-medium">{item.qty}</td>
-                          <td className="py-3 px-3 text-right font-mono">ETB {fmt(item.avgPrice)}</td>
-                          <td className="py-3 px-3 text-right font-mono text-orange-600">ETB {fmt(item.unitCogs)}</td>
-                          <td className="py-3 px-3 text-right font-mono font-semibold">ETB {fmt(item.revenue)}</td>
-                          <td className={`py-3 px-3 text-right font-mono font-bold ${item.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            ETB {fmt(item.profit)}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono">
-                            <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold ${
-                              item.costRatio <= 35 ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'
-                            }`}>
-                              {pct(item.costRatio)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-indigo-700">
-                            {pct(item.margin)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  {(!plData?.productBreakdown || plData.productBreakdown.length === 0) && (
+                  {filteredMatrixItems.map((item, idx) => {
+                    const badgeMap = {
+                      Star: { bg: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: '⭐', label: 'Star' },
+                      Workhorse: { bg: 'bg-blue-100 text-blue-800 border-blue-200', icon: '🐎', label: 'Workhorse' },
+                      Puzzle: { bg: 'bg-amber-100 text-amber-800 border-amber-200', icon: '🧩', label: 'Puzzle' },
+                      Dog: { bg: 'bg-rose-100 text-rose-800 border-rose-200', icon: '🐕', label: 'Dog' },
+                    };
+                    const b = badgeMap[item.matrixClass] || badgeMap.Dog;
+                    return (
+                      <tr key={idx} className="hover:bg-ink-50/40 transition">
+                        <td className="py-3 px-3 font-bold text-ink-900">{item.productName}</td>
+                        <td className="py-3 px-3">
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${b.bg}`}>
+                            <span>{b.icon}</span> {b.label}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right font-medium">{item.qty}</td>
+                        <td className="py-3 px-3 text-right font-mono">ETB {fmt(item.avgPrice)}</td>
+                        <td className="py-3 px-3 text-right font-mono text-orange-600">ETB {fmt(item.unitCogs)}</td>
+                        <td className="py-3 px-3 text-right font-mono font-semibold">ETB {fmt(item.revenue)}</td>
+                        <td className={`py-3 px-3 text-right font-mono font-bold ${item.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          ETB {fmt(item.profit)}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono">
+                          <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold ${
+                            item.costRatio <= 35 ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'
+                          }`}>
+                            {pct(item.costRatio)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono font-bold text-indigo-700">
+                          {pct(item.margin)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredMatrixItems.length === 0 && (
                     <tr>
                       <td colSpan={9} className="py-8 text-center text-xs text-ink-400">
                         No product breakdown data available.
@@ -816,6 +853,48 @@ export default function Analytics() {
                     </tr>
                   )}
                 </tbody>
+                {filteredMatrixItems.length > 0 && (
+                  <tfoot className="border-t-2 border-ink-300 bg-ink-100/70 font-bold text-ink-900">
+                    <tr>
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center gap-1.5 font-black text-ink-900 text-xs">
+                          <span>TOTAL SUMMARY</span>
+                          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800">
+                            {matrixTotals.count} Products
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3 text-ink-400 font-normal">—</td>
+                      <td className="py-3.5 px-3 text-right font-black text-blue-700 tabular text-sm">
+                        {matrixTotals.totalQty.toLocaleString()}
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-mono text-ink-700">
+                        ETB {fmt(matrixTotals.avgSellingPrice)}
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-mono text-orange-700">
+                        ETB {fmt(matrixTotals.totalCOGS)}
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-mono font-black text-ink-900 text-sm">
+                        ETB {fmt(matrixTotals.totalRevenue)}
+                      </td>
+                      <td className={`py-3.5 px-3 text-right font-mono font-black text-sm ${
+                        matrixTotals.totalProfit >= 0 ? 'text-emerald-700' : 'text-red-700'
+                      }`}>
+                        ETB {fmt(matrixTotals.totalProfit)}
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-mono">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          matrixTotals.overallFoodCostPct <= 35 ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'
+                        }`}>
+                          {pct(matrixTotals.overallFoodCostPct)}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3 text-right font-mono font-black text-indigo-700 text-sm">
+                        {pct(matrixTotals.overallMarginPct)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </Card>
