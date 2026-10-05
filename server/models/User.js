@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema(
       default: 'storekeeper',
     },
     phone: { type: String, trim: true, default: '' },
+    avatar: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

@@ -194,10 +194,23 @@ const Sidebar = ({ open, onClose }) => {
         </nav>
 
         {/* User info */}
-        <div className="mx-3 mb-5 rounded-xl bg-white/10 backdrop-blur-sm p-3 text-xs text-blue-200">
-          Signed in as
-          <p className="mt-0.5 truncate text-sm font-semibold text-white">{user?.name}</p>
-          <p className="capitalize text-blue-300">{user?.role}</p>
+        <div className="mx-3 mb-5 rounded-xl bg-white/10 backdrop-blur-sm p-3 text-xs text-blue-200 flex items-center gap-3">
+          {user?.avatar ? (
+            <img
+              src={user.avatar}
+              alt={user?.name}
+              className="h-9 w-9 rounded-xl object-cover ring-1 ring-white/30 flex-shrink-0"
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 font-bold text-white text-sm flex-shrink-0">
+              {user?.name?.[0]?.toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] text-blue-200/80 leading-none">Signed in as</span>
+            <p className="mt-0.5 truncate text-sm font-semibold text-white leading-tight">{user?.name}</p>
+            <p className="capitalize text-blue-300 text-[11px] leading-tight">{user?.role}</p>
+          </div>
         </div>
       </aside>
     </>

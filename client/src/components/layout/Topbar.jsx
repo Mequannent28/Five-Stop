@@ -73,9 +73,17 @@ const Topbar = ({ onMenuClick, title }) => {
           onClick={() => setMenuOpen((v) => !v)}
           className="flex items-center gap-2.5 rounded-full border border-ink-200/80 bg-white py-1 pl-1 pr-3 shadow-xs hover:border-ink-300 hover:bg-ink-50/60 transition"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-xs">
-            {user?.name?.[0]?.toUpperCase()}
-          </span>
+          {user?.avatar ? (
+            <img
+              src={user.avatar}
+              alt={user?.name}
+              className="h-8 w-8 rounded-full object-cover ring-1 ring-ink-200"
+            />
+          ) : (
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-xs">
+              {user?.name?.[0]?.toUpperCase()}
+            </span>
+          )}
           <div className="hidden text-left sm:block">
             <p className="text-xs font-semibold leading-tight text-ink-800">{user?.name}</p>
             <p className="text-[10px] capitalize leading-none text-ink-400">{user?.role}</p>
@@ -88,9 +96,17 @@ const Topbar = ({ onMenuClick, title }) => {
             {/* User Profile Card Header */}
             <div className="rounded-xl bg-ink-50/70 p-3 mb-1">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 font-bold text-white text-sm shadow-xs">
-                  {user?.name?.[0]?.toUpperCase()}
-                </span>
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user?.name}
+                    className="h-9 w-9 rounded-xl object-cover ring-1 ring-ink-200 shadow-xs"
+                  />
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 font-bold text-white text-sm shadow-xs">
+                    {user?.name?.[0]?.toUpperCase()}
+                  </span>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-ink-900 truncate">{user?.name}</p>
                   <p className="text-[11px] text-ink-400 truncate">{user?.email}</p>

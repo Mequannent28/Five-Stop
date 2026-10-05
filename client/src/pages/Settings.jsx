@@ -17,6 +17,9 @@ import {
   Sparkles,
   Layers,
   Check,
+  Camera,
+  Upload,
+  Trash2,
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -51,6 +54,7 @@ export default function Settings() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Password state
   const [passwordForm, setPasswordForm] = useState({
@@ -133,6 +137,87 @@ export default function Settings() {
       setProfileError(err.response?.data?.message || 'Failed to update profile.');
     } finally {
       setProfileSaving(false);
+    }
+  };
+
+  // Handle Profile Photo Upload
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setProfileError('Please select a valid image file (PNG, JPG, or WEBP).');
+      return;
+    }
+
+    setAvatarUploading(true);
+    setProfileError('');
+    setProfileSuccess('');
+
+    try {
+      // Compress image client-side to max 500x500 JPEG
+      const compressedBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target.result;
+          img.onload = () => {
+            const maxWidth = 500;
+            const maxHeight = 500;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              }
+            } else {
+              if (height > maxHeight) {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          };
+          img.onerror = reject;
+        };
+        reader.onerror = reject;
+      });
+
+      const res = await api.put('/auth/profile', { avatar: compressedBase64 });
+      updateUser(res.data);
+      setProfileSuccess('Profile photo updated successfully!');
+      setTimeout(() => setProfileSuccess(''), 4000);
+    } catch (err) {
+      setProfileError(err.response?.data?.message || 'Failed to upload profile photo.');
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  // Handle Remove Profile Photo
+  const handleRemoveAvatar = async () => {
+    if (!window.confirm('Are you sure you want to remove your profile photo?')) return;
+    setAvatarUploading(true);
+    setProfileError('');
+    try {
+      const res = await api.put('/auth/profile', { avatar: '' });
+      updateUser(res.data);
+      setProfileSuccess('Profile photo removed.');
+      setTimeout(() => setProfileSuccess(''), 4000);
+    } catch (err) {
+      setProfileError(err.response?.data?.message || 'Failed to remove profile photo.');
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -261,13 +346,63 @@ export default function Settings() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Identity Card */}
           <Card className="lg:col-span-1 flex flex-col items-center text-center p-6">
-            <div className="relative mb-4">
-              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-2xl font-black text-white shadow-md">
-                {user?.name?.[0]?.toUpperCase() || 'U'}
+            {/* Avatar with Photo Upload */}
+            <div className="relative mb-3 group">
+              <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-3xl font-black text-white shadow-md overflow-hidden ring-4 ring-white border border-ink-100">
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user?.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  user?.name?.[0]?.toUpperCase() || 'U'
+                )}
               </div>
-              <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow">
-                <Sparkles size={13} className="text-brass-500" />
-              </span>
+
+              {/* Upload Badge Button */}
+              <label
+                className={`absolute -bottom-1 -right-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white shadow-md ring-2 ring-white transition hover:bg-blue-700 hover:scale-105 ${
+                  avatarUploading ? 'animate-pulse pointer-events-none opacity-80' : ''
+                }`}
+                title="Upload profile photo"
+              >
+                <Camera size={15} />
+                <input
+                  type="file"
+                  accept="image/png, image/jpeg, image/webp"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                  disabled={avatarUploading}
+                />
+              </label>
+            </div>
+
+            {/* Photo Action Buttons */}
+            <div className="flex items-center gap-2 mb-2">
+              <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 transition">
+                <Upload size={12} className="text-blue-600" />
+                {avatarUploading ? 'Uploading...' : user?.avatar ? 'Change Photo' : 'Upload Photo'}
+                <input
+                  type="file"
+                  accept="image/png, image/jpeg, image/webp"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                  disabled={avatarUploading}
+                />
+              </label>
+
+              {user?.avatar && (
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  disabled={avatarUploading}
+                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50/50 px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-100 transition"
+                  title="Remove profile photo"
+                >
+                  <Trash2 size={11} /> Remove
+                </button>
+              )}
             </div>
 
             <h3 className="font-display text-lg font-bold text-ink-900">{user?.name}</h3>

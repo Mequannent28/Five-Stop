@@ -19,6 +19,8 @@ const registerUser = asyncHandler(async (req, res) => {
     name: user.name,
     email: user.email,
     role: user.role,
+    phone: user.phone || '',
+    avatar: user.avatar || '',
     token: generateToken(user._id),
   });
 });
@@ -43,6 +45,8 @@ const loginUser = asyncHandler(async (req, res) => {
     name: user.name,
     email: user.email,
     role: user.role,
+    phone: user.phone || '',
+    avatar: user.avatar || '',
     token: generateToken(user._id),
   });
 });
@@ -69,7 +73,7 @@ const verifyPassword = asyncHandler(async (req, res) => {
   res.json({ valid: true, userId: user._id, name: user.name, role: user.role });
 });
 
-// @desc  Update profile of current user (name, email, phone)
+// @desc  Update profile of current user (name, email, phone, avatar)
 // PUT /api/auth/profile
 const updateProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
@@ -89,6 +93,7 @@ const updateProfile = asyncHandler(async (req, res) => {
 
   if (req.body.name) user.name = req.body.name;
   if (req.body.phone !== undefined) user.phone = req.body.phone;
+  if (req.body.avatar !== undefined) user.avatar = req.body.avatar;
 
   const updated = await user.save();
   res.json({
@@ -97,6 +102,7 @@ const updateProfile = asyncHandler(async (req, res) => {
     email: updated.email,
     role: updated.role,
     phone: updated.phone || '',
+    avatar: updated.avatar || '',
     token: generateToken(updated._id),
   });
 });
