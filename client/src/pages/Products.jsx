@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Plus, Search, Pencil, Trash2, ChefHat, X, Upload, Download } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, ChefHat, X, Upload, Download, Zap } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
@@ -65,6 +65,18 @@ const Products = () => {
 
   // ── CRUD ──
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModalOpen(true); };
+
+  // Auto-generate next sequential P-XXXX code
+  const generateCode = () => {
+    const nums = products
+      .map(p => {
+        const match = String(p.code || '').match(/^P-?(\d+)$/i);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => n > 0);
+    const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    setForm(f => ({ ...f, code: `P-${String(next).padStart(4, '0')}` }));
+  };
 
   const openEdit = (p) => {
     setEditing(p);
@@ -423,9 +435,23 @@ const Products = () => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-ink-600">Code</label>
-              <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
-                placeholder="e.g. P-0013"
-                className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value })}
+                  placeholder="e.g. P-0013"
+                  className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={generateCode}
+                  title="Auto-generate next code"
+                  className="flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition whitespace-nowrap"
+                >
+                  <Zap size={13} className="text-amber-500" />
+                  Auto
+                </button>
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink-600">UOM</label>

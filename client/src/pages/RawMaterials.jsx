@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Plus, Search, Pencil, Trash2, Upload, Download, X } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Upload, Download, X, Zap } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/ui/DataTable';
@@ -35,6 +35,18 @@ const RawMaterials = () => {
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModalOpen(true); };
   const openEdit = (m) => { setEditing(m); setForm(m); setModalOpen(true); };
+
+  // Auto-generate next sequential RM-XXXX code
+  const generateCode = () => {
+    const nums = materials
+      .map(m => {
+        const match = String(m.code || '').match(/^RM-?(\d+)$/i);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => n > 0);
+    const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    setForm(f => ({ ...f, code: `RM-${String(next).padStart(4, '0')}` }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -177,9 +189,23 @@ const RawMaterials = () => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-ink-600">Code</label>
-              <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })}
-                placeholder="e.g. RM-0001"
-                className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brass-400" />
+              <div className="flex items-center gap-1.5">
+                <input
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value })}
+                  placeholder="e.g. RM-0001"
+                  className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brass-400"
+                />
+                <button
+                  type="button"
+                  onClick={generateCode}
+                  title="Auto-generate next code"
+                  className="flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition whitespace-nowrap"
+                >
+                  <Zap size={13} className="text-amber-500" />
+                  Auto
+                </button>
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink-600">Name</label>
