@@ -11,10 +11,13 @@ import Suppliers from './pages/Suppliers';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Products from './pages/Products';
+import Settings from './pages/Settings';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   return (
-    <Routes>
+    <ErrorBoundary>
+      <Routes>
       <Route path="/login" element={<Login />} />
 
       <Route
@@ -76,8 +79,11 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/profile" element={<Settings />} />
       </Route>
     </Routes>
+    </ErrorBoundary>
   );
 }
 

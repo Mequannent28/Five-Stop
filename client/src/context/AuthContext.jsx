@@ -31,10 +31,16 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const updateUser = (updatedData) => {
+    const newUser = { ...user, ...updatedData };
+    localStorage.setItem('hotelStockAuth', JSON.stringify(newUser));
+    setUser(newUser);
+  };
+
   const hasRole = (...roles) => user && roles.includes(user.role);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, hasRole }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser, hasRole }}>
       {children}
     </AuthContext.Provider>
   );

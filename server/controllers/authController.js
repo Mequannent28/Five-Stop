@@ -69,4 +69,69 @@ const verifyPassword = asyncHandler(async (req, res) => {
   res.json({ valid: true, userId: user._id, name: user.name, role: user.role });
 });
 
-module.exports = { registerUser, loginUser, getMe, verifyPassword };
+// @desc  Update profile of current user (name, email, phone)
+// PUT /api/auth/profile
+const updateProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  if (req.body.email && req.body.email.toLowerCase() !== user.email) {
+    const emailExists = await User.findOne({ email: req.body.email.toLowerCase(), _id: { $ne: user._id } });
+    if (emailExists) {
+      res.status(400);
+      throw new Error('This email is already in use by another account');
+    }
+    user.email = req.body.email.toLowerCase();
+  }
+
+  if (req.body.name) user.name = req.body.name;
+  if (req.body.phone !== undefined) user.phone = req.body.phone;
+
+  const updated = await user.save();
+  res.json({
+    _id: updated._id,
+    name: updated.name,
+    email: updated.email,
+    role: updated.role,
+    phone: updated.phone || '',
+    token: generateToken(updated._id),
+  });
+});
+
+// @desc  Change password of current user
+// PUT /api/auth/password
+const updatePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    res.status(400);
+    throw new Error('Both current and new password are required');
+  }
+
+  if (newPassword.length < 6) {
+    res.status(400);
+    throw new Error('New password must be at least 6 characters');
+  }
+
+  const user = await User.findById(req.user._id).select('+password');
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  const match = await user.matchPassword(currentPassword);
+  if (!match) {
+    res.status(400);
+    throw new Error('Current password is incorrect');
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  res.json({ message: 'Password updated successfully' });
+});
+
+module.exports = { registerUser, loginUser, getMe, verifyPassword, updateProfile, updatePassword };
+

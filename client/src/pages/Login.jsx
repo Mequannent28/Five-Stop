@@ -33,7 +33,7 @@ const Login = () => {
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brass-400 text-ink-900">
             <Warehouse size={26} strokeWidth={2.25} />
           </div>
-          <h1 className="font-display text-2xl text-white">Cresthaven Stock</h1>
+          <h1 className="font-display text-2xl text-white">Five Stop</h1>
           <p className="mt-1 text-sm text-ink-300">Hotel inventory &amp; supply control</p>
         </div>
 

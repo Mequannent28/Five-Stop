@@ -5,7 +5,7 @@ import {
   ArrowLeftRight, FileBarChart, Users, UtensilsCrossed,
   ChevronDown, ChevronRight,
   ShoppingBag, CreditCard, Leaf, TrendingUp, Flame, TrendingDown,
-  BarChart2, Calendar, PackageOpen,
+  BarChart2, Calendar, PackageOpen, Settings as SettingsIcon,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -43,7 +43,6 @@ const NAV_BEFORE = [
 const NAV_AFTER = [
   { to: '/purchases', label: 'Purchases',     icon: ShoppingCart, roles: ['admin','manager'] },
   { to: '/suppliers', label: 'Suppliers',     icon: Truck,        roles: ['admin','manager'] },
-  { to: '/users',     label: 'Staff Accounts',icon: Users,        roles: ['admin'] },
 ];
 
 // ── Reusable sub-item link ────────────────────────────────────────────
@@ -184,6 +183,12 @@ const Sidebar = ({ open, onClose }) => {
               <Users size={18} strokeWidth={2} /> Staff Accounts
             </NavLink>
           )}
+
+          {/* Settings */}
+          <NavLink to="/settings" onClick={onClose}
+            className={({ isActive }) => linkCls(isActive)}>
+            <SettingsIcon size={18} strokeWidth={2} /> Settings
+          </NavLink>
         </nav>
 
         {/* User info */}

@@ -25,7 +25,7 @@ const emptyForm = key => ({ voucherType: key, voucherNo: '', supplier: '', reaso
 
 // ── Component ─────────────────────────────────────────────────────────
 export default function StockTransactions({ defaultVoucher } = {}) {
-  const { hasRole } = useAuth();
+  const { user, hasRole } = useAuth();
   const canEdit   = hasRole('admin', 'manager', 'storekeeper');
   const canDelete = hasRole('admin', 'manager');
 
@@ -52,13 +52,6 @@ export default function StockTransactions({ defaultVoucher } = {}) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailTxn,  setDetailTxn]  = useState(null);
 
-  // Auto-open form when arriving via a specific voucher sidebar link
-  useEffect(() => {
-    if (defaultVoucher && voucherByKey[defaultVoucher]) {
-      openForm(defaultVoucher);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultVoucher]);
 
   const load = useCallback(() => {
     const params = filterType ? { voucherType: filterType } : {};

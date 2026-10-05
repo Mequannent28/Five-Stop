@@ -34,6 +34,7 @@ app.use('/api/transactions', require('./routes/transactionRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
+app.use('/api/settings', require('./routes/settingRoutes'));
 
 const path = require('path');
 
