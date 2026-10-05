@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Plus, Search, Pencil, Trash2, Upload, Download, X } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -6,6 +6,7 @@ import DataTable from '../components/ui/DataTable';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
+import ExportDropdown from '../components/ui/ExportDropdown';
 
 const emptyForm = { name: '', category: '', unit: '', currentStock: 0, reorderLevel: 10, unitCost: 0, storeLocation: 'Main Store' };
 
@@ -104,6 +105,26 @@ const RawMaterials = () => {
       : []),
   ];
 
+  const exportData = useMemo(() => {
+    return materials.map(m => ({
+      'Material Name': m.name,
+      'Category': m.category || 'General',
+      'In Stock': `${m.currentStock} ${m.unit || ''}`.trim(),
+      'Reorder Level': `${m.reorderLevel} ${m.unit || ''}`.trim(),
+      'Unit Cost (ETB)': Number(m.unitCost || 0).toFixed(2),
+      'Status': m.status || (m.currentStock <= m.reorderLevel ? 'Low Stock' : 'Optimal'),
+    }));
+  }, [materials]);
+
+  const pdfColumns = [
+    { header: 'Material Name', accessor: 'Material Name' },
+    { header: 'Category', accessor: 'Category' },
+    { header: 'In Stock', accessor: 'In Stock', align: 'right' },
+    { header: 'Reorder Level', accessor: 'Reorder Level', align: 'right' },
+    { header: 'Unit Cost (ETB)', accessor: 'Unit Cost (ETB)', align: 'right' },
+    { header: 'Status', accessor: 'Status', align: 'center' },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -116,20 +137,23 @@ const RawMaterials = () => {
             className="w-full rounded-lg border border-ink-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-brass-400"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={handleExport} title="Export to Excel">
-            <Download size={15} /> Export
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Export & Import (Excel, PDF, CSV, Print) */}
+          <ExportDropdown
+            data={exportData}
+            fileName="raw_materials"
+            pdfTitle="Raw Materials Inventory List"
+            pdfColumns={pdfColumns}
+            showImport={canEdit}
+            onImport={() => importRef.current?.click()}
+            importLabel="Import Excel"
+          />
+          <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
+
           {canEdit && (
-            <>
-              <input ref={importRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
-              <Button variant="ghost" onClick={() => importRef.current.click()}>
-                <Upload size={15} /> Import
-              </Button>
-              <Button variant="brass" onClick={openCreate}>
-                <Plus size={16} /> Add material
-              </Button>
-            </>
+            <Button variant="brass" onClick={openCreate}>
+              <Plus size={16} /> Add material
+            </Button>
           )}
         </div>
       </div>

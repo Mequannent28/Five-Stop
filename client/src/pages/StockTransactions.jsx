@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus, Trash2, Search, ArrowDownCircle, ArrowUpCircle,
   ShoppingBag, CreditCard, Flame, TrendingDown, TrendingUp, Leaf, X, Eye,
@@ -8,6 +9,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import WorkflowBadge from '../components/ui/WorkflowBadge';
 import ApproveModal, { TrailTimeline } from '../components/ui/ApproveModal';
+import ExportDropdown from '../components/ui/ExportDropdown';
 import { useAuth } from '../context/AuthContext';
 
 // ── Voucher config ────────────────────────────────────────────────────
@@ -26,6 +28,7 @@ const emptyForm = key => ({ voucherType: key, voucherNo: '', supplier: '', reaso
 // ── Component ─────────────────────────────────────────────────────────
 export default function StockTransactions({ defaultVoucher } = {}) {
   const { user, hasRole } = useAuth();
+  const navigate = useNavigate();
   const canEdit   = hasRole('admin', 'manager', 'storekeeper');
   const canDelete = hasRole('admin', 'manager');
 
@@ -52,7 +55,6 @@ export default function StockTransactions({ defaultVoucher } = {}) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailTxn,  setDetailTxn]  = useState(null);
 
-
   const load = useCallback(() => {
     const params = filterType ? { voucherType: filterType } : {};
     api.get('/transactions', { params }).then(r => setTransactions(r.data));
@@ -69,6 +71,43 @@ export default function StockTransactions({ defaultVoucher } = {}) {
     const mat = t.material?.name ?? t.items?.[0]?.material?.name ?? '';
     return (mat + (t.voucherNo ?? '') + (t.supplier?.name ?? '')).toLowerCase().includes(search.toLowerCase());
   });
+
+  // Export Data for Excel & CSV
+  const exportData = useMemo(() => {
+    return displayed.map((t) => {
+      const v = voucherByKey[t.voucherType];
+      const matNames = t.items && t.items.length > 0
+        ? t.items.map(i => `${i.material?.name ?? '—'} ×${i.quantity}`).join(', ')
+        : `${t.material?.name ?? '—'}${t.quantity ? ' ×' + t.quantity : ''}`;
+
+      return {
+        'Date': new Date(t.date || t.createdAt).toLocaleString(),
+        'Voucher No': t.voucherNo || '—',
+        'Voucher Type': v?.label || t.voucherType || '—',
+        'Direction': t.type === 'in' ? 'IN' : 'OUT',
+        'Material(s)': matNames,
+        'Supplier': t.supplier?.name || '—',
+        'Total (ETB)': Number(t.totalAmount || 0).toFixed(2),
+        'Status': (t.status || 'pending').toUpperCase(),
+        'Recorded By': t.performedBy?.name || 'System',
+        'Reference': t.reference || '',
+        'Notes': t.notes || '',
+      };
+    });
+  }, [displayed]);
+
+  // Export Columns for PDF
+  const pdfColumns = [
+    { header: 'Date', accessor: 'Date' },
+    { header: 'Voucher No', accessor: 'Voucher No' },
+    { header: 'Type', accessor: 'Voucher Type' },
+    { header: 'Direction', accessor: 'Direction', align: 'center' },
+    { header: 'Material(s)', accessor: 'Material(s)' },
+    { header: 'Supplier', accessor: 'Supplier' },
+    { header: 'Total (ETB)', accessor: 'Total (ETB)', align: 'right' },
+    { header: 'Status', accessor: 'Status', align: 'center' },
+    { header: 'By', accessor: 'Recorded By' },
+  ];
 
   const openForm = key => { setActiveV(voucherByKey[key]); setForm(emptyForm(key)); setError(''); setModalOpen(true); };
   const addItem    = ()          => setForm(f => ({ ...f, items: [...f.items, emptyItem()] }));
@@ -168,7 +207,18 @@ export default function StockTransactions({ defaultVoucher } = {}) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Export (Excel, PDF, CSV, Print) & Import */}
+          <ExportDropdown
+            data={exportData}
+            fileName={headingV ? `stock_${headingV.key}` : 'all_stock_movements'}
+            pdfTitle={headingV ? headingV.fullLabel : 'All Stock Movements Report'}
+            pdfColumns={pdfColumns}
+            showImport={true}
+            onImport={() => navigate('/sales-import')}
+            importLabel="Import Excel / POS"
+          />
+
           {/* Search */}
           <div className="relative">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-300" />
@@ -176,7 +226,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search…"
-              className="rounded-lg border border-ink-200 py-2 pl-8 pr-3 text-sm outline-none focus:border-blue-500 w-44"
+              className="rounded-lg border border-ink-200 py-2 pl-8 pr-3 text-sm outline-none focus:border-blue-500 w-40 sm:w-48"
             />
           </div>
 

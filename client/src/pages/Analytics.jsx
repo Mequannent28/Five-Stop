@@ -4,6 +4,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
+import ExportDropdown from '../components/ui/ExportDropdown';
 import {
   TrendingUp, TrendingDown, DollarSign, PieChart as PieChartIcon,
   BarChart3, Calendar, Layers, AlertTriangle, CheckCircle2,
@@ -106,6 +107,51 @@ export default function Analytics() {
   const fmt = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const pct = (n) => `${(Number(n) || 0).toFixed(1)}%`;
 
+  // ── Export data by active tab ──
+  const exportData = useMemo(() => {
+    if (activeTab === 'pl' && plData) {
+      return (plData.products || []).map(p => ({
+        'Product':      p.name,
+        'Units Sold':   p.unitsSold ?? 0,
+        'Revenue (ETB)': Number(p.revenue || 0).toFixed(2),
+        'COGS (ETB)':   Number(p.cogs || 0).toFixed(2),
+        'Gross Profit (ETB)': Number((p.revenue || 0) - (p.cogs || 0)).toFixed(2),
+        'Food Cost %':  Number(p.foodCostPct || 0).toFixed(1) + '%',
+        'Margin %':     Number(p.marginPct || 0).toFixed(1) + '%',
+      }));
+    }
+    if (activeTab === 'consumption' && consumptionData) {
+      return (consumptionData.materials || []).map(m => ({
+        'Material':       m.name,
+        'Unit':           m.unit || '',
+        'Total Consumed': Number(m.totalConsumed || 0).toFixed(3),
+        'Total Cost (ETB)': Number(m.totalCost || 0).toFixed(2),
+        'Avg per Day':    Number(m.avgPerDay || 0).toFixed(3),
+      }));
+    }
+    if (activeTab === 'prediction' && predictionData) {
+      return (predictionData.predictions || []).map(p => ({
+        'Material':         p.name,
+        'Unit':             p.unit || '',
+        'Current Stock':    Number(p.currentStock || 0).toFixed(2),
+        'Avg Daily Use':    Number(p.avgDailyUse || 0).toFixed(3),
+        'Days Remaining':   Number(p.daysRemaining || 0).toFixed(1),
+        'Reorder Qty':      Number(p.reorderQty || 0).toFixed(2),
+        'Status':           p.status || '',
+      }));
+    }
+    if (activeTab === 'records') {
+      return recordsData.map(r => ({
+        'Date':           new Date(r.importedAt || r.createdAt).toLocaleDateString(),
+        'Product':        r.productName || '—',
+        'Units Sold':     r.unitsSold ?? 0,
+        'Revenue (ETB)':  Number(r.revenue || 0).toFixed(2),
+        'Imported By':    r.importedBy?.name || '—',
+      }));
+    }
+    return [];
+  }, [activeTab, plData, consumptionData, predictionData, recordsData]);
+
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ── */}
@@ -161,6 +207,16 @@ export default function Analytics() {
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Refresh
           </Button>
+          <ExportDropdown
+            data={exportData}
+            fileName={`analytics_${activeTab}`}
+            sheetName={activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+            pdfTitle={`Analytics — ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
+            pdfColumns={exportData[0]
+              ? Object.keys(exportData[0]).map(k => ({ header: k, accessor: k }))
+              : []
+            }
+          />
         </div>
       </div>
 

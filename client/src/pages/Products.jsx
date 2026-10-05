@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Plus, Search, Pencil, Trash2, ChefHat, X, Upload, Download } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
+import ExportDropdown from '../components/ui/ExportDropdown';
 
 const emptyForm = {
   code: '',
@@ -219,6 +220,29 @@ const Products = () => {
   const recipeCost = (p) =>
     p.ingredients?.reduce((sum, ing) => sum + (ing.material?.unitCost ?? 0) * ing.quantity, 0) ?? 0;
 
+  const exportData = useMemo(() => {
+    return products.map(p => ({
+      'Code': p.code || '—',
+      'Product Name': p.name,
+      'Department': p.parentCategory || 'FOOD',
+      'Category': p.category || 'General',
+      'Unit (UOM)': p.uom || 'Pcs',
+      'Selling Price (ETB)': Number(p.sellingPrice || 0).toFixed(2),
+      'Ingredients Count': p.ingredients?.length || 0,
+      'Active': p.isActive !== false ? 'Yes' : 'No',
+    }));
+  }, [products]);
+
+  const pdfColumns = [
+    { header: 'Code', accessor: 'Code' },
+    { header: 'Product Name', accessor: 'Product Name' },
+    { header: 'Department', accessor: 'Department' },
+    { header: 'Category', accessor: 'Category' },
+    { header: 'Unit', accessor: 'Unit (UOM)', align: 'center' },
+    { header: 'Selling Price (ETB)', accessor: 'Selling Price (ETB)', align: 'right' },
+    { header: 'Ingredients', accessor: 'Ingredients Count', align: 'center' },
+  ];
+
   return (
     <div className="space-y-4">
       {/* ── Toolbar ── */}
@@ -242,15 +266,23 @@ const Products = () => {
               <Trash2 size={15} /> Delete {selected.size} selected
             </button>
           )}
-          <Button variant="ghost" onClick={handleExport}><Download size={15} /> Export</Button>
+
+          {/* Export & Import (Excel, PDF, CSV, Print) */}
+          <ExportDropdown
+            data={exportData}
+            fileName="products_catalog"
+            pdfTitle="Products & Recipes Catalog"
+            pdfColumns={pdfColumns}
+            showImport={canEdit}
+            onImport={() => importRef.current?.click()}
+            importLabel="Import Excel"
+          />
+          <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
+
           {canEdit && (
-            <>
-              <input ref={importRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
-              <Button variant="ghost" onClick={() => importRef.current.click()}><Upload size={15} /> Import</Button>
-              <Button style={{ background: 'linear-gradient(135deg,#1a56db,#0d2d80)', color: 'white' }} onClick={openCreate}>
-                <Plus size={16} /> Add product
-              </Button>
-            </>
+            <Button style={{ background: 'linear-gradient(135deg,#1a56db,#0d2d80)', color: 'white' }} onClick={openCreate}>
+              <Plus size={16} /> Add product
+            </Button>
           )}
         </div>
       </div>

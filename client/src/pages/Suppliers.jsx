@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/ui/DataTable';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
+import ExportDropdown from '../components/ui/ExportDropdown';
 
 const emptyForm = { name: '', contactPerson: '', phone: '', email: '', category: '', address: '' };
 
@@ -37,6 +38,26 @@ const Suppliers = () => {
     load();
   };
 
+  const exportData = useMemo(() => {
+    return suppliers.map(s => ({
+      'Supplier Name': s.name,
+      'Category': s.category || 'General',
+      'Contact Person': s.contactPerson || '—',
+      'Phone': s.phone || '—',
+      'Email': s.email || '—',
+      'Address': s.address || '—',
+    }));
+  }, [suppliers]);
+
+  const pdfColumns = [
+    { header: 'Supplier Name', accessor: 'Supplier Name' },
+    { header: 'Category', accessor: 'Category' },
+    { header: 'Contact Person', accessor: 'Contact Person' },
+    { header: 'Phone', accessor: 'Phone' },
+    { header: 'Email', accessor: 'Email' },
+    { header: 'Address', accessor: 'Address' },
+  ];
+
   const columns = [
     { key: 'name', header: 'Supplier' },
     { key: 'category', header: 'Category' },
@@ -60,7 +81,15 @@ const Suppliers = () => {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search suppliers…"
             className="w-full rounded-lg border border-ink-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-brass-400" />
         </div>
-        <Button variant="brass" onClick={openCreate}><Plus size={16} /> Add supplier</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <ExportDropdown
+            data={exportData}
+            fileName="suppliers_directory"
+            pdfTitle="Hotel Suppliers Directory"
+            pdfColumns={pdfColumns}
+          />
+          <Button variant="brass" onClick={openCreate}><Plus size={16} /> Add supplier</Button>
+        </div>
       </div>
 
       <DataTable columns={columns} data={suppliers} emptyMessage="No suppliers yet. Add your first one." />

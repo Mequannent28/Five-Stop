@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronRight, Eye } from 'lucide-react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Eye, X } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import api from '../api/axios';
 import DataTable from '../components/ui/DataTable';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import WorkflowBadge from '../components/ui/WorkflowBadge';
 import ApproveModal, { TrailTimeline } from '../components/ui/ApproveModal';
+import ExportDropdown from '../components/ui/ExportDropdown';
 import { useAuth } from '../context/AuthContext';
 
 const emptyItem = { material: '', quantity: 1, unitCost: 0 };
@@ -34,6 +36,8 @@ export default function Purchases() {
   const [purchases,  setPurchases]  = useState([]);
   const [suppliers,  setSuppliers]  = useState([]);
   const [materials,  setMaterials]  = useState([]);
+  const [importResult, setImportResult] = useState(null);
+  const importRef = useRef();
 
   // Create modal
   const [createOpen,    setCreateOpen]    = useState(false);
@@ -60,6 +64,64 @@ export default function Purchases() {
     api.get('/suppliers').then(r => setSuppliers(r.data));
     api.get('/materials').then(r => setMaterials(r.data));
   }, []);
+
+  // ── Export data ──
+  const exportData = useMemo(() => {
+    return purchases.map(p => ({
+      'Date':          new Date(p.purchaseDate).toLocaleDateString(),
+      'Invoice No':    p.invoiceNumber || '—',
+      'Supplier':      p.supplier?.name || '—',
+      'Items Count':   p.items?.length ?? 0,
+      'Items Detail':  p.items?.map(i => `${i.material?.name ?? '?'} ×${i.quantity}`).join(', ') || '—',
+      'Total (ETB)':   Number(p.totalAmount || 0).toFixed(2),
+      'Status':        p.status,
+    }));
+  }, [purchases]);
+
+  const pdfColumns = [
+    { header: 'Date',         accessor: 'Date' },
+    { header: 'Invoice No',   accessor: 'Invoice No' },
+    { header: 'Supplier',     accessor: 'Supplier' },
+    { header: 'Items',        accessor: 'Items Detail' },
+    { header: 'Total (ETB)',  accessor: 'Total (ETB)', align: 'right' },
+    { header: 'Status',       accessor: 'Status', align: 'center' },
+  ];
+
+  // ── Import from Excel / CSV ──
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const wb  = XLSX.read(ev.target.result, { type: 'binary' });
+        const ws  = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        let created = 0;
+        let errors  = 0;
+        for (const row of rows) {
+          try {
+            const supplierName = String(row['Supplier'] || row['supplier'] || '').trim();
+            const invoice      = String(row['Invoice No'] || row['invoiceNumber'] || '').trim();
+            const found = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
+            if (!found) { errors++; continue; }
+            await api.post('/purchases', {
+              supplier:      found._id,
+              invoiceNumber: invoice,
+              items:         [], // imported as empty draft
+            });
+            created++;
+          } catch { errors++; }
+        }
+        setImportResult({ message: `Import complete — ${created} created, ${errors} skipped.` });
+        load();
+      } catch (err) {
+        setImportResult({ message: 'Import failed: invalid file format.' });
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
 
   // ── Create purchase ──
   const openCreate = () => {
@@ -160,7 +222,22 @@ export default function Purchases() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ExportDropdown
+          data={exportData}
+          fileName="purchases_export"
+          sheetName="Purchases"
+          pdfTitle="Purchase Orders Report"
+          pdfColumns={pdfColumns}
+          pdfSummary={[
+            { label: 'Total Purchases', value: purchases.length },
+            { label: 'Total Value (ETB)', value: purchases.reduce((s, p) => s + (p.totalAmount || 0), 0).toFixed(2) },
+          ]}
+          showImport={true}
+          onImport={() => importRef.current?.click()}
+          importLabel="Import Excel"
+        />
+        <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
         <Button
           style={{ background: 'linear-gradient(135deg,#1a56db,#0d2d80)', color: 'white' }}
           onClick={openCreate}
@@ -168,6 +245,15 @@ export default function Purchases() {
           <Plus size={16} /> Record purchase
         </Button>
       </div>
+
+      {importResult && (
+        <div className="flex items-start justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <p className="font-medium">{importResult.message}</p>
+          <button onClick={() => setImportResult(null)} className="ml-4 text-blue-500 hover:text-blue-700">
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       <DataTable columns={columns} data={purchases} emptyMessage="No purchases recorded yet." />
 

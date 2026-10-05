@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Printer, ShoppingBag, CreditCard, Flame, TrendingDown, TrendingUp,
   Leaf, LayoutDashboard, Boxes, ShoppingCart, ArrowDownCircle, ArrowUpCircle,
@@ -8,6 +8,7 @@ import api from '../api/axios';
 import Card from '../components/ui/Card';
 import DataTable from '../components/ui/DataTable';
 import Button from '../components/ui/Button';
+import ExportDropdown from '../components/ui/ExportDropdown';
 import { useAuth } from '../context/AuthContext';
 
 // ── Tab config ────────────────────────────────────────────────────────
@@ -156,6 +157,42 @@ export default function Reports({ defaultTab } = {}) {
   const colorCls = TAB_COLORS[tab] || 'text-ink-700 bg-ink-100';
   const printDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
+  // Build flat export data from whatever is currently loaded
+  const exportData = useMemo(() => {
+    if (!data) return [];
+    if (tab === 'stock' && data.materials) {
+      return data.materials.map(m => ({
+        'Material':      m.name,
+        'Category':      m.category || '',
+        'In Stock':      `${m.currentStock} ${m.unit}`,
+        'Reorder At':    `${m.reorderLevel} ${m.unit}`,
+        'Unit Cost (ETB)': Number(m.unitCost || 0).toFixed(2),
+        'Value (ETB)':   (m.currentStock * m.unitCost).toFixed(2),
+        'Status':        m.status,
+      }));
+    }
+    if (tab === 'purchases' && data.purchases) {
+      return data.purchases.map(p => ({
+        'Date':         new Date(p.purchaseDate).toLocaleDateString(),
+        'Supplier':     p.supplier?.name || '—',
+        'Items':        p.items?.length ?? 0,
+        'Total (ETB)':  Number(p.totalAmount || 0).toFixed(2),
+        'Status':       p.status,
+      }));
+    }
+    // voucher / daily tabs — transactions array
+    const txns = data.transactions || [];
+    return txns.map(t => ({
+      'Date':       new Date(t.date).toLocaleString(),
+      'Voucher':    t.voucherNo || '—',
+      'Type':       VOUCHER_LABELS[t.voucherType] || t.voucherType || '—',
+      'Material':   t.material?.name || t.items?.[0]?.material?.name || '—',
+      'Qty':        t.quantity ?? '',
+      'Total (ETB)': Number(t.totalAmount || 0).toFixed(2),
+      'By':         t.performedBy?.name || '—',
+    }));
+  }, [data, tab]);
+
   return (
     <div id="print-area" className="space-y-4">
 
@@ -170,9 +207,21 @@ export default function Reports({ defaultTab } = {}) {
         <h1 className="text-lg font-bold text-ink-900">
           {currentTab?.label ?? 'Reports'}
         </h1>
-        <Button variant="ghost" className="border border-ink-200" onClick={() => window.print()}>
-          <Printer size={15} /> Print
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportDropdown
+            data={exportData}
+            fileName={`report_${tab}`}
+            sheetName={currentTab?.label || 'Report'}
+            pdfTitle={currentTab?.label || 'Report'}
+            pdfColumns={exportData[0]
+              ? Object.keys(exportData[0]).map(k => ({ header: k, accessor: k }))
+              : []
+            }
+          />
+          <Button variant="ghost" className="border border-ink-200" onClick={() => window.print()}>
+            <Printer size={15} /> Print
+          </Button>
+        </div>
       </div>
 
       {/* ── Date filter bar ── */}
