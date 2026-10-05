@@ -9,7 +9,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, PieChart as PieChartIcon,
   BarChart3, Calendar, Layers, AlertTriangle, CheckCircle2,
   Package, Search, RefreshCw, Eye, Trash2, ArrowUpRight,
-  Flame, Sparkles, Filter, ChevronRight, ChevronDown, Download
+  Flame, Sparkles, Filter, ChevronRight, ChevronLeft, ChevronDown, Download
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -18,7 +18,9 @@ import {
 
 export default function Analytics() {
   const [activeTab, setActiveTab] = useState('pl'); // 'pl' | 'consumption' | 'prediction' | 'records'
-  const [dateRange, setDateRange] = useState('30d'); // 'today' | '7d' | '30d' | 'all' | 'custom'
+  const [dateRange, setDateRange] = useState('30d'); // 'daily' | 'monthly' | '7d' | '30d' | 'all' | 'custom'
+  const [selectedDay, setSelectedDay] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,15 +38,40 @@ export default function Analytics() {
   const [matrixFilter, setMatrixFilter] = useState('ALL'); // 'ALL' | 'Star' | 'Workhorse' | 'Puzzle' | 'Dog'
   const [ingredientFilter, setIngredientFilter] = useState('');
 
+  // Stepping helpers for date navigator
+  const handleStepDay = (delta) => {
+    const base = selectedDay ? new Date(selectedDay + 'T00:00:00') : new Date();
+    base.setDate(base.getDate() + delta);
+    setSelectedDay(base.toISOString().slice(0, 10));
+    setDateRange('daily');
+  };
+
+  const handleStepMonth = (delta) => {
+    const baseStr = selectedMonth || new Date().toISOString().slice(0, 7);
+    const [y, m] = baseStr.split('-').map(Number);
+    const base = new Date(y, m - 1 + delta, 1);
+    const nextY = base.getFullYear();
+    const nextM = String(base.getMonth() + 1).padStart(2, '0');
+    setSelectedMonth(`${nextY}-${nextM}`);
+    setDateRange('monthly');
+  };
+
   // Calculate actual from/to dates based on dateRange preset
   const dateParams = useMemo(() => {
     const now = new Date();
     let from = null;
     let to = null;
 
-    if (dateRange === 'today') {
-      from = now.toISOString().slice(0, 10);
-      to = from;
+    if (dateRange === 'daily' || dateRange === 'today') {
+      const d = selectedDay || now.toISOString().slice(0, 10);
+      from = d;
+      to = d;
+    } else if (dateRange === 'monthly') {
+      const mStr = selectedMonth || now.toISOString().slice(0, 7);
+      const [y, m] = mStr.split('-').map(Number);
+      const lastDay = new Date(y, m, 0).getDate();
+      from = `${y}-${String(m).padStart(2, '0')}-01`;
+      to = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
     } else if (dateRange === '7d') {
       const d = new Date();
       d.setDate(d.getDate() - 7);
@@ -60,7 +87,7 @@ export default function Analytics() {
       to = customTo || null;
     }
     return { from, to };
-  }, [dateRange, customFrom, customTo]);
+  }, [dateRange, selectedDay, selectedMonth, customFrom, customTo]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -152,6 +179,27 @@ export default function Analytics() {
     return [];
   }, [activeTab, plData, consumptionData, predictionData, recordsData]);
 
+  // ── Dedicated export for Menu Engineering & Profit Matrix ──
+  const matrixExportData = useMemo(() => {
+    return (plData?.productBreakdown || [])
+      .filter((p) => {
+        if (productFilter && !p.productName.toLowerCase().includes(productFilter.toLowerCase())) return false;
+        if (matrixFilter !== 'ALL' && p.matrixClass !== matrixFilter) return false;
+        return true;
+      })
+      .map((item) => ({
+        'Product Name': item.productName,
+        'Category': item.matrixClass,
+        'Qty Sold': item.qty,
+        'Avg Selling Price (ETB)': Number(item.avgPrice || 0).toFixed(2),
+        'Recipe COGS (ETB)': Number(item.unitCogs || 0).toFixed(2),
+        'Total Revenue (ETB)': Number(item.revenue || 0).toFixed(2),
+        'Gross Profit (ETB)': Number(item.profit || 0).toFixed(2),
+        'Food Cost %': pct(item.costRatio),
+        'Margin %': pct(item.margin),
+      }));
+  }, [plData, productFilter, matrixFilter]);
+
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ── */}
@@ -177,7 +225,8 @@ export default function Analytics() {
           {activeTab !== 'prediction' && (
             <div className="inline-flex rounded-xl bg-ink-100/70 p-1 text-xs font-semibold text-ink-600">
               {[
-                { id: 'today', label: 'Today' },
+                { id: 'daily', label: 'Daily' },
+                { id: 'monthly', label: 'Monthly' },
                 { id: '7d', label: '7 Days' },
                 { id: '30d', label: '30 Days' },
                 { id: 'all', label: 'All Time' },
@@ -187,8 +236,8 @@ export default function Analytics() {
                   key={btn.id}
                   onClick={() => setDateRange(btn.id)}
                   className={`rounded-lg px-3 py-1.5 transition ${
-                    dateRange === btn.id
-                      ? 'bg-white text-ink-900 shadow-sm font-bold'
+                    dateRange === btn.id || (btn.id === 'daily' && dateRange === 'today')
+                      ? 'bg-white text-blue-600 shadow-sm font-bold'
                       : 'hover:text-ink-900'
                   }`}
                 >
@@ -220,29 +269,119 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Custom Date Range Picker */}
-      {dateRange === 'custom' && activeTab !== 'prediction' && (
+      {/* Date Range Picker Banner for Daily, Monthly & Custom */}
+      {activeTab !== 'prediction' && (dateRange === 'daily' || dateRange === 'today' || dateRange === 'monthly' || dateRange === 'custom') && (
         <Card className="p-3">
           <div className="flex flex-wrap items-center gap-4 text-xs">
-            <span className="font-bold text-ink-700">Custom Date Range:</span>
-            <div className="flex items-center gap-2">
-              <label className="text-ink-500">From:</label>
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="rounded-lg border border-ink-200 px-2 py-1 text-xs outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-ink-500">To:</label>
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="rounded-lg border border-ink-200 px-2 py-1 text-xs outline-none focus:border-blue-500"
-              />
-            </div>
+            {(dateRange === 'daily' || dateRange === 'today') && (
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-ink-700 flex items-center gap-1.5">
+                  <Calendar size={14} className="text-blue-600" /> Daily Report Date:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleStepDay(-1)}
+                  className="rounded-lg border border-ink-200 bg-white p-1 text-ink-500 hover:bg-ink-50"
+                  title="Previous Day"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+                <input
+                  type="date"
+                  value={selectedDay}
+                  onChange={(e) => {
+                    setSelectedDay(e.target.value);
+                    setDateRange('daily');
+                  }}
+                  className="rounded-lg border border-ink-200 px-2.5 py-1 text-xs outline-none focus:border-blue-500 bg-white font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleStepDay(1)}
+                  className="rounded-lg border border-ink-200 bg-white p-1 text-ink-500 hover:bg-ink-50"
+                  title="Next Day"
+                >
+                  <ChevronRight size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDay(new Date().toISOString().slice(0, 10));
+                    setDateRange('daily');
+                  }}
+                  className="rounded px-2 py-1 text-[11px] font-semibold text-blue-600 hover:bg-blue-50"
+                >
+                  Today
+                </button>
+              </div>
+            )}
+
+            {dateRange === 'monthly' && (
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-ink-700 flex items-center gap-1.5">
+                  <Calendar size={14} className="text-blue-600" /> Monthly Report Month:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleStepMonth(-1)}
+                  className="rounded-lg border border-ink-200 bg-white p-1 text-ink-500 hover:bg-ink-50"
+                  title="Previous Month"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => {
+                    setSelectedMonth(e.target.value);
+                    setDateRange('monthly');
+                  }}
+                  className="rounded-lg border border-ink-200 px-2.5 py-1 text-xs outline-none focus:border-blue-500 bg-white font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleStepMonth(1)}
+                  className="rounded-lg border border-ink-200 bg-white p-1 text-ink-500 hover:bg-ink-50"
+                  title="Next Month"
+                >
+                  <ChevronRight size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedMonth(new Date().toISOString().slice(0, 7));
+                    setDateRange('monthly');
+                  }}
+                  className="rounded px-2 py-1 text-[11px] font-semibold text-blue-600 hover:bg-blue-50"
+                >
+                  This Month
+                </button>
+              </div>
+            )}
+
+            {dateRange === 'custom' && (
+              <>
+                <span className="font-bold text-ink-700">Custom Date Range:</span>
+                <div className="flex items-center gap-2">
+                  <label className="text-ink-500">From:</label>
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="rounded-lg border border-ink-200 px-2 py-1 text-xs outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-ink-500">To:</label>
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="rounded-lg border border-ink-200 px-2 py-1 text-xs outline-none focus:border-blue-500"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </Card>
       )}
@@ -391,7 +530,7 @@ export default function Analytics() {
 
           {/* Menu Engineering & Product P&L Matrix */}
           <Card>
-            <div className="flex flex-col gap-3 border-b border-ink-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border-b border-ink-100 pb-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-ink-900 text-base">Menu Engineering &amp; Profit Matrix</h3>
@@ -399,13 +538,140 @@ export default function Analytics() {
                     Kasavana &amp; Smith Standard
                   </span>
                 </div>
-                <p className="text-xs text-ink-400">
-                  Itemized profitability, recipe food cost percentage, and popularity analysis
+                <p className="text-xs text-ink-400 mt-1 flex flex-wrap items-center gap-1.5">
+                  <span>Itemized profitability, recipe food cost percentage, and popularity analysis ·</span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 font-semibold text-blue-700 border border-blue-200">
+                    <Calendar size={11} />
+                    {dateRange === 'daily' || dateRange === 'today'
+                      ? `Daily Report: ${selectedDay}`
+                      : dateRange === 'monthly'
+                      ? `Monthly Report: ${selectedMonth}`
+                      : dateRange === '7d'
+                      ? 'Last 7 Days'
+                      : dateRange === '30d'
+                      ? 'Last 30 Days'
+                      : dateRange === 'custom'
+                      ? `Custom: ${customFrom || 'Start'} → ${customTo || 'Now'}`
+                      : 'All Time Summary'}
+                  </span>
                 </p>
               </div>
 
-              {/* Filters */}
+              {/* Filters toolbar — Daily & Monthly Date Controls (User requested) */}
               <div className="flex flex-wrap items-center gap-2">
+                {/* Period Selector Toggle */}
+                <div className="inline-flex rounded-xl bg-ink-100/80 p-0.5 text-xs font-semibold text-ink-700 border border-ink-200/60">
+                  <button
+                    type="button"
+                    onClick={() => setDateRange('daily')}
+                    className={`rounded-lg px-2.5 py-1 text-xs transition ${
+                      dateRange === 'daily' || dateRange === 'today'
+                        ? 'bg-white text-blue-600 shadow-sm font-bold'
+                        : 'text-ink-600 hover:text-ink-900'
+                    }`}
+                  >
+                    Daily
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDateRange('monthly')}
+                    className={`rounded-lg px-2.5 py-1 text-xs transition ${
+                      dateRange === 'monthly'
+                        ? 'bg-white text-blue-600 shadow-sm font-bold'
+                        : 'text-ink-600 hover:text-ink-900'
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDateRange('30d')}
+                    className={`rounded-lg px-2.5 py-1 text-xs transition ${
+                      dateRange === '30d'
+                        ? 'bg-white text-blue-600 shadow-sm font-bold'
+                        : 'text-ink-600 hover:text-ink-900'
+                    }`}
+                  >
+                    30D
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDateRange('all')}
+                    className={`rounded-lg px-2.5 py-1 text-xs transition ${
+                      dateRange === 'all'
+                        ? 'bg-white text-blue-600 shadow-sm font-bold'
+                        : 'text-ink-600 hover:text-ink-900'
+                    }`}
+                  >
+                    All
+                  </button>
+                </div>
+
+                {/* Specific Day Picker with Step Buttons */}
+                {(dateRange === 'daily' || dateRange === 'today') && (
+                  <div className="flex items-center gap-1 bg-white rounded-xl border border-ink-200 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleStepDay(-1)}
+                      className="rounded-lg p-1 text-ink-500 hover:bg-ink-100 transition"
+                      title="Previous Day"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <input
+                      type="date"
+                      value={selectedDay}
+                      onChange={(e) => {
+                        setSelectedDay(e.target.value);
+                        setDateRange('daily');
+                      }}
+                      className="border-none py-1 px-1.5 text-xs outline-none bg-transparent font-medium text-ink-900 cursor-pointer"
+                      title="Choose report day"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleStepDay(1)}
+                      className="rounded-lg p-1 text-ink-500 hover:bg-ink-100 transition"
+                      title="Next Day"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Specific Month Picker with Step Buttons */}
+                {dateRange === 'monthly' && (
+                  <div className="flex items-center gap-1 bg-white rounded-xl border border-ink-200 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleStepMonth(-1)}
+                      className="rounded-lg p-1 text-ink-500 hover:bg-ink-100 transition"
+                      title="Previous Month"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <input
+                      type="month"
+                      value={selectedMonth}
+                      onChange={(e) => {
+                        setSelectedMonth(e.target.value);
+                        setDateRange('monthly');
+                      }}
+                      className="border-none py-1 px-1.5 text-xs outline-none bg-transparent font-medium text-ink-900 cursor-pointer"
+                      title="Choose report month"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleStepMonth(1)}
+                      className="rounded-lg p-1 text-ink-500 hover:bg-ink-100 transition"
+                      title="Next Month"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Product Search */}
                 <div className="relative">
                   <Search size={14} className="absolute left-2.5 top-2.5 text-ink-400" />
                   <input
@@ -413,21 +679,41 @@ export default function Analytics() {
                     placeholder="Search product..."
                     value={productFilter}
                     onChange={(e) => setProductFilter(e.target.value)}
-                    className="rounded-xl border border-ink-200 py-1.5 pl-8 pr-3 text-xs outline-none focus:border-blue-500 w-40 sm:w-48"
+                    className="rounded-xl border border-ink-200 py-1.5 pl-8 pr-3 text-xs outline-none focus:border-blue-500 w-36 sm:w-44 bg-white"
                   />
                 </div>
 
+                {/* Category Classification Filter */}
                 <select
                   value={matrixFilter}
                   onChange={(e) => setMatrixFilter(e.target.value)}
-                  className="rounded-xl border border-ink-200 py-1.5 px-3 text-xs outline-none focus:border-blue-500 bg-white"
+                  className="rounded-xl border border-ink-200 py-1.5 px-2.5 text-xs outline-none focus:border-blue-500 bg-white"
                 >
                   <option value="ALL">All Categories</option>
-                  <option value="Star">⭐ Stars (High Volume, High Profit)</option>
-                  <option value="Workhorse">🐎 Workhorses (High Volume, Low Profit)</option>
-                  <option value="Puzzle">🧩 Puzzles (Low Volume, High Profit)</option>
-                  <option value="Dog">🐕 Dogs (Low Volume, Low Profit)</option>
+                  <option value="Star">⭐ Stars (High Vol, High Profit)</option>
+                  <option value="Workhorse">🐎 Workhorses (High Vol, Low Profit)</option>
+                  <option value="Puzzle">🧩 Puzzles (Low Vol, High Profit)</option>
+                  <option value="Dog">🐕 Dogs (Low Vol, Low Profit)</option>
                 </select>
+
+                {/* Export Matrix Dropdown */}
+                <ExportDropdown
+                  data={matrixExportData}
+                  fileName={`menu_matrix_${dateRange === 'daily' || dateRange === 'today' ? selectedDay : dateRange === 'monthly' ? selectedMonth : dateRange}`}
+                  sheetName="Profit Matrix"
+                  pdfTitle={`Menu Engineering & Profit Matrix — ${dateRange === 'daily' || dateRange === 'today' ? `Daily (${selectedDay})` : dateRange === 'monthly' ? `Monthly (${selectedMonth})` : dateRange}`}
+                  pdfColumns={[
+                    { header: 'Product Name', accessor: 'Product Name' },
+                    { header: 'Category', accessor: 'Category' },
+                    { header: 'Qty Sold', accessor: 'Qty Sold', align: 'right' },
+                    { header: 'Avg Price (ETB)', accessor: 'Avg Selling Price (ETB)', align: 'right' },
+                    { header: 'COGS (ETB)', accessor: 'Recipe COGS (ETB)', align: 'right' },
+                    { header: 'Revenue (ETB)', accessor: 'Total Revenue (ETB)', align: 'right' },
+                    { header: 'Gross Profit (ETB)', accessor: 'Gross Profit (ETB)', align: 'right' },
+                    { header: 'Food Cost %', accessor: 'Food Cost %', align: 'right' },
+                    { header: 'Margin %', accessor: 'Margin %', align: 'right' },
+                  ]}
+                />
               </div>
             </div>
 
