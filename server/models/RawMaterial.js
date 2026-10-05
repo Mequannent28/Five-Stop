@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const rawMaterialSchema = new mongoose.Schema(
   {
+    code: { type: String, trim: true, default: '' },
     name: { type: String, required: true, trim: true },
     category: { type: String, trim: true, default: 'General' },
     unit: { type: String, required: true, trim: true }, // kg, ltr, pcs, box...

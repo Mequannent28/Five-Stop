@@ -57,6 +57,7 @@ const exportMaterialsExcel = asyncHandler(async (req, res) => {
   const materials = await RawMaterial.find({}).sort({ name: 1 });
 
   const rows = materials.map((m) => ({
+    'Code': m.code || '',
     'Name': m.name,
     'Category': m.category,
     'Unit': m.unit,
@@ -70,7 +71,7 @@ const exportMaterialsExcel = asyncHandler(async (req, res) => {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(rows);
   // Set column widths
-  ws['!cols'] = [20, 15, 8, 14, 14, 10, 16, 12].map((w) => ({ wch: w }));
+  ws['!cols'] = [12, 20, 15, 8, 14, 14, 10, 16, 12].map((w) => ({ wch: w }));
   XLSX.utils.book_append_sheet(wb, ws, 'Raw Materials');
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
@@ -89,28 +90,47 @@ const importMaterialsExcel = asyncHandler(async (req, res) => {
 
   let created = 0;
   let updated = 0;
+  const processedIds = new Set();
 
   for (const row of rows) {
     const name = String(row['Name'] || '').trim();
+    const code = String(row['Code'] || '').trim().replace(/-+$/, '');
     if (!name) continue;
 
     const data = {
+      code,
       name,
-      category: String(row['Category'] || 'General').trim(),
-      unit: String(row['Unit'] || 'pcs').trim(),
-      currentStock: Number(row['Current Stock']) || 0,
-      reorderLevel: Number(row['Reorder Level']) || 10,
-      unitCost: Number(row['Unit Cost']) || 0,
+      category:      String(row['Category']      || 'General').trim(),
+      unit:          String(row['Unit']           || 'pcs').trim(),
+      currentStock:  Number(row['Current Stock']) || 0,
+      reorderLevel:  Number(row['Reorder Level']) || 10,
+      unitCost:      Number(row['Unit Cost'])     || 0,
       storeLocation: String(row['Store Location'] || 'Main Store').trim(),
     };
 
-    const existing = await RawMaterial.findOne({ name: { $regex: `^${name}$`, $options: 'i' } });
+    let existing = null;
+
+    // 1️⃣ Match by Code first
+    if (code) {
+      const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      existing = await RawMaterial.findOne({ code: { $regex: `^${escapedCode}-?$`, $options: 'i' } });
+      if (existing && processedIds.has(existing._id.toString())) existing = null;
+    }
+    // 2️⃣ Fall back to name
+    if (!existing) {
+      const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const byName = await RawMaterial.findOne({ name: { $regex: `^${escapedName}$`, $options: 'i' } });
+      if (byName && !processedIds.has(byName._id.toString())) existing = byName;
+    }
+
     if (existing) {
       Object.assign(existing, data);
       await existing.save();
+      processedIds.add(existing._id.toString());
       updated++;
     } else {
-      await RawMaterial.create(data);
+      const created_ = await RawMaterial.create(data);
+      processedIds.add(created_._id.toString());
       created++;
     }
   }
