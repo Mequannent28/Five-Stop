@@ -43,6 +43,7 @@ const updateSettings = asyncHandler(async (req, res) => {
     'taxRate',
     'autoGenerateVoucherNo',
     'allowNegativeStock',
+    'rolePermissions',
     'notes',
   ];
 

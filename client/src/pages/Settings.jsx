@@ -23,6 +23,16 @@ import { useAuth } from '../context/AuthContext';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 
+const CAPABILITIES = [
+  { key: 'recordGoods', label: 'Record Goods Receiving (Cash/Credit GRV)' },
+  { key: 'checkReview', label: 'Check & Review Transactions (Stage 1)' },
+  { key: 'approveGoods', label: 'Approve Goods & Vouchers (Stage 2)' },
+  { key: 'postLedger', label: 'Post Documents to Ledger (Final Stage)' },
+  { key: 'voidTransactions', label: 'Void / Reverse Transactions' },
+  { key: 'viewReports', label: 'View Financial & Valuation Reports' },
+  { key: 'manageAccounts', label: 'Manage Staff Accounts & Passwords' },
+];
+
 export default function Settings() {
   const { user, updateUser, hasRole } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -64,6 +74,15 @@ export default function Settings() {
     taxRate: 15,
     autoGenerateVoucherNo: true,
     allowNegativeStock: false,
+    rolePermissions: {
+      recordGoods: { storekeeper: true, manager: true, admin: true },
+      checkReview: { storekeeper: false, manager: true, admin: true },
+      approveGoods: { storekeeper: false, manager: false, admin: true },
+      postLedger: { storekeeper: false, manager: true, admin: true },
+      voidTransactions: { storekeeper: false, manager: false, admin: true },
+      viewReports: { storekeeper: false, manager: true, admin: true },
+      manageAccounts: { storekeeper: false, manager: false, admin: true }
+    },
     notes: '',
   });
   const [systemLoading, setSystemLoading] = useState(false);
@@ -653,65 +672,75 @@ export default function Settings() {
             </h3>
           </div>
           <p className="text-xs text-ink-400 mb-5">
-            Your current assigned role is <strong className="capitalize text-ink-800">{user?.role}</strong>
+            Your current assigned role is <strong className="capitalize text-ink-800">{user?.role}</strong>.
+            {hasRole('admin') ? ' You can modify the system permissions below.' : ' You do not have permission to modify these settings.'}
           </p>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs text-left">
-              <thead>
-                <tr className="border-b border-ink-100 bg-ink-50/70 text-ink-600 font-semibold">
-                  <th className="py-2.5 px-3">System Capability</th>
-                  <th className="py-2.5 px-3 text-center">Storekeeper</th>
-                  <th className="py-2.5 px-3 text-center">Manager</th>
-                  <th className="py-2.5 px-3 text-center">Admin</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-50 text-ink-700">
-                <tr>
-                  <td className="py-2.5 px-3 font-medium">Record Goods Receiving (Cash/Credit GRV)</td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-3 font-medium">Check &amp; Review Transactions (Stage 1)</td>
-                  <td className="py-2.5 px-3 text-center text-ink-300">—</td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-3 font-medium">Approve Goods &amp; Vouchers (Stage 2)</td>
-                  <td className="py-2.5 px-3 text-center text-ink-300">—</td>
-                  <td className="py-2.5 px-3 text-center text-ink-300">—</td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-3 font-medium">Post Documents to Ledger (Final Stage)</td>
-                  <td className="py-2.5 px-3 text-center text-ink-300">—</td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-3 font-medium">Void / Reverse Transactions</td>
-                  <td className="py-2.5 px-3 text-center text-ink-300">—</td>
-                  <td className="py-2.5 px-3 text-center text-ink-300">—</td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-3 font-medium">View Financial &amp; Valuation Reports</td>
-                  <td className="py-2.5 px-3 text-center text-ink-300">—</td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 px-3 font-medium">Manage Staff Accounts &amp; Passwords</td>
-                  <td className="py-2.5 px-3 text-center text-ink-300">—</td>
-                  <td className="py-2.5 px-3 text-center text-ink-300">—</td>
-                  <td className="py-2.5 px-3 text-center text-emerald-600"><Check size={14} className="mx-auto" /></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <form onSubmit={handleSystemSubmit}>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-ink-100 bg-ink-50/70 text-ink-600 font-semibold">
+                    <th className="py-2.5 px-3">System Capability</th>
+                    <th className="py-2.5 px-3 text-center">Storekeeper</th>
+                    <th className="py-2.5 px-3 text-center">Manager</th>
+                    <th className="py-2.5 px-3 text-center">Admin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ink-50 text-ink-700">
+                  {CAPABILITIES.map((cap) => (
+                    <tr key={cap.key}>
+                      <td className="py-2.5 px-3 font-medium">{cap.label}</td>
+                      {['storekeeper', 'manager', 'admin'].map((r) => (
+                        <td key={r} className="py-2.5 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            disabled={!hasRole('admin')}
+                            checked={systemForm.rolePermissions?.[cap.key]?.[r] || false}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setSystemForm(prev => ({
+                                ...prev,
+                                rolePermissions: {
+                                  ...prev.rolePermissions,
+                                  [cap.key]: {
+                                    ...prev.rolePermissions?.[cap.key],
+                                    [r]: checked
+                                  }
+                                }
+                              }));
+                            }}
+                            className="h-4 w-4 rounded border-ink-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {hasRole('admin') && (
+              <div className="pt-5 flex justify-end">
+                <Button type="submit" disabled={systemSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Save size={15} /> {systemSaving ? 'Saving Permissions…' : 'Save Role Permissions'}
+                </Button>
+              </div>
+            )}
+            
+            {systemSuccess && currentTab === 'permissions' && (
+              <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
+                <CheckCircle2 size={16} className="flex-shrink-0" />
+                <span>{systemSuccess}</span>
+              </div>
+            )}
+            {systemError && currentTab === 'permissions' && (
+              <div className="mt-4 flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
+                <AlertCircle size={16} className="flex-shrink-0" />
+                <span>{systemError}</span>
+              </div>
+            )}
+          </form>
         </Card>
       )}
     </div>
