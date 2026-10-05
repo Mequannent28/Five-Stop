@@ -7,7 +7,15 @@ const connectDB = async () => {
       console.log('MongoDB already connected');
       return;
     }
-    const conn = await mongoose.connect(process.env.MONGO_URI);
+
+    const uri = process.env.MONGO_URI;
+    if (!uri) {
+      console.error('FATAL: MONGO_URI environment variable is not set. Please add it to your hosting platform environment variables.');
+      console.error('Required env vars: MONGO_URI, JWT_SECRET, NODE_ENV, PORT');
+      throw new Error('MONGO_URI environment variable is missing. Configure it in your hosting provider dashboard.');
+    }
+
+    const conn = await mongoose.connect(uri);
     console.log(`MongoDB connected: ${conn.connection.host}`);
   } catch (error) {
     console.error(`MongoDB connection error: ${error.message}`);
@@ -16,3 +24,4 @@ const connectDB = async () => {
 };
 
 module.exports = connectDB;
+
