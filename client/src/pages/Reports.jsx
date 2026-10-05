@@ -8,6 +8,7 @@ import api from '../api/axios';
 import Card from '../components/ui/Card';
 import DataTable from '../components/ui/DataTable';
 import Button from '../components/ui/Button';
+import { useAuth } from '../context/AuthContext';
 
 // ── Tab config ────────────────────────────────────────────────────────
 const TABS = [
@@ -93,14 +94,25 @@ const MaterialBreakdown = ({ data }) => (
 
 // ── Main component ────────────────────────────────────────────────────
 export default function Reports({ defaultTab } = {}) {
+  const { user } = useAuth();
   const [tab, setTab]         = useState(defaultTab || 'summary');
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
+  const [hotelName, setHotelName] = useState('Five Stop');
 
   // Sync tab when navigated via sidebar
   useEffect(() => {
     if (defaultTab) { setTab(defaultTab); setData(null); }
   }, [defaultTab]);
+
+  // Load hotel name for print header
+  useEffect(() => {
+    import('../api/axios').then(({ default: api }) => {
+      api.get('/settings').then(res => {
+        if (res.data?.hotelName) setHotelName(res.data.hotelName);
+      }).catch(() => {});
+    });
+  }, []);
 
   // Date range / filter state
   const [date, setDate]     = useState(todayStr());
@@ -142,9 +154,16 @@ export default function Reports({ defaultTab } = {}) {
   useEffect(() => { load(); }, [load]);
 
   const colorCls = TAB_COLORS[tab] || 'text-ink-700 bg-ink-100';
+  const printDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
-    <div className="space-y-4">
+    <div id="print-area" className="space-y-4">
+
+      {/* ── Print-only header ── */}
+      <div id="print-header" style={{ display: 'none' }}>
+        <h1>{hotelName}</h1>
+        <p>{currentTab?.label ?? 'Report'} &mdash; Printed on {printDate}</p>
+      </div>
 
       {/* ── Page heading (from sidebar nav) ── */}
       <div className="flex items-center justify-between">
