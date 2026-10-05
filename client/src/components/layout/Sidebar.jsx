@@ -114,14 +114,14 @@ const Sidebar = ({ open, onClose }) => {
             <svg viewBox="0 0 40 40" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect width="40" height="40" rx="8" fill="#1a56db"/>
               <text x="50%" y="55%" dominantBaseline="middle" textAnchor="middle"
-                fill="white" fontSize="11" fontFamily="Georgia, serif" fontStyle="italic" fontWeight="bold">
+                fill="white" fontSize="13" fontWeight="bold">
                 5S
               </text>
             </svg>
           </div>
           <div>
             <p className="text-lg font-bold leading-none text-white tracking-wide">Five Stop</p>
-            <p className="text-xs text-blue-200 mt-0.5">Stock Control</p>
+            <p className="text-xs text-blue-200 mt-0.5">Inventory</p>
           </div>
         </div>
 

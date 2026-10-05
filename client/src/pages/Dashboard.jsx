@@ -231,15 +231,15 @@ export default function Dashboard() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="font-display text-2xl font-bold tracking-tight text-ink-900">
-              Operations Dashboard
+            <h1 className="text-2xl font-bold tracking-tight text-ink-900">
+              Dashboard
             </h1>
             <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200">
               Live
             </span>
           </div>
           <p className="text-sm text-ink-400 mt-0.5">
-            Welcome back, <strong className="text-ink-700">{user?.name || 'Hotel Admin'}</strong> · Here is your inventory &amp; goods flow overview
+            Overview of your inventory and stock movements
           </p>
         </div>
 

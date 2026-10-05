@@ -61,9 +61,9 @@ const Topbar = ({ onMenuClick, title }) => {
           <Menu size={22} />
         </button>
         <div>
-          <p className="font-display text-xl font-bold text-ink-900">{title}</p>
-          <p className="text-xs text-ink-400">
-            {greeting()}, <span className="font-medium text-ink-700">{user?.name?.split(' ')[0]}</span>
+          <p className="text-xl font-bold text-ink-900">{title}</p>
+          <p className="text-xs text-ink-500">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
       </div>
