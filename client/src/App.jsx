@@ -12,6 +12,7 @@ import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Products from './pages/Products';
 import Settings from './pages/Settings';
+import SalesImport from './pages/SalesImport';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
         <Route path="/transactions/pos-adjustment" element={<StockTransactions defaultVoucher="pos_adjustment" />} />
         <Route path="/transactions/disposal"       element={<StockTransactions defaultVoucher="disposal" />} />
         <Route path="/transactions/neg-adjustment" element={<StockTransactions defaultVoucher="neg_adjustment" />} />
+        <Route path="/sales-import" element={<SalesImport />} />
         <Route
           path="/purchases"
           element={

@@ -19,6 +19,7 @@ const VOUCHER_TYPES = [
   'neg_adjustment',
   'pos_adjustment',
   'fresh_bazaar',
+  'sales_import',
 ];
 
 // Direction each voucher type moves stock
@@ -29,6 +30,7 @@ const VOUCHER_DIRECTION = {
   neg_adjustment: 'out',
   pos_adjustment: 'in',
   fresh_bazaar:   'in',
+  sales_import:   'out',
 };
 
 const lineItemSchema = new mongoose.Schema(

@@ -22,6 +22,7 @@ const generateVoucherNo = async (voucherType) => {
     neg_adjustment: 'NADJ',
     pos_adjustment: 'PADJ',
     fresh_bazaar:   'FBR',
+    sales_import:   'SALE',
   };
   const prefix = prefixes[voucherType] ?? 'TXN';
   const count = await StockTransaction.countDocuments({ voucherType });
@@ -277,4 +278,106 @@ const advanceTransaction = asyncHandler(async (req, res) => {
   res.json({ message: `Voucher moved from "${prev}" → "${rule.to}"`, transaction: populated });
 });
 
-module.exports = { getTransactions, createTransaction, deleteTransaction, getVoucherSummary, advanceTransaction };
+// ── POST /api/transactions/import-sales ──────────────────────────────
+const importSales = asyncHandler(async (req, res) => {
+  const { sales, notes, reference } = req.body;
+  if (!sales || !sales.length) {
+    res.status(400);
+    throw new Error('No sales data provided');
+  }
+
+  const Product = require('../models/Product');
+  const materialDeductions = {};
+
+  const notFound = [];
+
+  for (const sale of sales) {
+    const { productName, quantity } = sale;
+    if (!productName || !quantity) continue;
+
+    // 1. Try to find Product
+    const product = await Product.findOne({ name: new RegExp(`^${productName}$`, 'i') });
+    if (product) {
+      if (product.ingredients && product.ingredients.length > 0) {
+        for (const ing of product.ingredients) {
+          const matId = ing.material.toString();
+          const deductQty = ing.quantity * Number(quantity);
+          materialDeductions[matId] = (materialDeductions[matId] || 0) + deductQty;
+        }
+      }
+      continue;
+    }
+
+    // 2. Try to find RawMaterial directly
+    const material = await RawMaterial.findOne({ name: new RegExp(`^${productName}$`, 'i') });
+    if (material) {
+      const matId = material._id.toString();
+      materialDeductions[matId] = (materialDeductions[matId] || 0) + Number(quantity);
+      continue;
+    }
+
+    notFound.push(productName);
+  }
+
+  const resolvedItems = [];
+  for (const [matId, qty] of Object.entries(materialDeductions)) {
+    if (qty <= 0) continue;
+    const mat = await RawMaterial.findById(matId);
+    if (mat) {
+      resolvedItems.push({
+        material: mat._id,
+        quantity: qty,
+        unitCost: mat.unitCost || 0,
+        totalCost: (mat.unitCost || 0) * qty,
+        _doc: mat
+      });
+    }
+  }
+
+  if (resolvedItems.length === 0) {
+    return res.status(400).json({
+      message: 'No matching products or raw materials found to deduct stock.',
+      unmatchedProducts: notFound,
+    });
+  }
+
+  const totalAmount = resolvedItems.reduce((s, i) => s + i.totalCost, 0);
+
+  const txnData = {
+    voucherType: 'sales_import',
+    voucherNo: await generateVoucherNo('sales_import'),
+    type: 'out',
+    items: resolvedItems.map(({ material, quantity, unitCost, totalCost }) => ({ material, quantity, unitCost, totalCost })),
+    material: resolvedItems[0].material,
+    quantity: resolvedItems[0].quantity,
+    unitCost: resolvedItems[0].unitCost,
+    reason: 'Sales Report Import',
+    reference: reference || '',
+    notes: notes || 'Automated stock deduction from sales report',
+    date: new Date(),
+    performedBy: req.user._id,
+    totalAmount,
+    status: 'pending',
+    trail: [{ action: 'pending', by: req.user._id, byName: req.user.name, byRole: req.user.role }],
+  };
+
+  const transaction = await StockTransaction.create(txnData);
+
+  // Apply stock changes
+  for (const item of resolvedItems) {
+    item._doc.currentStock -= item.quantity;
+    await item._doc.save();
+  }
+
+  const populated = await StockTransaction.findById(transaction._id)
+    .populate('items.material', 'name unit unitCost')
+    .populate('performedBy', 'name');
+
+  res.status(201).json({
+    message: 'Sales imported and stock deducted successfully.',
+    transaction: populated,
+    unmatchedProducts: notFound,
+  });
+});
+
+module.exports = { getTransactions, createTransaction, deleteTransaction, getVoucherSummary, advanceTransaction, importSales };

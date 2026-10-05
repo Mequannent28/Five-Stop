@@ -5,7 +5,7 @@ import {
   ArrowLeftRight, FileBarChart, Users, UtensilsCrossed,
   ChevronDown, ChevronRight,
   ShoppingBag, CreditCard, Leaf, TrendingUp, Flame, TrendingDown,
-  BarChart2, Calendar, PackageOpen, Settings as SettingsIcon,
+  BarChart2, Calendar, PackageOpen, Settings as SettingsIcon, UploadCloud
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -18,6 +18,7 @@ const STOCK_ITEMS = [
   { to: '/transactions/pos-adjustment', label: 'Positive Adjustment',     icon: TrendingUp   },
   { to: '/transactions/disposal',       label: 'Goods Disposal',          icon: Flame        },
   { to: '/transactions/neg-adjustment', label: 'Negative Adjustment',     icon: TrendingDown },
+  { to: '/sales-import',                label: 'Import Sales Report',     icon: UploadCloud  },
 ];
 
 // ── Reports sub-items ─────────────────────────────────────────────────
