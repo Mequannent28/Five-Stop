@@ -1,4 +1,12 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+// ── Startup diagnostics ────────────────────────────────────────────────
+console.log('[STARTUP] NODE_ENV:', process.env.NODE_ENV);
+console.log('[STARTUP] PORT:', process.env.PORT);
+console.log('[STARTUP] MONGO_URI set:', !!process.env.MONGO_URI);
+console.log('[STARTUP] JWT_SECRET set:', !!process.env.JWT_SECRET);
+
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
