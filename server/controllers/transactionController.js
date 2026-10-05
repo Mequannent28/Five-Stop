@@ -53,19 +53,6 @@ const getTransactions = asyncHandler(async (req, res) => {
 });
 
 // ── POST /api/transactions ────────────────────────────────────────────
-/*
-  Body shape:
-  {
-    voucherType: 'cash_grv' | 'credit_grv' | 'disposal' | 'neg_adjustment' | 'pos_adjustment' | 'fresh_bazaar',
-    voucherNo:  string (optional, auto-generated if empty),
-    supplier:   ObjectId  (required for cash_grv / credit_grv),
-    items: [{ material: ObjectId, quantity: number, unitCost: number }],
-    reason:    string  (for disposal / adjustments),
-    reference: string  (optional),
-    notes:     string  (optional),
-    date:      ISO string (optional, defaults to now),
-  }
-*/
 const createTransaction = asyncHandler(async (req, res) => {
   const {
     voucherType, voucherNo, supplier,
@@ -73,27 +60,23 @@ const createTransaction = asyncHandler(async (req, res) => {
     reason, reference, notes, date,
   } = req.body;
 
-  // Validate voucher type
   if (!VOUCHER_DIRECTION[voucherType]) {
     res.status(400);
     throw new Error(`Unknown voucher type: ${voucherType}`);
   }
 
-  const direction = VOUCHER_DIRECTION[voucherType]; // 'in' | 'out'
+  const direction = VOUCHER_DIRECTION[voucherType];
 
-  // Validate items
   if (!items.length) {
     res.status(400);
     throw new Error('At least one item is required.');
   }
 
-  // Supplier required for GRVs
   if ((voucherType === 'cash_grv' || voucherType === 'credit_grv') && !supplier) {
     res.status(400);
     throw new Error('Supplier is required for Goods Receiving Vouchers.');
   }
 
-  // Resolve materials and check stock for OUT vouchers
   const resolvedItems = [];
   for (const item of items) {
     const mat = await RawMaterial.findById(item.material);
@@ -112,11 +95,8 @@ const createTransaction = asyncHandler(async (req, res) => {
     resolvedItems.push({ material: mat._id, quantity: Number(item.quantity), unitCost, totalCost, _doc: mat });
   }
 
-  // Compute totals
   const totalAmount = resolvedItems.reduce((s, i) => s + i.totalCost, 0);
 
-  // Build transaction doc
-  // For single-item legacy compat, also set top-level material/type/quantity
   const firstItem = resolvedItems[0];
   const txnData = {
     voucherType,
@@ -139,7 +119,6 @@ const createTransaction = asyncHandler(async (req, res) => {
 
   const transaction = await StockTransaction.create(txnData);
 
-  // Apply stock changes
   for (const item of resolvedItems) {
     item._doc.currentStock += direction === 'in' ? item.quantity : -item.quantity;
     await item._doc.save();
@@ -161,7 +140,6 @@ const deleteTransaction = asyncHandler(async (req, res) => {
 
   const direction = transaction.type || VOUCHER_DIRECTION[transaction.voucherType];
 
-  // Reverse all line items
   const itemsToReverse = transaction.items?.length
     ? transaction.items
     : [{ material: transaction.material, quantity: transaction.quantity }];
@@ -179,7 +157,6 @@ const deleteTransaction = asyncHandler(async (req, res) => {
 });
 
 // ── GET /api/transactions/summary ────────────────────────────────────
-// Returns totals per voucher type for a date range (used by reports)
 const getVoucherSummary = asyncHandler(async (req, res) => {
   const { from, to, voucherType } = req.query;
   const match = {};
@@ -207,14 +184,6 @@ const getVoucherSummary = asyncHandler(async (req, res) => {
 });
 
 // ── POST /api/transactions/:id/advance ───────────────────────────────
-/*
-  Body: { action: 'check'|'approve'|'post'|'void', password: '...', note: '' }
-
-  check   : pending  → checked   (manager / admin)
-  approve : checked  → approved  (admin)
-  post    : approved → posted    (admin / manager) — locks document
-  void    : any      → voided    (admin) — reverses stock
-*/
 const advanceTransaction = asyncHandler(async (req, res) => {
   const { action, password, note = '' } = req.body;
   if (!password) { res.status(400); throw new Error('Password is required'); }
@@ -252,7 +221,6 @@ const advanceTransaction = asyncHandler(async (req, res) => {
   if (action === 'approve') { txn.approvedBy = actor._id; txn.approvedAt = new Date(); }
   if (action === 'post')    { txn.postedBy   = actor._id; txn.postedAt   = new Date(); }
 
-  // Voiding reverses stock
   if (action === 'void') {
     const direction = txn.type || VOUCHER_DIRECTION[txn.voucherType];
     const itemsToReverse = txn.items?.length
@@ -279,103 +247,171 @@ const advanceTransaction = asyncHandler(async (req, res) => {
 });
 
 // ── POST /api/transactions/import-sales ──────────────────────────────
+// Enhanced: saves full P&L SalesRecord with ingredient consumption per product
 const importSales = asyncHandler(async (req, res) => {
-  const { sales, notes, reference } = req.body;
+  const { sales, notes, reference, saleDate } = req.body;
   if (!sales || !sales.length) {
     res.status(400);
     throw new Error('No sales data provided');
   }
 
-  const Product = require('../models/Product');
-  const materialDeductions = {};
+  const Product     = require('../models/Product');
+  const SalesRecord = require('../models/SalesRecord');
 
-  const notFound = [];
+  const materialDeductions = {};
+  const saleLines = [];
+  const notFound  = [];
 
   for (const sale of sales) {
-    const { productName, quantity } = sale;
-    if (!productName || !quantity) continue;
+    const { productName, quantity, revenue } = sale;
+    if (!productName) continue;
+    const qty = Number(quantity) || 1;
+    const rev = Number(revenue)  || 0;
+    const lineIngredients = [];
 
-    // 1. Try to find Product
-    const product = await Product.findOne({ name: new RegExp(`^${productName}$`, 'i') });
+    // 1. Try Product (with recipe/ingredients)
+    const product = await Product.findOne({ name: new RegExp(`^${productName.trim()}$`, 'i') })
+      .populate('ingredients.material');
+
     if (product) {
+      let cogs = 0;
       if (product.ingredients && product.ingredients.length > 0) {
         for (const ing of product.ingredients) {
-          const matId = ing.material.toString();
-          const deductQty = ing.quantity * Number(quantity);
+          const mat = ing.material;
+          if (!mat) continue;
+          const matId     = mat._id.toString();
+          const deductQty = ing.quantity * qty;
+          const ingCost   = (mat.unitCost || 0) * deductQty;
+          cogs += ingCost;
           materialDeductions[matId] = (materialDeductions[matId] || 0) + deductQty;
+          lineIngredients.push({
+            materialId:   mat._id,
+            materialName: mat.name,
+            unit:         mat.unit,
+            quantityUsed: deductQty,
+            unitCost:     mat.unitCost || 0,
+            totalCost:    ingCost,
+          });
         }
       }
+
+      // If revenue is provided use it; otherwise compute from product.sellingPrice * qty
+      const lineRev = rev > 0 ? rev : ((product.sellingPrice || 0) * qty);
+
+      saleLines.push({
+        productName,
+        productId:       product._id,
+        quantitySold:    qty,
+        sellingPrice:    qty > 0 ? (lineRev / qty) : 0,
+        revenue:         lineRev,
+        cogs,
+        grossProfit:     lineRev - cogs,
+        ingredientsUsed: lineIngredients,
+      });
       continue;
     }
 
-    // 2. Try to find RawMaterial directly
-    const material = await RawMaterial.findOne({ name: new RegExp(`^${productName}$`, 'i') });
+    // 2. Try RawMaterial directly
+    const material = await RawMaterial.findOne({ name: new RegExp(`^${productName.trim()}$`, 'i') });
     if (material) {
-      const matId = material._id.toString();
-      materialDeductions[matId] = (materialDeductions[matId] || 0) + Number(quantity);
+      const matId   = material._id.toString();
+      const ingCost = (material.unitCost || 0) * qty;
+      materialDeductions[matId] = (materialDeductions[matId] || 0) + qty;
+      lineIngredients.push({
+        materialId:   material._id,
+        materialName: material.name,
+        unit:         material.unit,
+        quantityUsed: qty,
+        unitCost:     material.unitCost || 0,
+        totalCost:    ingCost,
+      });
+
+      const lineRev = rev > 0 ? rev : (material.unitCost ? material.unitCost * 1.35 * qty : 0);
+
+      saleLines.push({
+        productName,
+        productId:       null,
+        quantitySold:    qty,
+        sellingPrice:    qty > 0 ? (lineRev / qty) : 0,
+        revenue:         lineRev,
+        cogs:            ingCost,
+        grossProfit:     lineRev - ingCost,
+        ingredientsUsed: lineIngredients,
+      });
       continue;
     }
 
     notFound.push(productName);
   }
 
+  // Aggregate totals
+  const totalRevenue = saleLines.reduce((s, l) => s + (l.revenue     || 0), 0);
+  const totalCOGS    = saleLines.reduce((s, l) => s + (l.cogs        || 0), 0);
+  const grossProfit  = totalRevenue - totalCOGS;
+  const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+  // Create SalesRecord
+  const salesRecord = await SalesRecord.create({
+    saleDate:    saleDate ? new Date(saleDate) : new Date(),
+    reference:   reference || '',
+    notes:       notes || 'Imported from POS/Excel report',
+    source:      'excel_import',
+    lines:       saleLines,
+    totalRevenue,
+    totalCOGS,
+    grossProfit,
+    profitMargin,
+    importedBy:  req.user._id,
+  });
+
+  // Create stock transaction if there are materials to deduct
+  let transaction = null;
   const resolvedItems = [];
   for (const [matId, qty] of Object.entries(materialDeductions)) {
     if (qty <= 0) continue;
     const mat = await RawMaterial.findById(matId);
-    if (mat) {
-      resolvedItems.push({
-        material: mat._id,
-        quantity: qty,
-        unitCost: mat.unitCost || 0,
-        totalCost: (mat.unitCost || 0) * qty,
-        _doc: mat
-      });
+    if (mat) resolvedItems.push({ material: mat._id, quantity: qty, unitCost: mat.unitCost || 0, totalCost: (mat.unitCost || 0) * qty, _doc: mat });
+  }
+
+  if (resolvedItems.length > 0) {
+    const totalAmount = resolvedItems.reduce((s, i) => s + i.totalCost, 0);
+    transaction = await StockTransaction.create({
+      voucherType: 'sales_import',
+      voucherNo:   await generateVoucherNo('sales_import'),
+      type:        'out',
+      items:       resolvedItems.map(({ material, quantity, unitCost, totalCost }) => ({ material, quantity, unitCost, totalCost })),
+      material:    resolvedItems[0].material,
+      quantity:    resolvedItems[0].quantity,
+      unitCost:    resolvedItems[0].unitCost,
+      reason:      'Sales Report Import',
+      reference:   reference || '',
+      notes:       notes || 'Automated stock deduction from sales report',
+      date:        saleDate ? new Date(saleDate) : new Date(),
+      performedBy: req.user._id,
+      totalAmount,
+      status:      'pending',
+      trail: [{ action: 'pending', by: req.user._id, byName: req.user.name, byRole: req.user.role }],
+    });
+
+    salesRecord.stockTransaction = transaction._id;
+    await salesRecord.save();
+
+    for (const item of resolvedItems) {
+      item._doc.currentStock -= item.quantity;
+      await item._doc.save();
     }
   }
 
-  if (resolvedItems.length === 0) {
-    return res.status(400).json({
-      message: 'No matching products or raw materials found to deduct stock.',
-      unmatchedProducts: notFound,
-    });
-  }
-
-  const totalAmount = resolvedItems.reduce((s, i) => s + i.totalCost, 0);
-
-  const txnData = {
-    voucherType: 'sales_import',
-    voucherNo: await generateVoucherNo('sales_import'),
-    type: 'out',
-    items: resolvedItems.map(({ material, quantity, unitCost, totalCost }) => ({ material, quantity, unitCost, totalCost })),
-    material: resolvedItems[0].material,
-    quantity: resolvedItems[0].quantity,
-    unitCost: resolvedItems[0].unitCost,
-    reason: 'Sales Report Import',
-    reference: reference || '',
-    notes: notes || 'Automated stock deduction from sales report',
-    date: new Date(),
-    performedBy: req.user._id,
-    totalAmount,
-    status: 'pending',
-    trail: [{ action: 'pending', by: req.user._id, byName: req.user.name, byRole: req.user.role }],
-  };
-
-  const transaction = await StockTransaction.create(txnData);
-
-  // Apply stock changes
-  for (const item of resolvedItems) {
-    item._doc.currentStock -= item.quantity;
-    await item._doc.save();
-  }
-
-  const populated = await StockTransaction.findById(transaction._id)
-    .populate('items.material', 'name unit unitCost')
-    .populate('performedBy', 'name');
-
   res.status(201).json({
-    message: 'Sales imported and stock deducted successfully.',
-    transaction: populated,
+    message: 'Sales imported. Stock deducted and P&L recorded.',
+    salesRecord,
+    transactionId: transaction?._id,
+    summary: {
+      totalRevenue,
+      totalCOGS,
+      grossProfit,
+      profitMargin: profitMargin.toFixed(1) + '%',
+    },
     unmatchedProducts: notFound,
   });
 });

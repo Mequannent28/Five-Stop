@@ -37,9 +37,10 @@ const REPORT_ITEMS = [
 
 // ── Top-level items (excluding stock movements & reports handled below) ─
 const NAV_BEFORE = [
-  { to: '/',          label: 'Dashboard',     icon: LayoutDashboard, roles: ['admin','manager','storekeeper'] },
-  { to: '/materials', label: 'Raw Materials', icon: Boxes,           roles: ['admin','manager','storekeeper'] },
-  { to: '/products',  label: 'Products',      icon: UtensilsCrossed, roles: ['admin','manager','storekeeper'] },
+  { to: '/',          label: 'Dashboard',       icon: LayoutDashboard, roles: ['admin','manager','storekeeper'] },
+  { to: '/materials', label: 'Raw Materials',   icon: Boxes,           roles: ['admin','manager','storekeeper'] },
+  { to: '/products',  label: 'Products',        icon: UtensilsCrossed, roles: ['admin','manager','storekeeper'] },
+  { to: '/analytics', label: 'Analytics & P&L', icon: TrendingUp,      roles: ['admin','manager'] },
 ];
 const NAV_AFTER = [
   { to: '/purchases', label: 'Purchases',     icon: ShoppingCart, roles: ['admin','manager'] },

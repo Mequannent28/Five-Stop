@@ -13,6 +13,7 @@ import Users from './pages/Users';
 import Products from './pages/Products';
 import Settings from './pages/Settings';
 import SalesImport from './pages/SalesImport';
+import Analytics from './pages/Analytics';
 import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/materials" element={<RawMaterials />} />
         <Route path="/products" element={<Products />} />
+        <Route path="/analytics" element={<ProtectedRoute roles={['admin', 'manager']}><Analytics /></ProtectedRoute>} />
         <Route path="/transactions" element={<StockTransactions />} />
         <Route path="/transactions/cash-grv"       element={<StockTransactions defaultVoucher="cash_grv" />} />
         <Route path="/transactions/credit-grv"     element={<StockTransactions defaultVoucher="credit_grv" />} />
