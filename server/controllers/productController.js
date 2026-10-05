@@ -138,10 +138,11 @@ const importProductsExcel = asyncHandler(async (req, res) => {
     const row = validRows[i];
 
     const name = String(row['Name'] || row['Product Name'] || '').trim();
+    const code = String(row['Code'] || '').trim();
 
     const data = {
       name,
-      code:           String(row['Code']           || '').trim(),
+      code,
       uom:            String(row['UOM']             || 'Pcs').trim(),
       category:       String(row['Child Category']  || row['Category'] || 'General').trim(),
       parentCategory: String(row['Parent Category'] || 'FOOD').trim(),
@@ -150,18 +151,33 @@ const importProductsExcel = asyncHandler(async (req, res) => {
     };
 
     try {
-      // Escape special regex chars in name for safe lookup
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const existing = await Product.findOne({
-        name: { $regex: `^${escaped}$`, $options: 'i' },
-      });
+      let existing = null;
+
+      // 1️⃣ Match by Code first — codes are unique per product in the source system
+      if (code) {
+        existing = await Product.findOne({ code: { $regex: `^${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
+      }
+
+      // 2️⃣ If no code match, fall back to exact name match
+      if (!existing) {
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        existing = await Product.findOne({ name: { $regex: `^${escaped}$`, $options: 'i' } });
+      }
 
       if (existing) {
-        Object.assign(existing, data);
-        existing.isActive = true;
+        // Update existing record — preserve ingredients
+        existing.name           = data.name;
+        existing.code           = data.code || existing.code;
+        existing.uom            = data.uom;
+        existing.category       = data.category;
+        existing.parentCategory = data.parentCategory;
+        existing.sellingPrice   = data.sellingPrice;
+        existing.description    = data.description || existing.description;
+        existing.isActive       = true;
         await existing.save();
         updated++;
       } else {
+        // No match at all — create a brand-new product
         await Product.create({ ...data, ingredients: [] });
         created++;
       }

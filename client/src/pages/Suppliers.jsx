@@ -57,7 +57,6 @@ const Suppliers = () => {
     { header: 'Email', accessor: 'Email' },
     { header: 'Address', accessor: 'Address' },
   ];
-
   const columns = [
     { key: 'name', header: 'Supplier' },
     { key: 'category', header: 'Category' },
