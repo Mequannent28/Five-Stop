@@ -10,6 +10,15 @@ import ExportDropdown from '../components/ui/ExportDropdown';
 
 const emptyForm = { code: '', name: '', category: '', unit: '', currentStock: 0, reorderLevel: 10, unitCost: 0, storeLocation: 'Main Store' };
 
+// Common units for hospitality / kitchen / store
+const UNITS = [
+  { group: 'Volume',  items: ['Litre (L)', 'Millilitre (ml)', 'Gallon', 'Fluid oz'] },
+  { group: 'Weight',  items: ['Kilogram (kg)', 'Gram (g)', 'Pound (lb)', 'Ounce (oz)'] },
+  { group: 'Count',   items: ['Piece (Pcs)', 'Dozen', 'Pack', 'Box', 'Carton', 'Bag', 'Bottle', 'Can', 'Roll', 'Sheet'] },
+  { group: 'Length',  items: ['Metre (m)', 'Centimetre (cm)'] },
+  { group: 'Other',   items: ['Portion', 'Serving', 'Tray', 'Batch', 'Pair', 'Set'] },
+];
+
 const statusBadge = (status) => {
   if (status === 'out_of_stock') return <Badge color="red">Out of stock</Badge>;
   if (status === 'low_stock') return <Badge color="amber">Low stock</Badge>;
@@ -22,6 +31,7 @@ const RawMaterials = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [unitCustom, setUnitCustom] = useState(false); // true = show custom text input
   const [importResult, setImportResult] = useState(null);
   const importRef = useRef();
   const { hasRole } = useAuth();
@@ -33,8 +43,16 @@ const RawMaterials = () => {
 
   useEffect(() => { load(); }, [search]);
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setModalOpen(true); };
-  const openEdit = (m) => { setEditing(m); setForm(m); setModalOpen(true); };
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setUnitCustom(false); setModalOpen(true); };
+  const openEdit = (m) => {
+    // Check if stored unit is in the preset list
+    const allUnits = UNITS.flatMap(g => g.items);
+    const isPreset = allUnits.includes(m.unit);
+    setEditing(m);
+    setForm(m);
+    setUnitCustom(!isPreset && !!m.unit);
+    setModalOpen(true);
+  };
 
   // Auto-generate next sequential RM-XXXX code
   const generateCode = () => {
@@ -220,9 +238,48 @@ const RawMaterials = () => {
                 className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brass-400" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-ink-600">Unit (kg, ltr, pcs…)</label>
-              <input required value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brass-400" />
+              <label className="mb-1 block text-sm font-medium text-ink-600">Unit *</label>
+              {unitCustom ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    required
+                    autoFocus
+                    value={form.unit}
+                    onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                    placeholder="Type custom unit…"
+                    className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brass-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setUnitCustom(false); setForm(f => ({ ...f, unit: '' })); }}
+                    className="rounded-lg border border-ink-200 px-2.5 py-2 text-xs text-ink-500 hover:bg-ink-50 transition"
+                  >← List</button>
+                </div>
+              ) : (
+                <select
+                  required
+                  value={form.unit}
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') {
+                      setUnitCustom(true);
+                      setForm(f => ({ ...f, unit: '' }));
+                    } else {
+                      setForm({ ...form, unit: e.target.value });
+                    }
+                  }}
+                  className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brass-400 bg-white"
+                >
+                  <option value="">Select unit…</option>
+                  {UNITS.map(group => (
+                    <optgroup key={group.group} label={group.group}>
+                      {group.items.map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                  <option value="__custom__">✏️ Custom…</option>
+                </select>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
