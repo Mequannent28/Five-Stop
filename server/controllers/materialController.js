@@ -1,13 +1,24 @@
 const asyncHandler = require('express-async-handler');
 const XLSX = require('xlsx');
 const RawMaterial = require('../models/RawMaterial');
+const { invalidateDashboardCache } = require('./dashboardController');
 
 const getMaterials = asyncHandler(async (req, res) => {
   const { search, status } = req.query;
-  const filter = {};
+  const filter = { isActive: true };
   if (search) filter.name = { $regex: search, $options: 'i' };
 
-  let materials = await RawMaterial.find(filter).sort({ name: 1 });
+  let materials = await RawMaterial.find(filter).sort({ name: 1 }).lean();
+
+  materials = materials.map((m) => ({
+    ...m,
+    status:
+      m.currentStock <= 0
+        ? 'out_of_stock'
+        : m.currentStock <= m.reorderLevel
+        ? 'low_stock'
+        : 'in_stock',
+  }));
 
   if (status) {
     materials = materials.filter((m) => m.status === status);
@@ -27,6 +38,7 @@ const getMaterialById = asyncHandler(async (req, res) => {
 
 const createMaterial = asyncHandler(async (req, res) => {
   const material = await RawMaterial.create(req.body);
+  invalidateDashboardCache();
   res.status(201).json(material);
 });
 
@@ -39,6 +51,7 @@ const updateMaterial = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Raw material not found');
   }
+  invalidateDashboardCache();
   res.json(material);
 });
 
@@ -49,8 +62,10 @@ const deleteMaterial = asyncHandler(async (req, res) => {
     throw new Error('Raw material not found');
   }
   await material.deleteOne();
+  invalidateDashboardCache();
   res.json({ message: 'Raw material removed' });
 });
+
 
 // GET /api/materials/export/excel
 const exportMaterialsExcel = asyncHandler(async (req, res) => {
@@ -135,8 +150,10 @@ const importMaterialsExcel = asyncHandler(async (req, res) => {
     }
   }
 
+  invalidateDashboardCache();
   res.json({ message: `Imported: ${created} created, ${updated} updated` });
 });
+
 
 module.exports = {
   getMaterials,

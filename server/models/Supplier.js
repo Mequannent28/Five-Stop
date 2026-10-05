@@ -14,4 +14,8 @@ const supplierSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+supplierSchema.index({ isActive: 1, name: 1 });
+supplierSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('Supplier', supplierSchema);
+

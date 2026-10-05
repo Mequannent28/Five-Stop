@@ -4,6 +4,7 @@ const StockTransaction = require('../models/StockTransaction');
 const { VOUCHER_DIRECTION } = require('../models/StockTransaction');
 const RawMaterial = require('../models/RawMaterial');
 const User = require('../models/User');
+const { invalidateDashboardCache } = require('./dashboardController');
 
 // ── helpers ───────────────────────────────────────────────────────────
 const verifyUserPassword = async (userId, password) => {
@@ -47,10 +48,12 @@ const getTransactions = asyncHandler(async (req, res) => {
     .populate('supplier', 'name')
     .populate('performedBy', 'name')
     .sort({ date: -1 })
-    .limit(500);
+    .limit(500)
+    .lean();
 
   res.json(transactions);
 });
+
 
 // ── POST /api/transactions ────────────────────────────────────────────
 const createTransaction = asyncHandler(async (req, res) => {
@@ -130,6 +133,7 @@ const createTransaction = asyncHandler(async (req, res) => {
     .populate('supplier', 'name')
     .populate('performedBy', 'name');
 
+  invalidateDashboardCache();
   res.status(201).json(populated);
 });
 
@@ -153,8 +157,10 @@ const deleteTransaction = asyncHandler(async (req, res) => {
   }
 
   await transaction.deleteOne();
+  invalidateDashboardCache();
   res.json({ message: 'Transaction deleted and stock reversed.' });
 });
+
 
 // ── GET /api/transactions/summary ────────────────────────────────────
 const getVoucherSummary = asyncHandler(async (req, res) => {
@@ -236,6 +242,7 @@ const advanceTransaction = asyncHandler(async (req, res) => {
   }
 
   await txn.save();
+  invalidateDashboardCache();
 
   const populated = await StockTransaction.findById(txn._id)
     .populate('material', 'name unit')
@@ -245,6 +252,7 @@ const advanceTransaction = asyncHandler(async (req, res) => {
 
   res.json({ message: `Voucher moved from "${prev}" → "${rule.to}"`, transaction: populated });
 });
+
 
 // ── POST /api/transactions/import-sales ──────────────────────────────
 // Enhanced: saves full P&L SalesRecord with ingredient consumption per product
@@ -402,7 +410,10 @@ const importSales = asyncHandler(async (req, res) => {
     }
   }
 
+  invalidateDashboardCache();
+
   res.status(201).json({
+
     message: 'Sales imported. Stock deducted and P&L recorded.',
     salesRecord,
     transactionId: transaction?._id,

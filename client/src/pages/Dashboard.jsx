@@ -120,7 +120,15 @@ const CustomPieTooltip = ({ active, payload }) => {
   return null;
 };
 
-let cachedDashboardData = null;
+const getStoredDashboardData = () => {
+  try {
+    const raw = localStorage.getItem('five_stop_dash_cache_v1');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+};
+
+let cachedDashboardData = getStoredDashboardData();
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -133,9 +141,12 @@ export default function Dashboard() {
   const fetchSummary = async (isManual = false) => {
     try {
       if (isManual) setRefreshing(true);
-      const res = await api.get('/dashboard/summary');
+      const res = await api.get('/dashboard/summary' + (isManual ? '?refresh=1' : ''));
       cachedDashboardData = res.data;
       setData(res.data);
+      try {
+        localStorage.setItem('five_stop_dash_cache_v1', JSON.stringify(res.data));
+      } catch (e) {}
     } catch (err) {
       console.error('Failed to load dashboard summary', err);
     } finally {
@@ -147,6 +158,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchSummary();
   }, []);
+
 
   const trendData = useMemo(() => {
     if (!data?.trend) return [];
@@ -280,13 +292,14 @@ export default function Dashboard() {
             <CreditCard size={14} /> New Credit GRV
           </button>
           <button
-            onClick={fetchSummary}
+            onClick={() => fetchSummary(true)}
             disabled={refreshing}
             className="inline-flex items-center gap-1 rounded-xl border border-ink-200 bg-white p-2 text-xs font-medium text-ink-600 hover:bg-ink-50 transition"
             title="Refresh statistics"
           >
             <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
           </button>
+
         </div>
       </div>
 

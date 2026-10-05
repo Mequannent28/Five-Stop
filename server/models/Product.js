@@ -23,7 +23,11 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Virtual: total raw material cost based on ingredients
+productSchema.index({ isActive: 1, createdAt: -1 });
+productSchema.index({ code: 1 });
+productSchema.index({ name: 1 });
+productSchema.index({ category: 1 });
+
 productSchema.virtual('recipeCost').get(function () {
   return this.ingredients.reduce((sum, ing) => {
     const unitCost = ing.material?.unitCost ?? 0;
@@ -35,3 +39,4 @@ productSchema.set('toJSON', { virtuals: true });
 productSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Product', productSchema);
+

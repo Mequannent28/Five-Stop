@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const XLSX = require('xlsx');
 const Product = require('../models/Product');
 const RawMaterial = require('../models/RawMaterial');
+const { invalidateDashboardCache } = require('./dashboardController');
 
 // GET /api/products
 const getProducts = asyncHandler(async (req, res) => {
@@ -11,9 +12,18 @@ const getProducts = asyncHandler(async (req, res) => {
 
   const products = await Product.find(filter)
     .populate('ingredients.material', 'name unit unitCost')
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
-  res.json(products);
+  const mapped = products.map((p) => ({
+    ...p,
+    recipeCost: (p.ingredients || []).reduce((sum, ing) => {
+      const unitCost = ing.material?.unitCost ?? 0;
+      return sum + unitCost * (ing.quantity || 0);
+    }, 0),
+  }));
+
+  res.json(mapped);
 });
 
 // GET /api/products/:id
@@ -26,11 +36,13 @@ const getProductById = asyncHandler(async (req, res) => {
 
 // POST /api/products
 const createProduct = asyncHandler(async (req, res) => {
-  const { name, category, description, sellingPrice, ingredients } = req.body;
-  const product = await Product.create({ name, category, description, sellingPrice, ingredients });
+  const { name, category, description, sellingPrice, ingredients, code } = req.body;
+  const product = await Product.create({ code, name, category, description, sellingPrice, ingredients });
   const populated = await product.populate('ingredients.material', 'name unit unitCost');
+  invalidateDashboardCache();
   res.status(201).json(populated);
 });
+
 
 // PUT /api/products/:id
 const updateProduct = asyncHandler(async (req, res) => {
@@ -46,6 +58,7 @@ const updateProduct = asyncHandler(async (req, res) => {
 
   const updated = await product.save();
   const populated = await updated.populate('ingredients.material', 'name unit unitCost');
+  invalidateDashboardCache();
   res.json(populated);
 });
 
@@ -55,16 +68,20 @@ const deleteProduct = asyncHandler(async (req, res) => {
   if (!product) { res.status(404); throw new Error('Product not found'); }
   product.isActive = false;
   await product.save();
+  invalidateDashboardCache();
   res.json({ message: 'Product removed' });
 });
+
 
 // DELETE /api/products/bulk  (bulk soft delete)
 const bulkDeleteProducts = asyncHandler(async (req, res) => {
   const { ids } = req.body;
   if (!ids || !ids.length) { res.status(400); throw new Error('No ids provided'); }
   await Product.updateMany({ _id: { $in: ids } }, { isActive: false });
+  invalidateDashboardCache();
   res.json({ message: `${ids.length} product(s) deleted` });
 });
+
 
 // GET /api/products/export/excel
 // Exports in the Five Stop format:
@@ -217,8 +234,10 @@ const importProductsExcel = asyncHandler(async (req, res) => {
     });
   }
 
+  invalidateDashboardCache();
   send({ type: 'done', created, updated, skipped, errors, total });
   res.end();
 });
+
 
 module.exports = { getProducts, getProductById, createProduct, updateProduct, deleteProduct, bulkDeleteProducts, exportProductsExcel, importProductsExcel };

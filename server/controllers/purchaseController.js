@@ -4,6 +4,7 @@ const Purchase = require('../models/Purchase');
 const RawMaterial = require('../models/RawMaterial');
 const StockTransaction = require('../models/StockTransaction');
 const User = require('../models/User');
+const { invalidateDashboardCache } = require('./dashboardController');
 
 // ── helpers ──────────────────────────────────────────────────────────
 const applyStock = async (purchase, performedBy) => {
@@ -46,7 +47,8 @@ const getPurchases = asyncHandler(async (req, res) => {
     .populate('approvedBy', 'name role')
     .populate('receivedBy', 'name role')
     .populate('trail.by',   'name role')
-    .sort({ purchaseDate: -1 });
+    .sort({ purchaseDate: -1 })
+    .lean();
   res.json(purchases);
 });
 
@@ -75,6 +77,8 @@ const createPurchase = asyncHandler(async (req, res) => {
     trail: [{ action: 'draft', by: req.user._id, byName: req.user.name, byRole: req.user.role }],
   });
 
+  invalidateDashboardCache();
+
   const populated = await purchase.populate([
     { path: 'supplier', select: 'name' },
     { path: 'items.material', select: 'name unit' },
@@ -82,6 +86,7 @@ const createPurchase = asyncHandler(async (req, res) => {
   ]);
   res.status(201).json(populated);
 });
+
 
 // ── POST /api/purchases/:id/advance ──────────────────────────────────
 /*
@@ -132,6 +137,7 @@ const advancePurchase = asyncHandler(async (req, res) => {
   if (action === 'receive') { purchase.receivedBy = actor._id; purchase.receivedAt = new Date(); }
 
   await purchase.save();
+  invalidateDashboardCache();
 
   // Apply stock only on receive
   if (action === 'receive') {
@@ -155,8 +161,10 @@ const deletePurchase = asyncHandler(async (req, res) => {
     throw new Error('Cannot delete a received purchase. Cancel it first if needed.');
   }
   await purchase.deleteOne();
+  invalidateDashboardCache();
   res.json({ message: 'Purchase deleted' });
 });
+
 
 // kept for backward compat
 const updatePurchaseStatus = asyncHandler(async (req, res) => {

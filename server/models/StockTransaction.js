@@ -111,6 +111,12 @@ const stockTransactionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+stockTransactionSchema.index({ date: -1 });
+stockTransactionSchema.index({ createdAt: -1 });
+stockTransactionSchema.index({ voucherType: 1, date: -1 });
+stockTransactionSchema.index({ status: 1 });
+stockTransactionSchema.index({ material: 1 });
+
 // Virtual: human-readable label
 stockTransactionSchema.virtual('voucherLabel').get(function () {
   const labels = {
@@ -130,3 +136,4 @@ stockTransactionSchema.set('toObject', { virtuals: true });
 module.exports = mongoose.model('StockTransaction', stockTransactionSchema);
 module.exports.VOUCHER_TYPES = VOUCHER_TYPES;
 module.exports.VOUCHER_DIRECTION = VOUCHER_DIRECTION;
+

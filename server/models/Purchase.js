@@ -62,4 +62,10 @@ const purchaseSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+purchaseSchema.index({ purchaseDate: -1 });
+purchaseSchema.index({ createdAt: -1 });
+purchaseSchema.index({ status: 1 });
+purchaseSchema.index({ supplier: 1 });
+
 module.exports = mongoose.model('Purchase', purchaseSchema);
+

@@ -4,14 +4,32 @@ const Purchase = require('../models/Purchase');
 const StockTransaction = require('../models/StockTransaction');
 const Supplier = require('../models/Supplier');
 
+// In-memory cache for ultra-fast instantaneous responses (TTL 25s)
+let summaryCache = {
+  data: null,
+  timestamp: 0,
+};
+const CACHE_TTL_MS = 25 * 1000;
+
+const invalidateDashboardCache = () => {
+  summaryCache = { data: null, timestamp: 0 };
+};
+
 const getSummary = asyncHandler(async (req, res) => {
+  const isForceRefresh = req.query.refresh === '1' || req.query.force === 'true';
+
+  // Fast path: return cached summary if still valid
+  if (!isForceRefresh && summaryCache.data && (Date.now() - summaryCache.timestamp < CACHE_TTL_MS)) {
+    return res.json(summaryCache.data);
+  }
+
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const sevenDaysAgo = new Date(startOfToday);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-  // Parallel database execution for instantaneous responses
+  // Parallel database execution with targeted projection for high speed
   const [
     materials,
     totalSuppliers,
@@ -20,12 +38,15 @@ const getSummary = asyncHandler(async (req, res) => {
     weekTransactions,
     recentTransactions,
   ] = await Promise.all([
-    RawMaterial.find({}).lean(),
+    RawMaterial.find({ isActive: true })
+      .select('name category unit currentStock reorderLevel unitCost')
+      .lean(),
     Supplier.countDocuments({ isActive: true }),
     Purchase.countDocuments({ purchaseDate: { $gte: startOfToday } }),
     Purchase.find({ purchaseDate: { $gte: startOfMonth } }).select('totalAmount').lean(),
     StockTransaction.find({ date: { $gte: sevenDaysAgo } }).select('date type quantity items').lean(),
     StockTransaction.find({})
+      .select('voucherType voucherNo type quantity totalAmount date createdAt material items supplier performedBy')
       .populate('material', 'name unit')
       .populate('items.material', 'name unit')
       .populate('supplier', 'name')
@@ -34,6 +55,7 @@ const getSummary = asyncHandler(async (req, res) => {
       .limit(7)
       .lean(),
   ]);
+
 
   const totalMaterials = materials.length;
   const lowStockCount = materials.filter((m) => m.currentStock > 0 && m.currentStock <= m.reorderLevel).length;
@@ -120,7 +142,7 @@ const getSummary = asyncHandler(async (req, res) => {
     .sort((a, b) => a.currentStock - b.currentStock)
     .slice(0, 6);
 
-  res.json({
+  const payload = {
     totalMaterials,
     lowStockCount,
     outOfStockCount,
@@ -137,7 +159,16 @@ const getSummary = asyncHandler(async (req, res) => {
     topValuableItems,
     lowStockItems,
     recentTransactions,
-  });
+  };
+
+  // Cache in server memory
+  summaryCache = {
+    data: payload,
+    timestamp: Date.now(),
+  };
+
+  res.json(payload);
 });
 
-module.exports = { getSummary };
+module.exports = { getSummary, invalidateDashboardCache };
+
