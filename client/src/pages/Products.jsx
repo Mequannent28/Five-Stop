@@ -30,8 +30,8 @@ const Products = () => {
   const [importResult, setImportResult] = useState(null);
   const [importProgress, setImportProgress] = useState(null); // { percent, current, total, created, updated, skipped }
   const importRef = useRef();
-  const { hasRole } = useAuth();
-  const canEdit = hasRole('admin', 'manager');
+  const { hasRole, can } = useAuth();
+  const canEdit = hasRole('admin', 'manager') || can('recordGoods');
 
   const load = () =>
     api.get('/products', { params: { search } }).then((r) => {

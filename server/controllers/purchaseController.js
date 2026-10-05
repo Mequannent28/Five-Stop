@@ -5,6 +5,7 @@ const RawMaterial = require('../models/RawMaterial');
 const StockTransaction = require('../models/StockTransaction');
 const User = require('../models/User');
 const { invalidateDashboardCache } = require('./dashboardController');
+const { hasPermission } = require('../middleware/authMiddleware');
 
 // ── helpers ──────────────────────────────────────────────────────────
 const applyStock = async (purchase, performedBy) => {
@@ -108,23 +109,34 @@ const advancePurchase = asyncHandler(async (req, res) => {
   const purchase = await Purchase.findById(req.params.id);
   if (!purchase) { res.status(404); throw new Error('Purchase not found'); }
 
+  const actionCapMap = {
+    check: 'checkReview',
+    approve: 'approveGoods',
+    receive: 'recordGoods',
+    cancel: 'voidTransactions',
+  };
+
+  const cap = actionCapMap[action];
+  if (!cap) { res.status(400); throw new Error(`Unknown action: ${action}`); }
+
   // ── Transition rules ──
   const transitions = {
-    check:   { from: ['draft'],    to: 'checked',   roles: ['admin','manager'] },
-    approve: { from: ['checked'],  to: 'approved',  roles: ['admin'] },
-    receive: { from: ['approved'], to: 'received',  roles: ['admin','manager','storekeeper'] },
-    cancel:  { from: ['draft','checked','approved'], to: 'cancelled', roles: ['admin','manager'] },
+    check:   { from: ['draft'],    to: 'checked' },
+    approve: { from: ['checked'],  to: 'approved' },
+    receive: { from: ['approved'], to: 'received' },
+    cancel:  { from: ['draft','checked','approved'], to: 'cancelled' },
   };
 
   const rule = transitions[action];
-  if (!rule) { res.status(400); throw new Error(`Unknown action: ${action}`); }
   if (!rule.from.includes(purchase.status)) {
     res.status(400);
     throw new Error(`Cannot ${action} a purchase that is currently "${purchase.status}"`);
   }
-  if (!rule.roles.includes(actor.role)) {
+
+  const allowed = await hasPermission(actor.role, cap);
+  if (!allowed) {
     res.status(403);
-    throw new Error(`Your role (${actor.role}) cannot perform "${action}"`);
+    throw new Error(`Your role (${actor.role}) does not have permission to "${action}" purchases`);
   }
 
   // Apply transition

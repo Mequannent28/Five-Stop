@@ -5,6 +5,7 @@ const { VOUCHER_DIRECTION } = require('../models/StockTransaction');
 const RawMaterial = require('../models/RawMaterial');
 const User = require('../models/User');
 const { invalidateDashboardCache } = require('./dashboardController');
+const { hasPermission } = require('../middleware/authMiddleware');
 
 // ── helpers ───────────────────────────────────────────────────────────
 const verifyUserPassword = async (userId, password) => {
@@ -200,22 +201,33 @@ const advanceTransaction = asyncHandler(async (req, res) => {
   const txn = await StockTransaction.findById(req.params.id);
   if (!txn) { res.status(404); throw new Error('Transaction not found'); }
 
+  const actionCapMap = {
+    check: 'checkReview',
+    approve: 'approveGoods',
+    post: 'postLedger',
+    void: 'voidTransactions',
+  };
+
+  const cap = actionCapMap[action];
+  if (!cap) { res.status(400); throw new Error(`Unknown action: ${action}`); }
+
   const transitions = {
-    check:   { from: ['pending'],            to: 'checked',  roles: ['admin','manager'] },
-    approve: { from: ['checked'],            to: 'approved', roles: ['admin'] },
-    post:    { from: ['approved'],           to: 'posted',   roles: ['admin','manager'] },
-    void:    { from: ['pending','checked','approved','posted'], to: 'voided', roles: ['admin'] },
+    check:   { from: ['pending'],            to: 'checked' },
+    approve: { from: ['checked'],            to: 'approved' },
+    post:    { from: ['approved'],           to: 'posted' },
+    void:    { from: ['pending','checked','approved','posted'], to: 'voided' },
   };
 
   const rule = transitions[action];
-  if (!rule) { res.status(400); throw new Error(`Unknown action: ${action}`); }
   if (!rule.from.includes(txn.status)) {
     res.status(400);
     throw new Error(`Cannot ${action} a voucher that is currently "${txn.status}"`);
   }
-  if (!rule.roles.includes(actor.role)) {
+
+  const allowed = await hasPermission(actor.role, cap);
+  if (!allowed) {
     res.status(403);
-    throw new Error(`Your role (${actor.role}) cannot perform "${action}"`);
+    throw new Error(`Your role (${actor.role}) does not have permission to "${action}" vouchers`);
   }
 
   const prev = txn.status;

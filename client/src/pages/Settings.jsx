@@ -37,7 +37,7 @@ const CAPABILITIES = [
 ];
 
 export default function Settings() {
-  const { user, updateUser, hasRole } = useAuth();
+  const { user, updateUser, hasRole, refreshPermissions } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') || 'profile';
 
@@ -107,7 +107,7 @@ export default function Settings() {
 
   // Load system settings
   useEffect(() => {
-    if (hasRole('admin')) {
+    if (user) {
       setSystemLoading(true);
       api
         .get('/settings')
@@ -265,7 +265,12 @@ export default function Settings() {
     try {
       const res = await api.put('/settings', systemForm);
       setSystemForm((prev) => ({ ...prev, ...res.data }));
-      setSystemSuccess('Five Stop system settings saved successfully.');
+      if (res.data?.rolePermissions) {
+        await refreshPermissions(res.data.rolePermissions);
+      } else {
+        await refreshPermissions();
+      }
+      setSystemSuccess('Five Stop system settings & role permissions saved and activated immediately.');
       setTimeout(() => setSystemSuccess(''), 4000);
     } catch (err) {
       setSystemError(err.response?.data?.message || 'Failed to update system settings.');

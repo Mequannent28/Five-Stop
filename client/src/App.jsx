@@ -32,7 +32,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/materials" element={<RawMaterials />} />
         <Route path="/products" element={<Products />} />
-        <Route path="/analytics" element={<ProtectedRoute roles={['admin', 'manager']}><Analytics /></ProtectedRoute>} />
+        <Route path="/analytics" element={<ProtectedRoute capability="viewReports"><Analytics /></ProtectedRoute>} />
         <Route path="/transactions" element={<StockTransactions />} />
         <Route path="/transactions/cash-grv"       element={<StockTransactions defaultVoucher="cash_grv" />} />
         <Route path="/transactions/credit-grv"     element={<StockTransactions defaultVoucher="credit_grv" />} />
@@ -44,7 +44,7 @@ function App() {
         <Route
           path="/purchases"
           element={
-            <ProtectedRoute roles={['admin', 'manager']}>
+            <ProtectedRoute capability="recordGoods">
               <Purchases />
             </ProtectedRoute>
           }
@@ -60,25 +60,25 @@ function App() {
         <Route
           path="/reports"
           element={
-            <ProtectedRoute roles={['admin', 'manager']}>
+            <ProtectedRoute capability="viewReports">
               <Reports />
             </ProtectedRoute>
           }
         />
-        <Route path="/reports/summary"        element={<ProtectedRoute roles={['admin','manager']}><Reports defaultTab="summary"        /></ProtectedRoute>} />
-        <Route path="/reports/daily"          element={<ProtectedRoute roles={['admin','manager']}><Reports defaultTab="daily"          /></ProtectedRoute>} />
-        <Route path="/reports/cash-grv"       element={<ProtectedRoute roles={['admin','manager']}><Reports defaultTab="cash_grv"       /></ProtectedRoute>} />
-        <Route path="/reports/credit-grv"     element={<ProtectedRoute roles={['admin','manager']}><Reports defaultTab="credit_grv"     /></ProtectedRoute>} />
-        <Route path="/reports/fresh-bazaar"   element={<ProtectedRoute roles={['admin','manager']}><Reports defaultTab="fresh_bazaar"   /></ProtectedRoute>} />
-        <Route path="/reports/pos-adjustment" element={<ProtectedRoute roles={['admin','manager']}><Reports defaultTab="pos_adjustment" /></ProtectedRoute>} />
-        <Route path="/reports/disposal"       element={<ProtectedRoute roles={['admin','manager']}><Reports defaultTab="disposal"       /></ProtectedRoute>} />
-        <Route path="/reports/neg-adjustment" element={<ProtectedRoute roles={['admin','manager']}><Reports defaultTab="neg_adjustment" /></ProtectedRoute>} />
-        <Route path="/reports/stock-levels"   element={<ProtectedRoute roles={['admin','manager']}><Reports defaultTab="stock"         /></ProtectedRoute>} />
-        <Route path="/reports/purchases"      element={<ProtectedRoute roles={['admin','manager']}><Reports defaultTab="purchases"      /></ProtectedRoute>} />
+        <Route path="/reports/summary"        element={<ProtectedRoute capability="viewReports"><Reports defaultTab="summary"        /></ProtectedRoute>} />
+        <Route path="/reports/daily"          element={<ProtectedRoute capability="viewReports"><Reports defaultTab="daily"          /></ProtectedRoute>} />
+        <Route path="/reports/cash-grv"       element={<ProtectedRoute capability="viewReports"><Reports defaultTab="cash_grv"       /></ProtectedRoute>} />
+        <Route path="/reports/credit-grv"     element={<ProtectedRoute capability="viewReports"><Reports defaultTab="credit_grv"     /></ProtectedRoute>} />
+        <Route path="/reports/fresh-bazaar"   element={<ProtectedRoute capability="viewReports"><Reports defaultTab="fresh_bazaar"   /></ProtectedRoute>} />
+        <Route path="/reports/pos-adjustment" element={<ProtectedRoute capability="viewReports"><Reports defaultTab="pos_adjustment" /></ProtectedRoute>} />
+        <Route path="/reports/disposal"       element={<ProtectedRoute capability="viewReports"><Reports defaultTab="disposal"       /></ProtectedRoute>} />
+        <Route path="/reports/neg-adjustment" element={<ProtectedRoute capability="viewReports"><Reports defaultTab="neg_adjustment" /></ProtectedRoute>} />
+        <Route path="/reports/stock-levels"   element={<ProtectedRoute capability="viewReports"><Reports defaultTab="stock"         /></ProtectedRoute>} />
+        <Route path="/reports/purchases"      element={<ProtectedRoute capability="viewReports"><Reports defaultTab="purchases"      /></ProtectedRoute>} />
         <Route
           path="/users"
           element={
-            <ProtectedRoute roles={['admin']}>
+            <ProtectedRoute capability="manageAccounts">
               <Users />
             </ProtectedRoute>
           }

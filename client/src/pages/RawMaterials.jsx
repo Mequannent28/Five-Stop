@@ -34,8 +34,8 @@ const RawMaterials = () => {
   const [unitCustom, setUnitCustom] = useState(false); // true = show custom text input
   const [importResult, setImportResult] = useState(null);
   const importRef = useRef();
-  const { hasRole } = useAuth();
-  const canEdit = hasRole('admin', 'manager');
+  const { hasRole, can } = useAuth();
+  const canEdit = hasRole('admin', 'manager') || can('recordGoods');
 
   const load = () => {
     api.get('/materials', { params: { search } }).then((res) => setMaterials(res.data));

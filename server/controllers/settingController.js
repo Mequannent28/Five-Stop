@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const Setting = require('../models/Setting');
+const { clearSettingsCache, DEFAULT_ROLE_PERMISSIONS } = require('../middleware/authMiddleware');
 
 // @desc   Get system settings (creates default if none exists)
 // @route  GET /api/settings
@@ -18,7 +19,12 @@ const getSettings = asyncHandler(async (req, res) => {
       taxRate: 15,
       autoGenerateVoucherNo: true,
       allowNegativeStock: false,
+      rolePermissions: DEFAULT_ROLE_PERMISSIONS,
     });
+  } else if (!settings.rolePermissions) {
+    settings.rolePermissions = DEFAULT_ROLE_PERMISSIONS;
+    settings.markModified('rolePermissions');
+    await settings.save();
   }
   res.json(settings);
 });
@@ -43,7 +49,6 @@ const updateSettings = asyncHandler(async (req, res) => {
     'taxRate',
     'autoGenerateVoucherNo',
     'allowNegativeStock',
-    'rolePermissions',
     'notes',
   ];
 
@@ -53,8 +58,15 @@ const updateSettings = asyncHandler(async (req, res) => {
     }
   });
 
+  if (req.body.rolePermissions !== undefined) {
+    settings.rolePermissions = req.body.rolePermissions;
+    settings.markModified('rolePermissions');
+  }
+
   const updated = await settings.save();
+  clearSettingsCache();
   res.json(updated);
 });
 
 module.exports = { getSettings, updateSettings };
+

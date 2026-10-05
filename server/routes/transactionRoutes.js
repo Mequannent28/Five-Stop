@@ -8,15 +8,16 @@ const {
   advanceTransaction,
   importSales,
 } = require('../controllers/transactionController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, authorizePermission } = require('../middleware/authMiddleware');
 
 router.use(protect);
 
 router.get('/summary', getVoucherSummary);
 router.get('/', getTransactions);
-router.post('/', authorize('admin', 'manager', 'storekeeper'), createTransaction);
-router.post('/import-sales', authorize('admin', 'manager', 'storekeeper'), importSales);
+router.post('/', authorizePermission('recordGoods'), createTransaction);
+router.post('/import-sales', authorizePermission('recordGoods'), importSales);
 router.post('/:id/advance', advanceTransaction);
-router.delete('/:id', authorize('admin', 'manager'), deleteTransaction);
+router.delete('/:id', authorizePermission('voidTransactions'), deleteTransaction);
 
 module.exports = router;
+

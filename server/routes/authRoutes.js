@@ -8,10 +8,10 @@ const {
   updateProfile,
   updatePassword,
 } = require('../controllers/authController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, authorize, authorizePermission } = require('../middleware/authMiddleware');
 
 router.post('/login', loginUser);
-router.post('/register', protect, authorize('admin'), registerUser);
+router.post('/register', protect, authorizePermission('manageAccounts'), registerUser);
 router.get('/me', protect, getMe);
 router.post('/verify-password', protect, verifyPassword);
 router.put('/profile', protect, updateProfile);

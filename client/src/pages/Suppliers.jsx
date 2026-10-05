@@ -15,8 +15,8 @@ const Suppliers = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const { hasRole } = useAuth();
-  const canDelete = hasRole('admin');
+  const { hasRole, can } = useAuth();
+  const canDelete = hasRole('admin') || can('manageAccounts');
 
   const load = () => api.get('/suppliers', { params: { search } }).then((res) => setSuppliers(res.data));
   useEffect(() => { load(); }, [search]);

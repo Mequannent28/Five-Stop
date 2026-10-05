@@ -13,10 +13,10 @@ const {
   getPurchaseReport,
   getSummaryReport,
 } = require('../controllers/reportController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, authorizePermission } = require('../middleware/authMiddleware');
 
 router.use(protect);
-router.use(authorize('admin', 'manager'));
+router.use(authorizePermission('viewReports'));
 
 // Existing
 router.get('/daily',        getDailyReport);

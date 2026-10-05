@@ -40,10 +40,10 @@ const NAV_BEFORE = [
   { to: '/',          label: 'Dashboard',       icon: LayoutDashboard, roles: ['admin','manager','storekeeper'] },
   { to: '/materials', label: 'Raw Materials',   icon: Boxes,           roles: ['admin','manager','storekeeper'] },
   { to: '/products',  label: 'Products',        icon: UtensilsCrossed, roles: ['admin','manager','storekeeper'] },
-  { to: '/analytics', label: 'Analytics & P&L', icon: TrendingUp,      roles: ['admin','manager'] },
+  { to: '/analytics', label: 'Analytics & P&L', icon: TrendingUp,      capability: 'viewReports', roles: ['admin','manager'] },
 ];
 const NAV_AFTER = [
-  { to: '/purchases', label: 'Purchases',     icon: ShoppingCart, roles: ['admin','manager'] },
+  { to: '/purchases', label: 'Purchases',     icon: ShoppingCart, capability: 'recordGoods', roles: ['admin','manager'] },
   { to: '/suppliers', label: 'Suppliers',     icon: Truck,        roles: ['admin','manager'] },
 ];
 
@@ -84,7 +84,7 @@ const CollapsibleNav = ({ label, icon: Icon, isActive, open, onToggle, children 
 
 // ── Sidebar ───────────────────────────────────────────────────────────
 const Sidebar = ({ open, onClose }) => {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const location = useLocation();
 
   const onTransactions = location.pathname.startsWith('/transactions');
@@ -93,13 +93,18 @@ const Sidebar = ({ open, onClose }) => {
   const [stockOpen,  setStockOpen]  = useState(onTransactions);
   const [reportOpen, setReportOpen] = useState(onReports);
 
-  const canSeeStock   = ['admin','manager','storekeeper'].includes(user?.role);
-  const canSeeReports = ['admin','manager'].includes(user?.role);
+  const canSeeStock   = can('recordGoods') || ['admin','manager','storekeeper'].includes(user?.role);
+  const canSeeReports = can('viewReports');
 
   const linkCls = (isActive) =>
     `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
       isActive ? 'bg-white/20 text-white shadow-sm backdrop-blur-sm' : 'text-blue-100 hover:bg-white/10 hover:text-white'
     }`;
+
+  const isItemVisible = (item) => {
+    if (item.capability) return can(item.capability);
+    return item.roles ? item.roles.includes(user?.role) : true;
+  };
 
   return (
     <>
@@ -131,7 +136,7 @@ const Sidebar = ({ open, onClose }) => {
         <nav className="mt-1 flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
 
           {/* Before-group items */}
-          {NAV_BEFORE.filter(i => i.roles.includes(user?.role)).map(({ to, label, icon: Icon }) => (
+          {NAV_BEFORE.filter(isItemVisible).map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={to === '/'} onClick={onClose}
               className={({ isActive }) => linkCls(isActive)}>
               <Icon size={18} strokeWidth={2} />{label}
@@ -154,7 +159,7 @@ const Sidebar = ({ open, onClose }) => {
           )}
 
           {/* After-group items (Purchases, Suppliers) */}
-          {NAV_AFTER.filter(i => i.roles.includes(user?.role))
+          {NAV_AFTER.filter(isItemVisible)
             .filter(i => i.to !== '/reports')
             .map(({ to, label, icon: Icon }) => (
               <NavLink key={to} to={to} onClick={onClose}
@@ -179,7 +184,7 @@ const Sidebar = ({ open, onClose }) => {
           )}
 
           {/* Staff Accounts */}
-          {user?.role === 'admin' && (
+          {(can('manageAccounts') || user?.role === 'admin') && (
             <NavLink to="/users" onClick={onClose}
               className={({ isActive }) => linkCls(isActive)}>
               <Users size={18} strokeWidth={2} /> Staff Accounts

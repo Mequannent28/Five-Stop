@@ -27,10 +27,10 @@ const emptyForm = key => ({ voucherType: key, voucherNo: '', supplier: '', reaso
 
 // ── Component ─────────────────────────────────────────────────────────
 export default function StockTransactions({ defaultVoucher } = {}) {
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, can } = useAuth();
   const navigate = useNavigate();
-  const canEdit   = hasRole('admin', 'manager', 'storekeeper');
-  const canDelete = hasRole('admin', 'manager');
+  const canEdit   = can('recordGoods');
+  const canDelete = can('voidTransactions');
 
   // filterType comes from sidebar navigation (defaultVoucher) or stays null (All)
   const filterType = defaultVoucher ?? null;
@@ -143,12 +143,12 @@ export default function StockTransactions({ defaultVoucher } = {}) {
 
   // ── Workflow helpers ──
   const NEXT_ACTIONS = {
-    pending:  [{ action: 'check',   label: 'Check',   roles: ['admin','manager'] },
-               { action: 'void',    label: 'Void',    roles: ['admin'], danger: true }],
-    checked:  [{ action: 'approve', label: 'Approve', roles: ['admin'] },
-               { action: 'void',    label: 'Void',    roles: ['admin'], danger: true }],
-    approved: [{ action: 'post',    label: 'Post',    roles: ['admin','manager'] },
-               { action: 'void',    label: 'Void',    roles: ['admin'], danger: true }],
+    pending:  [{ action: 'check',   label: 'Check',   cap: 'checkReview' },
+               { action: 'void',    label: 'Void',    cap: 'voidTransactions', danger: true }],
+    checked:  [{ action: 'approve', label: 'Approve', cap: 'approveGoods' },
+               { action: 'void',    label: 'Void',    cap: 'voidTransactions', danger: true }],
+    approved: [{ action: 'post',    label: 'Post',    cap: 'postLedger' },
+               { action: 'void',    label: 'Void',    cap: 'voidTransactions', danger: true }],
     posted:   [],
     voided:   [],
   };
@@ -162,7 +162,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
 
   const actionsFor = (txn) => {
     const possible = NEXT_ACTIONS[txn.status ?? 'pending'] ?? [];
-    return possible.filter(a => a.roles.includes(user?.role));
+    return possible.filter(a => can(a.cap));
   };
 
   const openApprove = (txn, action) => {
@@ -256,12 +256,12 @@ export default function StockTransactions({ defaultVoucher } = {}) {
               <th className="px-4 py-3 text-right font-semibold text-ink-500 whitespace-nowrap">Total (ETB)</th>
               <th className="px-4 py-3 text-left font-semibold text-ink-500 whitespace-nowrap">Status</th>
               <th className="px-4 py-3 text-left font-semibold text-ink-500 whitespace-nowrap">By</th>
-              {canDelete && <th className="px-4 py-3" />}
+              <th className="px-4 py-3 text-right font-semibold text-ink-500 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-ink-50">
             {displayed.length === 0 && (
-              <tr><td colSpan={canDelete ? 9 : 8} className="px-4 py-12 text-center text-ink-400">No transactions found.</td></tr>
+              <tr><td colSpan={filterType ? 9 : 10} className="px-4 py-12 text-center text-ink-400">No transactions found.</td></tr>
             )}
             {displayed.map(t => {
               const v = voucherByKey[t.voucherType];
@@ -299,35 +299,34 @@ export default function StockTransactions({ defaultVoucher } = {}) {
                     <WorkflowBadge status={t.status ?? 'pending'} size="sm" />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-xs text-ink-400">{t.performedBy?.name || '—'}</td>
-                  {canDelete && (
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1">
-                        {/* Detail / trail */}
-                        <button
-                          onClick={() => { setDetailTxn(t); setDetailOpen(true); }}
-                          className="rounded-md p-1.5 text-ink-300 hover:bg-ink-100 hover:text-ink-600"
-                          title="View trail"
-                        >
-                          <Eye size={13} />
+                  <td className="px-4 py-3 whitespace-nowrap text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {/* Detail / trail */}
+                      <button
+                        onClick={() => { setDetailTxn(t); setDetailOpen(true); }}
+                        className="rounded-md p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-600 transition"
+                        title="View trail"
+                      >
+                        <Eye size={13} />
+                      </button>
+                      {/* Workflow action buttons */}
+                      {acts.map(a => (
+                        <button key={a.action}
+                          onClick={() => openApprove(t, a.action)}
+                          className={`rounded-lg px-2 py-1 text-xs font-semibold text-white transition ${ACTION_COLORS[a.action]}`}>
+                          {a.label}
                         </button>
-                        {/* Workflow action buttons */}
-                        {acts.map(a => (
-                          <button key={a.action}
-                            onClick={() => openApprove(t, a.action)}
-                            className={`rounded-lg px-2 py-1 text-xs font-semibold text-white ${ACTION_COLORS[a.action]}`}>
-                            {a.label}
-                          </button>
-                        ))}
-                        {/* Delete (only pending/voided) */}
-                        {['pending','voided'].includes(t.status ?? 'pending') && (
-                          <button onClick={() => handleDelete(t._id)}
-                            className="rounded-md p-1.5 text-ink-300 hover:bg-red-50 hover:text-red-600">
-                            <Trash2 size={13} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  )}
+                      ))}
+                      {/* Delete (only pending/voided and if user has voidTransactions capability) */}
+                      {canDelete && ['pending','voided'].includes(t.status ?? 'pending') && (
+                        <button onClick={() => handleDelete(t._id)}
+                          className="rounded-md p-1.5 text-ink-400 hover:bg-red-50 hover:text-red-600 transition"
+                          title="Delete transaction">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               );
             })}

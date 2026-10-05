@@ -14,12 +14,12 @@ const emptyItem = { material: '', quantity: 1, unitCost: 0 };
 
 // Which action buttons to show per status
 const NEXT_ACTIONS = {
-  draft:    [{ action: 'check',   label: 'Check',   roles: ['admin','manager'] },
-             { action: 'cancel',  label: 'Cancel',  roles: ['admin','manager'], danger: true }],
-  checked:  [{ action: 'approve', label: 'Approve', roles: ['admin'] },
-             { action: 'cancel',  label: 'Cancel',  roles: ['admin','manager'], danger: true }],
-  approved: [{ action: 'receive', label: 'Receive', roles: ['admin','manager','storekeeper'] },
-             { action: 'cancel',  label: 'Cancel',  roles: ['admin','manager'], danger: true }],
+  draft:    [{ action: 'check',   label: 'Check',   cap: 'checkReview' },
+             { action: 'cancel',  label: 'Cancel',  cap: 'voidTransactions', danger: true }],
+  checked:  [{ action: 'approve', label: 'Approve', cap: 'approveGoods' },
+             { action: 'cancel',  label: 'Cancel',  cap: 'voidTransactions', danger: true }],
+  approved: [{ action: 'receive', label: 'Receive', cap: 'recordGoods' },
+             { action: 'cancel',  label: 'Cancel',  cap: 'voidTransactions', danger: true }],
   received: [],
   cancelled:[],
 };
@@ -32,7 +32,7 @@ const ACTION_COLORS = {
 };
 
 export default function Purchases() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const [purchases,  setPurchases]  = useState([]);
   const [suppliers,  setSuppliers]  = useState([]);
   const [materials,  setMaterials]  = useState([]);
@@ -175,7 +175,7 @@ export default function Purchases() {
   // ── Available actions for this user on this purchase ──
   const actionsFor = (purchase) => {
     const possible = NEXT_ACTIONS[purchase.status] ?? [];
-    return possible.filter(a => a.roles.includes(user?.role));
+    return possible.filter(a => can(a.cap));
   };
 
   const columns = [
@@ -238,12 +238,14 @@ export default function Purchases() {
           importLabel="Import Excel"
         />
         <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
-        <Button
-          style={{ background: 'linear-gradient(135deg,#1a56db,#0d2d80)', color: 'white' }}
-          onClick={openCreate}
-        >
-          <Plus size={16} /> Record purchase
-        </Button>
+        {can('recordGoods') && (
+          <Button
+            style={{ background: 'linear-gradient(135deg,#1a56db,#0d2d80)', color: 'white' }}
+            onClick={openCreate}
+          >
+            <Plus size={16} /> Record purchase
+          </Button>
+        )}
       </div>
 
       {importResult && (

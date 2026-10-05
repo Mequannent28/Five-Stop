@@ -7,14 +7,15 @@ const {
   advancePurchase,
   deletePurchase,
 } = require('../controllers/purchaseController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect, authorizePermission } = require('../middleware/authMiddleware');
 
 router.use(protect);
 router.get('/',    getPurchases);
 router.get('/:id', getPurchaseById);
-router.post('/',   authorize('admin', 'manager'), createPurchase);
-// Advance workflow: check / approve / receive / cancel — roles checked inside controller
+router.post('/',   authorizePermission('recordGoods'), createPurchase);
+// Advance workflow: check / approve / receive / cancel — capabilities checked inside controller
 router.post('/:id/advance', advancePurchase);
-router.delete('/:id', authorize('admin', 'manager'), deletePurchase);
+router.delete('/:id', authorizePermission('voidTransactions'), deletePurchase);
 
 module.exports = router;
+
