@@ -134,11 +134,16 @@ const importProductsExcel = asyncHandler(async (req, res) => {
 
   send({ type: 'start', total });
 
+  // Track which DB _ids have already been updated in THIS import run.
+  // If the same _id is matched again (duplicate row in Excel), we create a NEW product.
+  const processedIds = new Set();
+
   for (let i = 0; i < validRows.length; i++) {
     const row = validRows[i];
 
     const name = String(row['Name'] || row['Product Name'] || '').trim();
-    const code = String(row['Code'] || '').trim();
+    // Normalize code — strip trailing dashes/spaces (source system quirk)
+    const code = String(row['Code'] || '').trim().replace(/-+$/, '');
 
     const data = {
       name,
@@ -153,15 +158,27 @@ const importProductsExcel = asyncHandler(async (req, res) => {
     try {
       let existing = null;
 
-      // 1️⃣ Match by Code first — codes are unique per product in the source system
+      // 1️⃣ Match by normalized Code (exact, case-insensitive)
       if (code) {
-        existing = await Product.findOne({ code: { $regex: `^${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
+        const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Also try matching the code with trailing dash (stored format)
+        existing = await Product.findOne({
+          code: { $regex: `^${escapedCode}-?$`, $options: 'i' },
+        });
+        // Only use this match if it hasn't been processed already
+        if (existing && processedIds.has(existing._id.toString())) {
+          existing = null; // Force create — this DB record was already updated this run
+        }
       }
 
-      // 2️⃣ If no code match, fall back to exact name match
+      // 2️⃣ Fall back to exact name match (only if no code match)
       if (!existing) {
-        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        existing = await Product.findOne({ name: { $regex: `^${escaped}$`, $options: 'i' } });
+        const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const byName = await Product.findOne({ name: { $regex: `^${escapedName}$`, $options: 'i' } });
+        // Only use name match if this record hasn't been updated yet this run
+        if (byName && !processedIds.has(byName._id.toString())) {
+          existing = byName;
+        }
       }
 
       if (existing) {
@@ -175,10 +192,12 @@ const importProductsExcel = asyncHandler(async (req, res) => {
         existing.description    = data.description || existing.description;
         existing.isActive       = true;
         await existing.save();
+        processedIds.add(existing._id.toString()); // Mark as processed
         updated++;
       } else {
-        // No match at all — create a brand-new product
-        await Product.create({ ...data, ingredients: [] });
+        // No match found (or already updated this run) — create a brand-new product
+        const created_ = await Product.create({ ...data, ingredients: [] });
+        processedIds.add(created_._id.toString());
         created++;
       }
     } catch (err) {
