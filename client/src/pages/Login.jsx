@@ -40,80 +40,68 @@ const Login = () => {
     <div className="flex min-h-screen w-full flex-col lg:flex-row bg-white selection:bg-blue-600 selection:text-white">
       
       {/* ════════════════════════════════════════════════════════════════
-          LEFT COLUMN: Brand & Security Showcase (Vibrant Solid Royal Blue)
+          LEFT COLUMN: Brand & Security Showcase (Refined High-End Brand Blue)
       ════════════════════════════════════════════════════════════════ */}
       <div
-        className="relative flex flex-col justify-between overflow-hidden p-8 text-white sm:p-12 lg:w-1/2 lg:p-16 shadow-2xl bg-[#0f2b6e]"
+        className="relative flex flex-col justify-between overflow-hidden p-8 text-white sm:p-12 lg:w-1/2 lg:p-16 shadow-2xl"
         style={{
-          background: 'linear-gradient(145deg, #091e4f 0%, #1d4ed8 45%, #0c2356 100%)',
+          background: 'linear-gradient(150deg, #091f58 0%, #1742a8 50%, #0d286d 100%)',
         }}
       >
         {/* Decorative background ambient glow circles */}
-        <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-cyan-400/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-blue-500/30 blur-3xl" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:20px_20px] opacity-25" />
+        <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-sky-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-blue-500/25 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:24px_24px] opacity-20" />
 
-        {/* Top: Brand Logo */}
-        <div className="relative z-10">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 p-2.5 backdrop-blur-md border border-white/30 shadow-xl shadow-black/30">
+        {/* Top: Brand Logo & Title */}
+        <div className="relative z-10 pb-6 border-b border-white/15">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 p-3 backdrop-blur-md border border-white/30 shadow-xl shadow-blue-950/30">
               <Warehouse className="h-full w-full text-white drop-shadow-sm" strokeWidth={2.2} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-black tracking-tight uppercase text-white font-sans drop-shadow-md">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl font-black tracking-tight uppercase text-white font-sans drop-shadow-md">
                   FIVE STOP
                 </span>
-                <span className="rounded-full bg-white/20 border border-white/30 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white uppercase shadow-xs">
+                <span className="rounded-full bg-white/20 border border-white/30 px-2.5 py-0.5 text-[10px] font-bold tracking-widest text-white uppercase shadow-xs">
                   ENTERPRISE
                 </span>
               </div>
-              <p className="text-xs font-medium tracking-wide text-blue-100 drop-shadow-xs">
-                Hotel Stock &amp; Inventory Management System
+              <p className="text-xs font-medium tracking-wide text-blue-100/90 mt-0.5">
+                Hotel &amp; Resort Stock Management System
               </p>
             </div>
           </div>
         </div>
 
-        {/* Middle: Headline, Live Highlights & Core Capabilities */}
-        <div className="relative z-10 my-10 space-y-6 lg:my-0 lg:max-w-lg">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/25 px-3.5 py-1 text-xs font-semibold text-white backdrop-blur-md shadow-xs">
+        {/* Middle: Headline, Subtext & Verified Badge Card */}
+        <div className="relative z-10 my-8 space-y-7 lg:my-0 lg:max-w-xl">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3.5 py-1 text-xs font-semibold text-white backdrop-blur-md shadow-xs">
               <Sparkles size={13} className="text-amber-300 animate-pulse" />
-              <span>Version 2.0 · Multi-Department Stock Control</span>
+              <span>Multi-Store &amp; Kitchen Inventory Engine</span>
             </div>
-            <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-[40px] leading-tight drop-shadow-md">
-              Hospitality Stock, Purchasing &amp; Recipe Ledger Desk
+            <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-[42px] leading-[1.18] drop-shadow-sm">
+              Secure Inventory &amp; Store Ledger Desk
             </h1>
-            <p className="text-sm leading-relaxed text-blue-50 font-medium">
-              Centralized real-time warehouse tracking, supplier price indexation, recipe consumption breakdown, and automated monthly ledger reconciliations.
+            <p className="text-sm sm:text-base leading-relaxed text-blue-50/90 font-normal">
+              Access the central store ledger for digital receiving verification (GRV), automated recipe costing, multi-tier Maker-Checker approvals, and perpetual stock reconciliations.
             </p>
           </div>
 
-          {/* Quick Metrics / Capabilities Grid */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="rounded-xl border border-white/20 bg-white/10 p-3 backdrop-blur-md shadow-xs">
-              <div className="text-lg font-black text-white">99.8%</div>
-              <div className="text-[11px] font-medium text-blue-100">Inventory Valuation Accuracy</div>
-            </div>
-            <div className="rounded-xl border border-white/20 bg-white/10 p-3 backdrop-blur-md shadow-xs">
-              <div className="text-lg font-black text-white">3-Step</div>
-              <div className="text-[11px] font-medium text-blue-100">Review · Approve · Post Workflow</div>
-            </div>
-          </div>
-
-          {/* Compliance & Audit Verified Card */}
-          <div className="rounded-2xl border border-white/25 bg-white/15 p-4.5 backdrop-blur-md transition hover:bg-white/20 shadow-xl shadow-blue-950/20">
-            <div className="flex items-start gap-3.5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 border border-white/30 text-white shadow-xs">
-                <ShieldCheck size={20} strokeWidth={2.2} />
+          {/* Compliance & Audit Verified Card (modeled after reference) */}
+          <div className="rounded-2xl border border-white/20 bg-white/10 p-5 backdrop-blur-md transition hover:bg-white/15 shadow-xl shadow-blue-950/20">
+            <div className="flex items-start gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 border border-white/30 text-white shadow-xs">
+                <ShieldCheck size={22} strokeWidth={2.3} />
               </div>
-              <div>
-                <h2 className="text-xs font-bold uppercase tracking-wider text-white drop-shadow-xs">
-                  Audit Trail &amp; Maker-Checker Compliant
+              <div className="space-y-1">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+                  COMPLIANCE &amp; AUDIT VERIFIED
                 </h2>
-                <p className="mt-1 text-xs leading-relaxed text-blue-50 font-normal">
-                  Enforces strict voucher authorization (Checked, Approved, Posted), perpetual inventory valuation, and tamper-proof user activity logs.
+                <p className="text-xs leading-relaxed text-blue-100/90 font-normal">
+                  Fully compliant with perpetual stock accounting, voucher-based multi-tier authorization (Review, Approve, Post), and automated monthly ledger balancing.
                 </p>
               </div>
             </div>
@@ -121,8 +109,8 @@ const Login = () => {
         </div>
 
         {/* Bottom: Left Column Footer */}
-        <div className="relative z-10 pt-6 text-xs text-blue-100 font-medium">
-          <p>© 2026 Five Stop Hotel &amp; Restaurant Management SC. All rights reserved.</p>
+        <div className="relative z-10 pt-6 text-xs text-blue-100/70 font-medium">
+          <p>© 2026 Five Stop Hotel &amp; Resort Management SC. All rights reserved.</p>
         </div>
       </div>
 
