@@ -40,30 +40,31 @@ const Login = () => {
     <div className="flex min-h-screen w-full flex-col lg:flex-row bg-white selection:bg-blue-600 selection:text-white">
       
       {/* ════════════════════════════════════════════════════════════════
-          LEFT COLUMN: Brand & Security Showcase (Dashboard Blue Theme)
+          LEFT COLUMN: Brand & Security Showcase (Vibrant Brand Blue)
       ════════════════════════════════════════════════════════════════ */}
-      <div className="relative flex flex-col justify-between overflow-hidden bg-linear-to-br from-[#0c1838] via-[#172e6d] to-[#080e22] p-8 text-white sm:p-12 lg:w-1/2 lg:p-16">
+      <div className="relative flex flex-col justify-between overflow-hidden bg-linear-to-br from-[#173b8a] via-[#1d4ed8] to-[#1e3a8a] p-8 text-white sm:p-12 lg:w-1/2 lg:p-16 shadow-2xl">
         
         {/* Subtle decorative background pattern / ambient glow */}
-        <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-blue-500/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-cyan-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-sky-300/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-blue-400/25 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] opacity-10" />
 
         {/* Top: Brand Logo */}
         <div className="relative z-10">
           <div className="flex items-center gap-3.5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 p-2.5 backdrop-blur-md border border-white/15 shadow-xl shadow-black/30">
-              <Warehouse className="h-full w-full text-blue-200" strokeWidth={2.2} />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 p-2.5 backdrop-blur-md border border-white/25 shadow-xl shadow-blue-950/20">
+              <Warehouse className="h-full w-full text-white" strokeWidth={2.2} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-black tracking-tight uppercase text-white font-sans">
+                <span className="text-xl font-black tracking-tight uppercase text-white font-sans drop-shadow-xs">
                   FIVE STOP
                 </span>
-                <span className="rounded-full bg-blue-500/30 border border-blue-400/30 px-2 py-0.5 text-[10px] font-bold tracking-wider text-blue-200 uppercase">
+                <span className="rounded-full bg-white/20 border border-white/30 px-2 py-0.5 text-[10px] font-bold tracking-wider text-white uppercase shadow-xs">
                   ENTERPRISE
                 </span>
               </div>
-              <p className="text-xs font-medium tracking-wide text-blue-200/70">
+              <p className="text-xs font-medium tracking-wide text-blue-100">
                 Hotel Stock &amp; Inventory Management System
               </p>
             </div>
@@ -73,29 +74,29 @@ const Login = () => {
         {/* Middle: Headline & Core Capabilities */}
         <div className="relative z-10 my-12 space-y-6 lg:my-0 lg:max-w-lg">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-blue-200 backdrop-blur-xs">
-              <Sparkles size={13} className="text-amber-300" />
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/20 px-3.5 py-1 text-xs font-semibold text-white backdrop-blur-md shadow-xs">
+              <Sparkles size={13} className="text-amber-300 animate-pulse" />
               <span>Version 2.0 · Multi-Department Stock Control</span>
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-[40px] leading-tight">
+            <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-[40px] leading-tight drop-shadow-sm">
               Hospitality Stock, Purchasing &amp; Recipe Ledger Desk
             </h1>
-            <p className="text-sm leading-relaxed text-blue-100/80">
+            <p className="text-sm leading-relaxed text-blue-50/90 font-medium">
               Centralized real-time warehouse tracking, supplier price indexation, recipe consumption breakdown, and automated monthly ledger reconciliations.
             </p>
           </div>
 
           {/* Compliance & Audit Verified Card */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4.5 backdrop-blur-md transition hover:bg-white/10">
+          <div className="rounded-2xl border border-white/20 bg-white/10 p-5 backdrop-blur-md transition hover:bg-white/15 shadow-lg shadow-blue-950/10">
             <div className="flex items-start gap-3.5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/20 border border-blue-400/30 text-sky-300">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 border border-white/30 text-white shadow-xs">
                 <ShieldCheck size={20} strokeWidth={2.2} />
               </div>
               <div>
                 <h2 className="text-xs font-bold uppercase tracking-wider text-white">
                   Audit Trail &amp; Maker-Checker Compliant
                 </h2>
-                <p className="mt-1 text-xs leading-relaxed text-blue-200/70">
+                <p className="mt-1 text-xs leading-relaxed text-blue-100 font-normal">
                   Enforces strict voucher authorization (Checked, Approved, Posted), perpetual inventory valuation, and tamper-proof user activity logs.
                 </p>
               </div>
@@ -104,7 +105,7 @@ const Login = () => {
         </div>
 
         {/* Bottom: Left Column Footer */}
-        <div className="relative z-10 pt-6 text-xs text-blue-200/50">
+        <div className="relative z-10 pt-6 text-xs text-blue-100/70 font-medium">
           <p>© 2026 Five Stop Hotel &amp; Restaurant Management SC. All rights reserved.</p>
         </div>
       </div>
