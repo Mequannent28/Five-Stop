@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Printer, Scale, Search, History, X, RefreshCw,
+  ChevronLeft, ChevronRight, Calendar, ArrowRight, CheckCircle, Clock,
 } from 'lucide-react';
 import api from '../api/axios';
 import Card from '../components/ui/Card';
@@ -104,13 +105,25 @@ export default function Reports({ defaultTab } = {}) {
   const [hotelName, setHotelName] = useState('Five Stop');
 
   // Filter & Search states
-  const [date, setDate]                     = useState(todayStr());
-  const [from, setFrom]                     = useState(startOfMonthStr());
-  const [to, setTo]                         = useState(todayStr());
-  const [activePreset, setActivePreset]     = useState('month');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [stockSearch, setStockSearch]       = useState('');
+  const currentYearMonthStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+
+  const [date, setDate]                             = useState(todayStr());
+  const [selectedMonth, setSelectedMonth]           = useState(currentYearMonthStr());
+  const [from, setFrom]                             = useState(startOfMonthStr());
+  const [to, setTo]                                 = useState(todayStr());
+  const [activePreset, setActivePreset]             = useState('month');
+  const [selectedCategory, setSelectedCategory]     = useState('all');
+  const [selectedStatus, setSelectedStatus]         = useState('all');
+  const [stockSearch, setStockSearch]               = useState('');
+
+  // Stock Balance view mode: 'detail' (detailed table) vs 'monthly_summary' (12-month evolution)
+  const [balanceViewMode, setBalanceViewMode]       = useState('detail');
+  const [monthlyClosingData, setMonthlyClosingData] = useState(null);
+  const [monthlyClosingLoading, setMonthlyClosingLoading] = useState(false);
+  const [summaryYear, setSummaryYear]               = useState(new Date().getFullYear());
 
   // Item Ledger (Bin Card) modal state
   const [selectedLedgerMaterial, setSelectedLedgerMaterial] = useState(null);
@@ -177,6 +190,32 @@ export default function Reports({ defaultTab } = {}) {
     load();
   }, [load]);
 
+  // Set exact calendar month range
+  const setMonthRange = (ymStr) => {
+    setSelectedMonth(ymStr);
+    const [y, m] = ymStr.split('-').map(Number);
+    const firstDay = `${y}-${String(m).padStart(2, '0')}-01`;
+    const lastDate = new Date(y, m, 0).getDate();
+    const lastDay = `${y}-${String(m).padStart(2, '0')}-${String(lastDate).padStart(2, '0')}`;
+    setFrom(firstDay);
+    setTo(lastDay);
+    setActivePreset('month');
+  };
+
+  const handlePrevMonth = () => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const prevDate = new Date(y, m - 2, 1);
+    const prevYm = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+    setMonthRange(prevYm);
+  };
+
+  const handleNextMonth = () => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const nextDate = new Date(y, m, 1);
+    const nextYm = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+    setMonthRange(nextYm);
+  };
+
   // Handler for quick date presets
   const applyPreset = (preset) => {
     setActivePreset(preset);
@@ -187,13 +226,37 @@ export default function Reports({ defaultTab } = {}) {
       setFrom(startOfWeekStr());
       setTo(todayStr());
     } else if (preset === 'month') {
-      setFrom(startOfMonthStr());
-      setTo(todayStr());
+      const ym = currentYearMonthStr();
+      setMonthRange(ym);
+    } else if (preset === 'last_month') {
+      const d = new Date();
+      const prevDate = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+      const prevYm = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+      setMonthRange(prevYm);
     } else if (preset === 'all') {
       setFrom('');
       setTo('');
     }
   };
+
+  // Load 12-Month Closing Evolution
+  const loadMonthlyClosing = useCallback(async (yr) => {
+    setMonthlyClosingLoading(true);
+    try {
+      const res = await api.get('/reports/monthly-closing', { params: { year: yr || summaryYear } });
+      setMonthlyClosingData(res.data);
+    } catch (e) {
+      console.error('Failed to load monthly closing report', e);
+    } finally {
+      setMonthlyClosingLoading(false);
+    }
+  }, [summaryYear]);
+
+  useEffect(() => {
+    if (tab === 'stock_balance' && balanceViewMode === 'monthly_summary') {
+      loadMonthlyClosing(summaryYear);
+    }
+  }, [tab, balanceViewMode, summaryYear, loadMonthlyClosing]);
 
   // Open Item Ledger Modal
   const openItemLedger = async (material) => {
@@ -321,77 +384,177 @@ export default function Reports({ defaultTab } = {}) {
       {/* ── Filter bar for Stock Balance ── */}
       {tab === 'stock_balance' && (
         <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-soft space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {/* Date Preset Buttons */}
-            <div className="flex items-center gap-1.5 p-1 bg-ink-50 rounded-xl border border-ink-100 text-xs font-semibold">
+          {/* Top Toggle: Detailed Month Sheet vs 12-Month Evolution */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 pb-3">
+            <div className="flex items-center gap-1.5 p-1 bg-ink-100 rounded-xl">
               <button
                 type="button"
-                onClick={() => applyPreset('month')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activePreset === 'month' ? 'bg-white text-emerald-700 shadow-xs font-bold' : 'text-ink-600 hover:text-ink-900'
+                onClick={() => setBalanceViewMode('detail')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                  balanceViewMode === 'detail'
+                    ? 'bg-white text-emerald-800 shadow-xs'
+                    : 'text-ink-600 hover:text-ink-900'
                 }`}
               >
-                This Month
+                <Scale size={14} /> Monthly Balance Sheet
               </button>
               <button
                 type="button"
-                onClick={() => applyPreset('week')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activePreset === 'week' ? 'bg-white text-emerald-700 shadow-xs font-bold' : 'text-ink-600 hover:text-ink-900'
+                onClick={() => { setBalanceViewMode('monthly_summary'); loadMonthlyClosing(summaryYear); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                  balanceViewMode === 'monthly_summary'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-ink-600 hover:text-ink-900'
                 }`}
               >
-                This Week
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset('today')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activePreset === 'today' ? 'bg-white text-emerald-700 shadow-xs font-bold' : 'text-ink-600 hover:text-ink-900'
-                }`}
-              >
-                Today
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset('all')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activePreset === 'all' ? 'bg-white text-emerald-700 shadow-xs font-bold' : 'text-ink-600 hover:text-ink-900'
-                }`}
-              >
-                All Time
+                <Calendar size={14} /> 12-Month Closing Evolution
               </button>
             </div>
 
-            {/* Custom Date Pickers */}
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <label className="flex items-center gap-1.5 text-ink-600 font-medium">
-                <span>From</span>
-                <input
-                  type="date"
-                  value={from}
-                  onChange={e => { setFrom(e.target.value); setActivePreset('custom'); }}
-                  className="rounded-lg border border-ink-200 px-2.5 py-1.5 text-xs outline-none focus:border-emerald-500 bg-white"
-                />
-              </label>
-              <label className="flex items-center gap-1.5 text-ink-600 font-medium">
-                <span>To</span>
-                <input
-                  type="date"
-                  value={to}
-                  onChange={e => { setTo(e.target.value); setActivePreset('custom'); }}
-                  className="rounded-lg border border-ink-200 px-2.5 py-1.5 text-xs outline-none focus:border-emerald-500 bg-white"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => load()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-ink-100 hover:bg-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-800 transition"
-                title="Refresh stock balance"
-              >
-                <RefreshCw size={12} /> Refresh
-              </button>
-            </div>
+            {/* Quick Month Switcher Controls */}
+            {balanceViewMode === 'detail' && (
+              <div className="flex items-center gap-1.5 bg-ink-50 p-1 rounded-xl border border-ink-100">
+                <button
+                  type="button"
+                  onClick={handlePrevMonth}
+                  title="Previous Month"
+                  className="rounded-lg p-1.5 text-ink-600 hover:bg-white hover:text-ink-900 hover:shadow-2xs transition"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <div className="flex items-center gap-1.5 px-2">
+                  <Calendar size={14} className="text-emerald-600" />
+                  <input
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => { if (e.target.value) setMonthRange(e.target.value); }}
+                    className="rounded-md border border-ink-200 bg-white px-2 py-0.5 text-xs font-bold text-ink-900 outline-none focus:border-emerald-500 cursor-pointer"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  title="Next Month"
+                  className="rounded-lg p-1.5 text-ink-600 hover:bg-white hover:text-ink-900 hover:shadow-2xs transition"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+
+            {/* Year Switcher for 12-Month Evolution */}
+            {balanceViewMode === 'monthly_summary' && (
+              <div className="flex items-center gap-2 bg-ink-50 p-1 rounded-xl border border-ink-100">
+                <button
+                  type="button"
+                  onClick={() => { const y = summaryYear - 1; setSummaryYear(y); loadMonthlyClosing(y); }}
+                  className="rounded-lg p-1.5 text-ink-600 hover:bg-white hover:text-ink-900 transition"
+                  title="Previous Year"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-xs font-black text-ink-900 px-2">Year {summaryYear}</span>
+                <button
+                  type="button"
+                  onClick={() => { const y = summaryYear + 1; setSummaryYear(y); loadMonthlyClosing(y); }}
+                  className="rounded-lg p-1.5 text-ink-600 hover:bg-white hover:text-ink-900 transition"
+                  title="Next Year"
+                >
+                  <ChevronRight size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => loadMonthlyClosing(summaryYear)}
+                  className="rounded-lg bg-white border border-ink-200 px-2 py-1 text-[11px] font-semibold text-ink-700 hover:bg-ink-100 transition ml-1"
+                >
+                  <RefreshCw size={12} className={monthlyClosingLoading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+            )}
           </div>
+
+          {balanceViewMode === 'detail' && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Date Preset Buttons */}
+              <div className="flex items-center gap-1.5 p-1 bg-ink-50 rounded-xl border border-ink-100 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => applyPreset('month')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    activePreset === 'month' ? 'bg-white text-emerald-700 shadow-xs font-bold' : 'text-ink-600 hover:text-ink-900'
+                  }`}
+                >
+                  This Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('last_month')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    activePreset === 'last_month' ? 'bg-white text-emerald-700 shadow-xs font-bold' : 'text-ink-600 hover:text-ink-900'
+                  }`}
+                >
+                  Last Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('week')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    activePreset === 'week' ? 'bg-white text-emerald-700 shadow-xs font-bold' : 'text-ink-600 hover:text-ink-900'
+                  }`}
+                >
+                  This Week
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('today')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    activePreset === 'today' ? 'bg-white text-emerald-700 shadow-xs font-bold' : 'text-ink-600 hover:text-ink-900'
+                  }`}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('all')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    activePreset === 'all' ? 'bg-white text-emerald-700 shadow-xs font-bold' : 'text-ink-600 hover:text-ink-900'
+                  }`}
+                >
+                  All Time
+                </button>
+              </div>
+
+              {/* Custom Date Pickers */}
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <label className="flex items-center gap-1.5 text-ink-600 font-medium">
+                  <span>From</span>
+                  <input
+                    type="date"
+                    value={from}
+                    onChange={e => { setFrom(e.target.value); setActivePreset('custom'); }}
+                    className="rounded-lg border border-ink-200 px-2.5 py-1.5 text-xs outline-none focus:border-emerald-500 bg-white"
+                  />
+                </label>
+                <label className="flex items-center gap-1.5 text-ink-600 font-medium">
+                  <span>To</span>
+                  <input
+                    type="date"
+                    value={to}
+                    onChange={e => { setTo(e.target.value); setActivePreset('custom'); }}
+                    className="rounded-lg border border-ink-200 px-2.5 py-1.5 text-xs outline-none focus:border-emerald-500 bg-white"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => load()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-ink-100 hover:bg-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-800 transition"
+                  title="Refresh stock balance"
+                >
+                  <RefreshCw size={12} /> Refresh
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Secondary Filters: Search, Category, Status */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-ink-50">
@@ -481,8 +644,70 @@ export default function Reports({ defaultTab } = {}) {
       {/* ════════════════════════════════════════════════════════════════
           STOCK BALANCE SHEET (ALL OVER RECONCILIATION)
       ════════════════════════════════════════════════════════════════ */}
-      {!loading && tab === 'stock_balance' && data && (
+      {!loading && tab === 'stock_balance' && balanceViewMode === 'detail' && data && (
         <div className="space-y-4">
+          {/* Monthly Stock Accounting Logic Banner */}
+          <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-white p-4 shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-100 pb-2.5 mb-3">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-600 text-white font-black text-xs shadow-2xs">
+                  ∑
+                </span>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-950">
+                  Monthly Stock Equation &middot; {data.monthLabel || `${from} to ${to}`}
+                </h4>
+              </div>
+              <span className="text-[11px] font-semibold text-blue-800 bg-blue-100/90 px-2.5 py-0.5 rounded-full border border-blue-200">
+                Rule: Closing Stock (Month M) = Beginning Stock (Month M+1)
+              </span>
+            </div>
+
+            {/* 4-Step Formula Breakdown */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5 items-center text-center">
+              {/* Step 1: Beginning */}
+              <div className="lg:col-span-2 rounded-xl bg-white border border-slate-200 p-2.5 shadow-2xs">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">1. Beginning Stock (1st)</p>
+                <p className="text-base font-black text-slate-900 tabular mt-0.5">
+                  ETB {(data.totals?.openingValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[10.5px] text-slate-500">Stock on hand at 00:00:00</p>
+              </div>
+
+              <div className="text-xl font-black text-emerald-600 hidden lg:block">+</div>
+
+              {/* Step 2: Inward */}
+              <div className="rounded-xl bg-white border border-emerald-200 p-2.5 shadow-2xs">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">2. Inward Receipts (+)</p>
+                <p className="text-base font-black text-emerald-700 tabular mt-0.5">
+                  +ETB {(data.totals?.inwardValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[10.5px] text-emerald-600">GRVs + Bazaar + PADJ</p>
+              </div>
+
+              <div className="text-xl font-black text-rose-600 hidden lg:block">−</div>
+
+              {/* Step 3: Outward */}
+              <div className="rounded-xl bg-white border border-rose-200 p-2.5 shadow-2xs">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">3. Outward Issued (−)</p>
+                <p className="text-base font-black text-rose-700 tabular mt-0.5">
+                  −ETB {(data.totals?.outwardValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[10.5px] text-rose-600">Sales + Disposal + NADJ</p>
+              </div>
+
+              <div className="text-xl font-black text-blue-700 hidden lg:block">=</div>
+
+              {/* Step 4: Closing */}
+              <div className="lg:col-span-2 rounded-xl bg-blue-600 text-white p-2.5 shadow-xs">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-100">4. Closing Stock (=)</p>
+                <p className="text-base font-black tabular mt-0.5 text-white">
+                  ETB {(data.totals?.closingValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[10.5px] text-blue-100">Stock on hand at 23:59:59</p>
+              </div>
+            </div>
+          </div>
+
           {/* Top KPI Balance Cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card className="border-l-4 border-l-slate-400">
@@ -736,6 +961,176 @@ export default function Reports({ defaultTab } = {}) {
               )}
             </table>
           </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════
+          12-MONTH STOCK CLOSING EVOLUTION VIEW
+      ════════════════════════════════════════════════════════════════ */}
+      {!loading && tab === 'stock_balance' && balanceViewMode === 'monthly_summary' && (
+        <div className="space-y-4">
+          {monthlyClosingLoading && (
+            <div className="py-16 text-center text-sm text-ink-400">
+              <RefreshCw className="animate-spin h-6 w-6 mx-auto mb-2 text-blue-600" />
+              Calculating 12-month stock closing balances for {summaryYear}…
+            </div>
+          )}
+
+          {!monthlyClosingLoading && monthlyClosingData && (
+            <>
+              {/* Annual Summary KPI Cards */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/20">
+                  <p className="text-xs font-semibold text-emerald-800">Total Annual Receipts (Inward)</p>
+                  <p className="tabular mt-1 text-2xl font-bold text-emerald-700">
+                    + ETB {(monthlyClosingData.totalsForYear?.totalInward || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="mt-0.5 text-xs text-emerald-600">All GRVs, Fresh Bazaar, +ve Count Adjustments</p>
+                </Card>
+
+                <Card className="border-l-4 border-l-rose-500 bg-rose-50/20">
+                  <p className="text-xs font-semibold text-rose-800">Total Annual Issues (Outward)</p>
+                  <p className="tabular mt-1 text-2xl font-bold text-rose-700">
+                    − ETB {(monthlyClosingData.totalsForYear?.totalOutward || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="mt-0.5 text-xs text-rose-600">POS Sales, Disposals, −ve Count Adjustments</p>
+                </Card>
+
+                <Card className="border-l-4 border-l-blue-600 bg-blue-50/30">
+                  <p className="text-xs font-bold text-blue-900">Net Inventory Change ({summaryYear})</p>
+                  <p className={`tabular mt-1 text-2xl font-black ${(monthlyClosingData.totalsForYear?.netChange || 0) >= 0 ? 'text-blue-900' : 'text-amber-700'}`}>
+                    {(monthlyClosingData.totalsForYear?.netChange || 0) >= 0 ? '+' : ''}
+                    ETB {(monthlyClosingData.totalsForYear?.netChange || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="mt-0.5 text-xs text-blue-700 font-medium">Net Stock Value Shift across {summaryYear}</p>
+                </Card>
+              </div>
+
+              {/* Monthly Table */}
+              <div className="overflow-x-auto rounded-2xl border border-ink-200 bg-white shadow-soft">
+                <div className="px-5 py-3 border-b border-ink-100 flex items-center justify-between bg-ink-50/50">
+                  <div>
+                    <h3 className="text-sm font-bold text-ink-900">
+                      Monthly Stock Closing Reconciliation — Year {summaryYear}
+                    </h3>
+                    <p className="text-xs text-ink-500 mt-0.5">
+                      Stock Logic: Beginning Stock + Inward Receipts − Outward Issues = Closing Stock. Closing Stock of Month M = Beginning Stock of Month M+1.
+                    </p>
+                  </div>
+                  <span className="text-xs font-medium text-ink-500 bg-white px-2.5 py-1 rounded-lg border border-ink-200">
+                    Current: <strong className="text-ink-800">{monthlyClosingData.currentMonth}</strong>
+                  </span>
+                </div>
+
+                <table className="min-w-full text-xs divide-y divide-ink-200">
+                  <thead className="bg-ink-100/90 text-ink-700 font-bold">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left uppercase tracking-wider text-[11px]">Calendar Month</th>
+                      <th className="px-3 py-2.5 text-right uppercase tracking-wider text-[11px] bg-slate-200/60 text-slate-800">
+                        Beginning Stock (1st)
+                      </th>
+                      <th className="px-3 py-2.5 text-right uppercase tracking-wider text-[11px] bg-emerald-100/80 text-emerald-900">
+                        Received Inward (+)
+                      </th>
+                      <th className="px-3 py-2.5 text-right uppercase tracking-wider text-[11px] bg-rose-100/80 text-rose-900">
+                        Issued Outward (−)
+                      </th>
+                      <th className="px-3 py-2.5 text-right uppercase tracking-wider text-[11px] bg-amber-100/60 text-amber-900">
+                        Net Change
+                      </th>
+                      <th className="px-3 py-2.5 text-right uppercase tracking-wider text-[11px] bg-blue-100/80 text-blue-900">
+                        Closing Stock (End)
+                      </th>
+                      <th className="px-3 py-2.5 text-center uppercase tracking-wider text-[11px]">Status</th>
+                      <th className="px-3 py-2.5 text-center uppercase tracking-wider text-[11px]">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-ink-100">
+                    {monthlyClosingData.months?.map((m) => (
+                      <tr
+                        key={m.month}
+                        className={`transition-colors ${
+                          m.isCurrent
+                            ? 'bg-blue-50/40 font-semibold'
+                            : 'hover:bg-ink-50/50'
+                        }`}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-ink-900">{m.monthName}</span>
+                            {m.isCurrent && (
+                              <span className="text-[10px] bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded">
+                                ACTIVE
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10.5px] text-ink-400 font-mono">{m.month} &middot; {m.txnCount} movements</span>
+                        </td>
+
+                        {/* Beginning Stock */}
+                        <td className="px-3 py-3 text-right tabular text-slate-800 bg-slate-50/40 font-medium">
+                          ETB {m.beginningVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Inward */}
+                        <td className="px-3 py-3 text-right tabular text-emerald-700 bg-emerald-50/20 font-medium">
+                          +ETB {m.totalInwardVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Outward */}
+                        <td className="px-3 py-3 text-right tabular text-rose-700 bg-rose-50/20 font-medium">
+                          −ETB {m.totalOutwardVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Net Change */}
+                        <td className={`px-3 py-3 text-right tabular font-bold ${m.netChangeVal >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          {m.netChangeVal >= 0 ? '+' : ''}ETB {m.netChangeVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Closing Stock */}
+                        <td className="px-3 py-3 text-right tabular text-blue-950 bg-blue-50/30 font-black text-sm">
+                          ETB {m.closingVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-3 py-3 text-center whitespace-nowrap">
+                          {m.status === 'closed' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                              <CheckCircle size={11} className="text-emerald-600" /> Closed
+                            </span>
+                          ) : m.status === 'in_progress' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+                              <Clock size={11} className="text-blue-600" /> In Progress
+                            </span>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-ink-100 text-ink-400">
+                              Upcoming
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Action: Open month detail */}
+                        <td className="px-3 py-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMonthRange(m.month);
+                              setBalanceViewMode('detail');
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
+                            title={`Inspect detailed stock balance for ${m.monthName}`}
+                          >
+                            <span>Inspect Sheet</span>
+                            <ArrowRight size={12} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 

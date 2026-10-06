@@ -14,14 +14,16 @@ const {
   getSummaryReport,
   getStockBalanceReport,
   getItemStockLedger,
+  getMonthlyClosingReport,
 } = require('../controllers/reportController');
 const { protect, authorizePermission } = require('../middleware/authMiddleware');
 
 router.use(protect);
 router.use(authorizePermission('viewReports'));
 
-// Stock Balance & Ledger
+// Stock Balance & Monthly Closing
 router.get('/stock-balance',                     getStockBalanceReport);
+router.get('/monthly-closing',                   getMonthlyClosingReport);
 router.get('/stock-balance/ledger/:materialId', getItemStockLedger);
 
 // Existing
