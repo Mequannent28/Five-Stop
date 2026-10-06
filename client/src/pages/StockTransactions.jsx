@@ -521,6 +521,13 @@ export default function StockTransactions({ defaultVoucher } = {}) {
               />
             </div>
 
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                <X size={14} className="shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="ghost" onClick={() => { setModalOpen(false); setEditingTxn(null); }}>Cancel</Button>
               <button type="submit" disabled={submitting}

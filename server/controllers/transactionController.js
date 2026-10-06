@@ -199,13 +199,16 @@ const updateTransaction = asyncHandler(async (req, res) => {
   // 1. Temporarily revert old stock impact to test new quantities cleanly
   const oldItems = transaction.items?.length
     ? transaction.items
-    : [{ material: transaction.material, quantity: transaction.quantity }];
+    : (transaction.material ? [{ material: transaction.material, quantity: transaction.quantity }] : []);
 
   for (const oldItem of oldItems) {
-    const mat = await RawMaterial.findById(oldItem.material);
-    if (mat) {
-      mat.currentStock += oldDirection === 'in' ? -oldItem.quantity : oldItem.quantity;
-      await mat.save();
+    const matId = oldItem.material?._id || oldItem.material;
+    if (matId) {
+      const mat = await RawMaterial.findById(matId);
+      if (mat) {
+        mat.currentStock += oldDirection === 'in' ? -oldItem.quantity : oldItem.quantity;
+        await mat.save();
+      }
     }
   }
 
@@ -213,12 +216,13 @@ const updateTransaction = asyncHandler(async (req, res) => {
   const resolvedItems = [];
   try {
     for (const item of items) {
-      const mat = await RawMaterial.findById(item.material);
+      const matId = item.material?._id || item.material;
+      const mat = await RawMaterial.findById(matId);
       if (!mat) {
         res.status(404);
-        throw new Error(`Material not found: ${item.material}`);
+        throw new Error(`Material not found: ${matId}`);
       }
-      if (newDirection === 'out' && mat.currentStock < item.quantity) {
+      if (newDirection === 'out' && mat.currentStock < Number(item.quantity)) {
         res.status(400);
         throw new Error(
           `Insufficient stock for "${mat.name}". Available: ${mat.currentStock} ${mat.unit}, requested: ${item.quantity}.`
@@ -231,10 +235,13 @@ const updateTransaction = asyncHandler(async (req, res) => {
   } catch (err) {
     // Re-apply old stock if validation fails
     for (const oldItem of oldItems) {
-      const mat = await RawMaterial.findById(oldItem.material);
-      if (mat) {
-        mat.currentStock += oldDirection === 'in' ? oldItem.quantity : -oldItem.quantity;
-        await mat.save();
+      const matId = oldItem.material?._id || oldItem.material;
+      if (matId) {
+        const mat = await RawMaterial.findById(matId);
+        if (mat) {
+          mat.currentStock += oldDirection === 'in' ? oldItem.quantity : -oldItem.quantity;
+          await mat.save();
+        }
       }
     }
     throw err;
@@ -272,10 +279,8 @@ const updateTransaction = asyncHandler(async (req, res) => {
   transaction.reference   = reference || '';
   transaction.notes       = notes || '';
   if (date) transaction.date = new Date(date);
-  if (formattedAttachments.length > 0) {
-    transaction.attachments = formattedAttachments;
-    transaction.attachment = formattedAttachments[0].url;
-  }
+  transaction.attachments = formattedAttachments;
+  transaction.attachment  = formattedAttachments.length > 0 ? formattedAttachments[0].url : '';
   transaction.totalAmount = totalAmount;
 
   if (!transaction.trail) transaction.trail = [];
