@@ -45,6 +45,7 @@ app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/settings', require('./routes/settingRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
+app.use('/api/upload', require('./routes/uploadRoutes'));
 
 // Serve Frontend in production (for Aletcloud, Render, etc.)
 if (process.env.NODE_ENV === 'production') {

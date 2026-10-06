@@ -62,6 +62,8 @@ const createTransaction = asyncHandler(async (req, res) => {
     voucherType, voucherNo, supplier,
     items = [],
     reason, reference, notes, date,
+    attachments = [],
+    attachment = '',
   } = req.body;
 
   if (!VOUCHER_DIRECTION[voucherType]) {
@@ -101,6 +103,16 @@ const createTransaction = asyncHandler(async (req, res) => {
 
   const totalAmount = resolvedItems.reduce((s, i) => s + i.totalCost, 0);
 
+  const formattedAttachments = Array.isArray(attachments) && attachments.length > 0
+    ? attachments.map(a => ({
+        url: a.url || a,
+        name: a.name || 'Receipt',
+        mimeType: a.mimeType || 'image/jpeg',
+        size: a.size || 0,
+        uploadedAt: a.uploadedAt || new Date(),
+      }))
+    : (attachment ? [{ url: attachment, name: 'Receipt', mimeType: 'image/jpeg', size: 0, uploadedAt: new Date() }] : []);
+
   const firstItem = resolvedItems[0];
   const txnData = {
     voucherType,
@@ -115,6 +127,8 @@ const createTransaction = asyncHandler(async (req, res) => {
     reference: reference || '',
     notes:     notes || '',
     date:      date ? new Date(date) : new Date(),
+    attachment: attachment || (formattedAttachments[0]?.url || ''),
+    attachments: formattedAttachments,
     performedBy: req.user._id,
     totalAmount,
     status: 'pending',
@@ -267,7 +281,7 @@ const advanceTransaction = asyncHandler(async (req, res) => {
 
 
 // ── POST /api/transactions/import-sales ──────────────────────────────
-// Enhanced: saves full P&L SalesRecord with ingredient consumption per product
+// Enhanced: matches by product code OR name, deducts stock if matched, records complete sold POS products list
 const importSales = asyncHandler(async (req, res) => {
   const { sales, notes, reference, saleDate } = req.body;
   if (!sales || !sales.length) {
@@ -278,24 +292,50 @@ const importSales = asyncHandler(async (req, res) => {
   const Product     = require('../models/Product');
   const SalesRecord = require('../models/SalesRecord');
 
+  const escapeRegex = (s) => (s ? String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '');
+
   const materialDeductions = {};
   const saleLines = [];
+  const allSoldProducts = [];
   const notFound  = [];
 
   for (const sale of sales) {
-    const { productName, quantity, revenue } = sale;
-    if (!productName) continue;
-    const qty = Number(quantity) || 1;
-    const rev = Number(revenue)  || 0;
+    const { productName, productCode, quantity, revenue, unitPrice } = sale;
+    const nameStr = (productName || '').trim();
+    const codeStr = (productCode || '').trim();
+
+    if (!nameStr && !codeStr) continue;
+
+    const qty = Math.max(0.001, Number(quantity) || 1);
+    const rev = Number(revenue) || 0;
+    const price = Number(unitPrice) || 0;
     const lineIngredients = [];
 
-    // 1. Try Product (with recipe/ingredients)
-    const product = await Product.findOne({ name: new RegExp(`^${productName.trim()}$`, 'i') })
-      .populate('ingredients.material');
+    // 1. Try to find in Product by code or name
+    let product = null;
+    if (codeStr) {
+      product = await Product.findOne({ code: new RegExp(`^${escapeRegex(codeStr)}$`, 'i') })
+        .populate('ingredients.material');
+    }
+    if (!product && nameStr) {
+      product = await Product.findOne({ name: new RegExp(`^${escapeRegex(nameStr)}$`, 'i') })
+        .populate('ingredients.material');
+    }
+    // Fallback: check if code matches name or vice-versa
+    if (!product && (codeStr || nameStr)) {
+      const term = (nameStr || codeStr);
+      product = await Product.findOne({
+        $or: [
+          { code: new RegExp(`^${escapeRegex(term)}$`, 'i') },
+          { name: new RegExp(`^${escapeRegex(term)}$`, 'i') },
+        ]
+      }).populate('ingredients.material');
+    }
 
     if (product) {
       let cogs = 0;
-      if (product.ingredients && product.ingredients.length > 0) {
+      const hasRecipe = product.ingredients && product.ingredients.length > 0;
+      if (hasRecipe) {
         for (const ing of product.ingredients) {
           const mat = ing.material;
           if (!mat) continue;
@@ -315,24 +355,52 @@ const importSales = asyncHandler(async (req, res) => {
         }
       }
 
-      // If revenue is provided use it; otherwise compute from product.sellingPrice * qty
-      const lineRev = rev > 0 ? rev : ((product.sellingPrice || 0) * qty);
+      let lineRev = rev;
+      if (lineRev <= 0) {
+        if (price > 0) lineRev = price * qty;
+        else if (product.sellingPrice > 0) lineRev = product.sellingPrice * qty;
+      }
+      const lineSellingPrice = qty > 0 ? (lineRev / qty) : (product.sellingPrice || 0);
 
-      saleLines.push({
-        productName,
+      const recordLine = {
+        productName:     product.name || nameStr,
+        productCode:     product.code || codeStr,
         productId:       product._id,
+        category:        product.category || 'General',
+        parentCategory:  product.parentCategory || 'FOOD',
+        uom:             product.uom || 'Pcs',
         quantitySold:    qty,
-        sellingPrice:    qty > 0 ? (lineRev / qty) : 0,
+        sellingPrice:    lineSellingPrice,
         revenue:         lineRev,
         cogs,
         grossProfit:     lineRev - cogs,
+        matchStatus:     hasRecipe ? 'recipe_deducted' : 'no_recipe',
         ingredientsUsed: lineIngredients,
-      });
+      };
+
+      saleLines.push(recordLine);
+      allSoldProducts.push(recordLine);
       continue;
     }
 
     // 2. Try RawMaterial directly
-    const material = await RawMaterial.findOne({ name: new RegExp(`^${productName.trim()}$`, 'i') });
+    let material = null;
+    if (codeStr) {
+      material = await RawMaterial.findOne({ code: new RegExp(`^${escapeRegex(codeStr)}$`, 'i') });
+    }
+    if (!material && nameStr) {
+      material = await RawMaterial.findOne({ name: new RegExp(`^${escapeRegex(nameStr)}$`, 'i') });
+    }
+    if (!material && (codeStr || nameStr)) {
+      const term = (nameStr || codeStr);
+      material = await RawMaterial.findOne({
+        $or: [
+          { code: new RegExp(`^${escapeRegex(term)}$`, 'i') },
+          { name: new RegExp(`^${escapeRegex(term)}$`, 'i') },
+        ]
+      });
+    }
+
     if (material) {
       const matId   = material._id.toString();
       const ingCost = (material.unitCost || 0) * qty;
@@ -346,22 +414,58 @@ const importSales = asyncHandler(async (req, res) => {
         totalCost:    ingCost,
       });
 
-      const lineRev = rev > 0 ? rev : (material.unitCost ? material.unitCost * 1.35 * qty : 0);
+      let lineRev = rev;
+      if (lineRev <= 0) {
+        if (price > 0) lineRev = price * qty;
+        else if (material.unitCost > 0) lineRev = material.unitCost * 1.35 * qty;
+      }
+      const lineSellingPrice = qty > 0 ? (lineRev / qty) : 0;
 
-      saleLines.push({
-        productName,
+      const recordLine = {
+        productName:     material.name || nameStr,
+        productCode:     material.code || codeStr,
         productId:       null,
+        category:        material.category || 'General',
+        parentCategory:  'RAW',
+        uom:             material.unit || 'Pcs',
         quantitySold:    qty,
-        sellingPrice:    qty > 0 ? (lineRev / qty) : 0,
+        sellingPrice:    lineSellingPrice,
         revenue:         lineRev,
         cogs:            ingCost,
         grossProfit:     lineRev - ingCost,
+        matchStatus:     'direct_material',
         ingredientsUsed: lineIngredients,
-      });
+      };
+
+      saleLines.push(recordLine);
+      allSoldProducts.push(recordLine);
       continue;
     }
 
-    notFound.push(productName);
+    // 3. Unmatched product
+    const identifier = nameStr || codeStr;
+    notFound.push(identifier);
+
+    let lineRev = rev;
+    if (lineRev <= 0 && price > 0) lineRev = price * qty;
+    const lineSellingPrice = qty > 0 ? (lineRev / qty) : price;
+
+    const unmatchedLine = {
+      productName:     nameStr || codeStr,
+      productCode:     codeStr,
+      productId:       null,
+      category:        'Unmatched',
+      parentCategory:  '—',
+      uom:             'Pcs',
+      quantitySold:    qty,
+      sellingPrice:    lineSellingPrice,
+      revenue:         lineRev,
+      cogs:            0,
+      grossProfit:     lineRev,
+      matchStatus:     'unmatched',
+      ingredientsUsed: [],
+    };
+    allSoldProducts.push(unmatchedLine);
   }
 
   // Aggregate totals
@@ -425,7 +529,6 @@ const importSales = asyncHandler(async (req, res) => {
   invalidateDashboardCache();
 
   res.status(201).json({
-
     message: 'Sales imported. Stock deducted and P&L recorded.',
     salesRecord,
     transactionId: transaction?._id,
@@ -434,7 +537,11 @@ const importSales = asyncHandler(async (req, res) => {
       totalCOGS,
       grossProfit,
       profitMargin: profitMargin.toFixed(1) + '%',
+      totalSoldProducts: allSoldProducts.length,
+      matchedCount: saleLines.length,
+      unmatchedCount: notFound.length,
     },
+    items: allSoldProducts,
     unmatchedProducts: notFound,
   });
 });

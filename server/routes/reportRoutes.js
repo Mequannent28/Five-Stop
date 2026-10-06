@@ -12,11 +12,17 @@ const {
   getStockLevelReport,
   getPurchaseReport,
   getSummaryReport,
+  getStockBalanceReport,
+  getItemStockLedger,
 } = require('../controllers/reportController');
 const { protect, authorizePermission } = require('../middleware/authMiddleware');
 
 router.use(protect);
 router.use(authorizePermission('viewReports'));
+
+// Stock Balance & Ledger
+router.get('/stock-balance',                     getStockBalanceReport);
+router.get('/stock-balance/ledger/:materialId', getItemStockLedger);
 
 // Existing
 router.get('/daily',        getDailyReport);

@@ -106,6 +106,18 @@ const stockTransactionSchema = new mongoose.Schema(
     notes: { type: String, trim: true, default: '' },
     date:  { type: Date, default: Date.now },
 
+    // Receipt / Invoice Attachments
+    attachment:  { type: String, default: '' },
+    attachments: [
+      {
+        url:        { type: String, required: true },
+        name:       { type: String, default: 'Receipt' },
+        mimeType:   { type: String, default: 'image/jpeg' },
+        size:       { type: Number, default: 0 },
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
+
     totalAmount: { type: Number, default: 0 },
   },
   { timestamps: true }

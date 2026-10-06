@@ -46,6 +46,13 @@ export default function ExportDropdown({
     });
   };
 
+  const handlePrint = () => {
+    setOpen(false);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
   return (
     <div className="flex items-center gap-2">
       {/* Optional Direct Import Button */}
@@ -113,7 +120,7 @@ export default function ExportDropdown({
             </button>
 
             <button
-              onClick={handlePDF}
+              onClick={handlePrint}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50 transition border-t border-ink-50 mt-1"
             >
               <Printer size={15} className="text-ink-500" />

@@ -3,12 +3,14 @@ const mongoose = require('mongoose');
 const saleLineSchema = new mongoose.Schema(
   {
     productName:    { type: String, required: true },
+    productCode:    { type: String, default: '' },
     productId:      { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
     quantitySold:   { type: Number, required: true, default: 1 },
     sellingPrice:   { type: Number, default: 0 },   // revenue per unit (if known)
     revenue:        { type: Number, default: 0 },   // total revenue for this line
     cogs:           { type: Number, default: 0 },   // total ingredient cost
     grossProfit:    { type: Number, default: 0 },   // revenue - cogs
+    matchStatus:    { type: String, default: 'matched' }, // 'recipe_deducted', 'direct_material', 'no_recipe', 'unmatched'
     ingredientsUsed: [
       {
         materialId:   { type: mongoose.Schema.Types.ObjectId, ref: 'RawMaterial' },

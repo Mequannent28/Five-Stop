@@ -5,7 +5,8 @@ import {
   ArrowLeftRight, FileBarChart, Users, UtensilsCrossed,
   ChevronDown, ChevronRight,
   ShoppingBag, CreditCard, Leaf, TrendingUp, Flame, TrendingDown,
-  BarChart2, Calendar, PackageOpen, Settings as SettingsIcon, UploadCloud
+  BarChart2, Calendar, PackageOpen, Settings as SettingsIcon, UploadCloud,
+  Scale
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -24,6 +25,7 @@ const STOCK_ITEMS = [
 // ── Reports sub-items ─────────────────────────────────────────────────
 const REPORT_ITEMS = [
   { to: '/reports/summary',        label: 'Overview',              icon: BarChart2      },
+  { to: '/reports/stock-balance',  label: 'Stock Balance Sheet',   icon: Scale          },
   { to: '/reports/daily',          label: 'Daily Report',          icon: Calendar       },
   { to: '/reports/cash-grv',       label: 'Cash GRV Report',       icon: ShoppingBag    },
   { to: '/reports/credit-grv',     label: 'Credit GRV Report',     icon: CreditCard     },

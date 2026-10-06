@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  Plus, Trash2, Search, ArrowDownCircle, ArrowUpCircle,
-  ShoppingBag, CreditCard, Flame, TrendingDown, TrendingUp, Leaf, X, Eye,
+  Plus, Trash2, Search,
+  ShoppingBag, CreditCard, Flame, TrendingDown, TrendingUp, Leaf, X, Eye, Paperclip,
 } from 'lucide-react';
 import api from '../api/axios';
 import Button from '../components/ui/Button';
@@ -10,6 +9,7 @@ import Modal from '../components/ui/Modal';
 import WorkflowBadge from '../components/ui/WorkflowBadge';
 import ApproveModal, { TrailTimeline } from '../components/ui/ApproveModal';
 import ExportDropdown from '../components/ui/ExportDropdown';
+import AttachmentUploader, { AttachmentViewer } from '../components/ui/AttachmentUploader';
 import { useAuth } from '../context/AuthContext';
 
 // ── Voucher config ────────────────────────────────────────────────────
@@ -23,12 +23,11 @@ const VOUCHERS = [
 ];
 const voucherByKey = Object.fromEntries(VOUCHERS.map(v => [v.key, v]));
 const emptyItem = () => ({ material: '', quantity: '', unitCost: '' });
-const emptyForm = key => ({ voucherType: key, voucherNo: '', supplier: '', reason: '', reference: '', notes: '', date: new Date().toISOString().slice(0, 16), items: [emptyItem()] });
+const emptyForm = key => ({ voucherType: key, voucherNo: '', supplier: '', reason: '', reference: '', notes: '', date: new Date().toISOString().slice(0, 16), items: [emptyItem()], attachments: [] });
 
 // ── Component ─────────────────────────────────────────────────────────
 export default function StockTransactions({ defaultVoucher } = {}) {
-  const { user, hasRole, can } = useAuth();
-  const navigate = useNavigate();
+  const { can } = useAuth();
   const canEdit   = can('recordGoods');
   const canDelete = can('voidTransactions');
 
@@ -123,10 +122,14 @@ export default function StockTransactions({ defaultVoucher } = {}) {
     e.preventDefault(); setError(''); setSubmitting(true);
     try {
       await api.post('/transactions', {
-        voucherType: form.voucherType,
-        voucherNo:   form.voucherNo  || undefined,
-        supplier:    form.supplier   || undefined,
-        reason: form.reason, reference: form.reference, notes: form.notes, date: form.date,
+        voucherType:  form.voucherType,
+        voucherNo:    form.voucherNo  || undefined,
+        supplier:     form.supplier   || undefined,
+        reason:       form.reason,
+        reference:    form.reference,
+        notes:        form.notes,
+        date:         form.date,
+        attachments:  form.attachments || [],
         items: form.items.filter(it => it.material && it.quantity).map(it => ({
           material: it.material, quantity: Number(it.quantity), unitCost: Number(it.unitCost) || 0,
         })),
@@ -301,6 +304,16 @@ export default function StockTransactions({ defaultVoucher } = {}) {
                   <td className="px-4 py-3 whitespace-nowrap text-xs text-ink-400">{t.performedBy?.name || '—'}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {/* Attachment badge */}
+                      {t.attachments?.length > 0 && (
+                        <span
+                          className="inline-flex items-center gap-0.5 rounded-full bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-bold text-blue-600 cursor-pointer"
+                          title={`${t.attachments.length} attachment${t.attachments.length > 1 ? 's' : ''}`}
+                          onClick={() => { setDetailTxn(t); setDetailOpen(true); }}
+                        >
+                          <Paperclip size={9} /> {t.attachments.length}
+                        </span>
+                      )}
                       {/* Detail / trail */}
                       <button
                         onClick={() => { setDetailTxn(t); setDetailOpen(true); }}
@@ -430,6 +443,17 @@ export default function StockTransactions({ defaultVoucher } = {}) {
                 className="w-full resize-none rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500"/>
             </div>
 
+            {/* ── Attachments ── */}
+            <div>
+              <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink-500">
+                <Paperclip size={12} /> Receipt / Invoice Attachments <span className="font-normal text-ink-400">(optional)</span>
+              </label>
+              <AttachmentUploader
+                attachments={form.attachments || []}
+                onAttachmentsChange={atts => setForm(f => ({ ...f, attachments: atts }))}
+              />
+            </div>
+
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
               <button type="submit" disabled={submitting}
@@ -459,7 +483,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
         title={`${voucherByKey[detailTxn?.voucherType]?.fullLabel ?? 'Voucher'} — ${detailTxn?.voucherNo || ''}`}
-        width="max-w-md"
+        width="max-w-lg"
       >
         {detailTxn && (
           <div className="space-y-4">
@@ -482,6 +506,19 @@ export default function StockTransactions({ defaultVoucher } = {}) {
               ))}
             </div>
             <TrailTimeline trail={detailTxn.trail ?? []} />
+
+            {/* Attachments section */}
+            <div>
+              <p className="text-xs font-semibold text-ink-500 flex items-center gap-1.5 mb-2">
+                <Paperclip size={12} /> Attachments
+                {(detailTxn.attachments?.length > 0) && (
+                  <span className="ml-1 inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
+                    {detailTxn.attachments.length}
+                  </span>
+                )}
+              </p>
+              <AttachmentViewer attachments={detailTxn.attachments || []} />
+            </div>
             {actionsFor(detailTxn).length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1 border-t border-ink-100">
                 {actionsFor(detailTxn).map(a => (
