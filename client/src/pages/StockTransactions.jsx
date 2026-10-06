@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  Plus, Trash2, Search,
+  Plus, Trash2, Search, ArrowDownCircle, ArrowUpCircle,
   ShoppingBag, CreditCard, Flame, TrendingDown, TrendingUp, Leaf, X, Eye, Paperclip,
 } from 'lucide-react';
 import api from '../api/axios';
