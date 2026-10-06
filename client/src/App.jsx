@@ -15,12 +15,16 @@ import Settings from './pages/Settings';
 import SalesImport from './pages/SalesImport';
 import Analytics from './pages/Analytics';
 import ErrorBoundary from './components/ErrorBoundary';
+import { SessionTimeoutProvider } from './context/SessionTimeoutContext';
+import SessionTimeoutModal from './components/common/SessionTimeoutModal';
 
 function App() {
   return (
     <ErrorBoundary>
-      <Routes>
-      <Route path="/login" element={<Login />} />
+      <SessionTimeoutProvider>
+        <SessionTimeoutModal />
+        <Routes>
+        <Route path="/login" element={<Login />} />
 
       <Route
         element={
@@ -89,6 +93,7 @@ function App() {
         <Route path="/profile" element={<Settings />} />
       </Route>
     </Routes>
+    </SessionTimeoutProvider>
     </ErrorBoundary>
   );
 }

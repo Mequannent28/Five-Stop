@@ -20,9 +20,11 @@ import {
   Camera,
   Upload,
   Trash2,
+  Clock,
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { useSessionTimeout, TIMEOUT_OPTIONS } from '../context/SessionTimeoutContext';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 
@@ -38,6 +40,8 @@ const CAPABILITIES = [
 
 export default function Settings() {
   const { user, updateUser, hasRole, refreshPermissions } = useAuth();
+  const { timeoutMinutes, setTimeoutMinutes } = useSessionTimeout();
+  const [sessionTimeoutSuccess, setSessionTimeoutSuccess] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') || 'profile';
 
@@ -613,6 +617,95 @@ export default function Settings() {
                 </Button>
               </div>
             </form>
+          </Card>
+
+          {/* Session Inactivity Timeout Card */}
+          <Card className="mt-6">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="rounded-lg bg-amber-50 p-1.5 text-amber-600">
+                  <Clock size={16} />
+                </span>
+                <h3 className="font-display text-base font-bold text-ink-900">
+                  Session Inactivity &amp; Auto-Logout
+                </h3>
+              </div>
+              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                timeoutMinutes === 0
+                  ? 'bg-slate-100 text-slate-600 border-slate-300'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}>
+                {timeoutMinutes === 0 ? 'Auto-Logout: Disabled' : `Active Policy: ${timeoutMinutes} min idle`}
+              </span>
+            </div>
+            <p className="text-xs text-ink-400 mb-5">
+              Automatically logs out when idle (no mouse, typing, or touch activity) to prevent unauthorized access at storerooms, reception, or cash counters.
+            </p>
+
+            {sessionTimeoutSuccess && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700 animate-in fade-in">
+                <CheckCircle2 size={16} className="flex-shrink-0" />
+                <span>{sessionTimeoutSuccess}</span>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-ink-700 mb-2">
+                  Choose Inactivity Idle Timeout Duration:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {TIMEOUT_OPTIONS.map((opt) => {
+                    const isSelected = timeoutMinutes === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setTimeoutMinutes(opt.value);
+                          setSessionTimeoutSuccess(`Session timeout updated to ${opt.label}.`);
+                          setTimeout(() => setSessionTimeoutSuccess(''), 3500);
+                        }}
+                        className={`flex items-center justify-between p-3 rounded-xl border text-left transition ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50/70 text-blue-900 ring-1 ring-blue-500'
+                            : 'border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50/50'
+                        }`}
+                      >
+                        <div>
+                          <p className="text-xs font-bold leading-tight">{opt.label}</p>
+                          <p className="text-[10px] text-ink-400 mt-0.5">
+                            {opt.value === 0
+                              ? 'Remain logged in indefinitely'
+                              : opt.value === 2
+                              ? 'Recommended security standard'
+                              : `Signs out after ${opt.value} minutes idle`}
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                            <Check size={12} strokeWidth={3} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 p-3 text-xs text-amber-900 space-y-1">
+                <p className="font-semibold flex items-center gap-1.5 text-amber-900">
+                  <Shield size={14} className="text-amber-600" />
+                  How Auto-Logout Protects You:
+                </p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  • 35 seconds prior to auto-logout, a warning dialog appears allowing you to extend your session with 1 click.
+                </p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  • Any active keystrokes, item scanning, or navigation instantly refreshes your session timer.
+                </p>
+              </div>
+            </div>
           </Card>
         </div>
       )}

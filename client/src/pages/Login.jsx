@@ -168,6 +168,19 @@ const Login = () => {
             </p>
           </div>
 
+          {/* Session Timeout Notice */}
+          {location.state?.sessionExpired && !error && (
+            <div className="mb-6 flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/90 p-3.5 text-xs text-amber-800 shadow-xs animate-in fade-in">
+              <span className="text-base leading-none">⏱️</span>
+              <div className="flex-1">
+                <p className="font-bold text-amber-900">Session Inactivity Timeout</p>
+                <p className="mt-0.5 text-[11px] text-amber-700 leading-relaxed">
+                  You were automatically signed out after {location.state?.timeoutMinutes || 2} minutes of inactivity to protect hotel inventory and financial records. Please sign in to resume.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-700 shadow-xs">

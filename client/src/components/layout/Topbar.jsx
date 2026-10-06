@@ -9,8 +9,11 @@ import {
   Building,
   Settings as SettingsIcon,
   Layers,
+  Clock,
+  Timer,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useSessionTimeout, TIMEOUT_OPTIONS } from '../../context/SessionTimeoutContext';
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -21,6 +24,7 @@ const greeting = () => {
 
 const Topbar = ({ onMenuClick, title }) => {
   const { user, logout, hasRole } = useAuth();
+  const { timeoutMinutes, setTimeoutMinutes, remainingSeconds } = useSessionTimeout();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -68,7 +72,21 @@ const Topbar = ({ onMenuClick, title }) => {
         </div>
       </div>
 
-      <div className="relative" ref={menuRef}>
+      <div className="flex items-center gap-2.5">
+        {/* Session Inactivity Indicator */}
+        <div
+          onClick={() => setMenuOpen((v) => !v)}
+          title={`Session Timeout: ${timeoutMinutes === 0 ? 'Disabled' : `Signs out after ${timeoutMinutes} minutes of inactivity`}`}
+          className="hidden md:flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-slate-50/80 px-2.5 py-1 text-xs text-slate-600 cursor-pointer hover:bg-slate-100 transition shadow-2xs"
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${timeoutMinutes === 0 ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
+          <Clock size={12} className="text-slate-400" />
+          <span className="text-[11px] font-medium text-slate-600">
+            {timeoutMinutes === 0 ? 'Timeout: Off' : `Auto-Logout: ${timeoutMinutes}m`}
+          </span>
+        </div>
+
+        <div className="relative" ref={menuRef}>
         <button
           onClick={() => setMenuOpen((v) => !v)}
           className="flex items-center gap-2.5 rounded-full border border-ink-200/80 bg-white py-1 pl-1 pr-3 shadow-xs hover:border-ink-300 hover:bg-ink-50/60 transition"
@@ -157,6 +175,37 @@ const Topbar = ({ onMenuClick, title }) => {
               </button>
             </div>
 
+            {/* Session Inactivity Timeout Selector */}
+            <div className="mt-2 rounded-xl bg-slate-50 border border-slate-200/80 p-2.5 text-xs">
+              <div className="flex items-center justify-between text-slate-700 font-semibold mb-1.5">
+                <span className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                  <Clock size={13} className="text-blue-600" />
+                  <span>Session Timeout</span>
+                </span>
+                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200">
+                  {timeoutMinutes === 0 ? 'Disabled' : `${timeoutMinutes} min`}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 mb-2 leading-tight">
+                Auto-signs out after idle time to secure workstation:
+              </p>
+              <select
+                id="topbar-session-timeout-select"
+                value={timeoutMinutes}
+                onChange={(e) => setTimeoutMinutes(Number(e.target.value))}
+                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-2 text-[11px] font-medium text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
+              >
+                <option value={1}>1 Minute (High Security)</option>
+                <option value={2}>2 Minutes (Default Policy)</option>
+                <option value={5}>5 Minutes</option>
+                <option value={10}>10 Minutes</option>
+                <option value={15}>15 Minutes</option>
+                <option value={30}>30 Minutes</option>
+                <option value={60}>60 Minutes (1 Hour)</option>
+                <option value={0}>Never (Off)</option>
+              </select>
+            </div>
+
             {/* Logout Action */}
             <div className="mt-1 border-t border-ink-100 pt-1">
               <button
@@ -169,6 +218,7 @@ const Topbar = ({ onMenuClick, title }) => {
             </div>
           </div>
         )}
+      </div>
       </div>
     </header>
   );
