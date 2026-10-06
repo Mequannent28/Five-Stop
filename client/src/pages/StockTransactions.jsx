@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  Plus, Trash2, Search, ArrowDownCircle, ArrowUpCircle,
+  Plus, Trash2, Search, CircleArrowDown, CircleArrowUp,
   ShoppingBag, CreditCard, Flame, TrendingDown, TrendingUp, Leaf, X, Eye, Paperclip, Pencil,
 } from 'lucide-react';
 import api from '../api/axios';
@@ -320,7 +320,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
             )}
             {displayed.map(t => {
               const v = voucherByKey[t.voucherType];
-              const Icon = v?.icon ?? ArrowDownCircle;
+              const Icon = v?.icon ?? CircleArrowDown;
               const isIn = t.type === 'in';
               const matSummary = t.items?.length > 0
                 ? t.items.map(i => `${i.material?.name ?? '—'} ×${i.quantity}`).join(', ')
@@ -341,7 +341,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
                   )}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`inline-flex items-center gap-1 text-xs font-semibold ${isIn ? 'text-emerald-700' : 'text-red-700'}`}>
-                      {isIn ? <ArrowDownCircle size={13}/> : <ArrowUpCircle size={13}/>}
+                      {isIn ? <CircleArrowDown size={13}/> : <CircleArrowUp size={13}/>}
                       {isIn ? 'IN' : 'OUT'}
                     </span>
                   </td>
@@ -422,7 +422,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${activeV.direction === 'in' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-              {activeV.direction === 'in' ? <ArrowDownCircle size={16}/> : <ArrowUpCircle size={16}/>}
+              {activeV.direction === 'in' ? <CircleArrowDown size={16}/> : <CircleArrowUp size={16}/>}
               {activeV.description} — stock will be <strong>{activeV.direction === 'in' ? 'increased' : 'decreased'}</strong>
             </div>
             {error && <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600"><X size={14}/>{error}</div>}
