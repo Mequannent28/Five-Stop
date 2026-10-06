@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Plus, Trash2, Search, ArrowDownCircle, ArrowUpCircle,
-  ShoppingBag, CreditCard, Flame, TrendingDown, TrendingUp, Leaf, X, Eye, Paperclip,
+  ShoppingBag, CreditCard, Flame, TrendingDown, TrendingUp, Leaf, X, Eye, Paperclip, Pencil,
 } from 'lucide-react';
 import api from '../api/axios';
 import Button from '../components/ui/Button';
@@ -40,6 +40,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
   const [search,       setSearch]       = useState('');
   const [modalOpen,    setModalOpen]    = useState(false);
   const [activeV,      setActiveV]      = useState(null);
+  const [editingTxn,   setEditingTxn]   = useState(null);
   const [form,         setForm]         = useState(null);
   const [error,        setError]        = useState('');
   const [submitting,   setSubmitting]   = useState(false);
@@ -108,7 +109,51 @@ export default function StockTransactions({ defaultVoucher } = {}) {
     { header: 'By', accessor: 'Recorded By' },
   ];
 
-  const openForm = key => { setActiveV(voucherByKey[key]); setForm(emptyForm(key)); setError(''); setModalOpen(true); };
+  const openForm = key => {
+    setEditingTxn(null);
+    setActiveV(voucherByKey[key]);
+    setForm(emptyForm(key));
+    setError('');
+    setModalOpen(true);
+  };
+
+  const openEditTransaction = (txn) => {
+    const vConfig = voucherByKey[txn.voucherType] || VOUCHERS[0];
+    setActiveV(vConfig);
+    setEditingTxn(txn);
+
+    let itemsList = [];
+    if (txn.items && txn.items.length > 0) {
+      itemsList = txn.items.map(it => ({
+        material: it.material?._id || it.material || '',
+        quantity: it.quantity ?? '',
+        unitCost: it.unitCost !== undefined && it.unitCost !== null ? it.unitCost : '',
+      }));
+    } else if (txn.material) {
+      itemsList = [{
+        material: txn.material?._id || txn.material || '',
+        quantity: txn.quantity ?? '',
+        unitCost: txn.unitCost !== undefined && txn.unitCost !== null ? txn.unitCost : '',
+      }];
+    } else {
+      itemsList = [emptyItem()];
+    }
+
+    setForm({
+      voucherType: txn.voucherType,
+      voucherNo: txn.voucherNo || '',
+      supplier: txn.supplier?._id || txn.supplier || '',
+      reason: txn.reason || '',
+      reference: txn.reference || '',
+      notes: txn.notes || '',
+      date: txn.date ? new Date(txn.date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+      items: itemsList,
+      attachments: txn.attachments || [],
+    });
+    setError('');
+    setModalOpen(true);
+  };
+
   const addItem    = ()          => setForm(f => ({ ...f, items: [...f.items, emptyItem()] }));
   const removeItem = i           => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
   const updateItem = (i, fld, v) => setForm(f => {
@@ -120,21 +165,28 @@ export default function StockTransactions({ defaultVoucher } = {}) {
 
   const handleSubmit = async e => {
     e.preventDefault(); setError(''); setSubmitting(true);
+    const payload = {
+      voucherType:  form.voucherType,
+      voucherNo:    form.voucherNo  || undefined,
+      supplier:     form.supplier   || undefined,
+      reason:       form.reason,
+      reference:    form.reference,
+      notes:        form.notes,
+      date:         form.date,
+      attachments:  form.attachments || [],
+      items: form.items.filter(it => it.material && it.quantity).map(it => ({
+        material: it.material, quantity: Number(it.quantity), unitCost: Number(it.unitCost) || 0,
+      })),
+    };
     try {
-      await api.post('/transactions', {
-        voucherType:  form.voucherType,
-        voucherNo:    form.voucherNo  || undefined,
-        supplier:     form.supplier   || undefined,
-        reason:       form.reason,
-        reference:    form.reference,
-        notes:        form.notes,
-        date:         form.date,
-        attachments:  form.attachments || [],
-        items: form.items.filter(it => it.material && it.quantity).map(it => ({
-          material: it.material, quantity: Number(it.quantity), unitCost: Number(it.unitCost) || 0,
-        })),
-      });
-      setModalOpen(false); load();
+      if (editingTxn) {
+        await api.put(`/transactions/${editingTxn._id}`, payload);
+      } else {
+        await api.post('/transactions', payload);
+      }
+      setModalOpen(false);
+      setEditingTxn(null);
+      load();
     } catch (err) { setError(err.response?.data?.message || 'Could not save voucher.');
     } finally { setSubmitting(false); }
   };
@@ -322,6 +374,16 @@ export default function StockTransactions({ defaultVoucher } = {}) {
                       >
                         <Eye size={13} />
                       </button>
+                      {/* Edit (only pending status) */}
+                      {canEdit && (t.status ?? 'pending') === 'pending' && (
+                        <button
+                          onClick={() => openEditTransaction(t)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-amber-500 hover:bg-amber-600 px-2 py-1 text-xs font-semibold text-white transition shadow-xs"
+                          title="Edit pending voucher"
+                        >
+                          <Pencil size={11} /> Edit
+                        </button>
+                      )}
                       {/* Workflow action buttons */}
                       {acts.map(a => (
                         <button key={a.action}
@@ -352,7 +414,12 @@ export default function StockTransactions({ defaultVoucher } = {}) {
 
       {/* ── Voucher Form Modal ── */}
       {activeV && form && (
-        <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={activeV.fullLabel} width="max-w-2xl">
+        <Modal
+          open={modalOpen}
+          onClose={() => { setModalOpen(false); setEditingTxn(null); }}
+          title={editingTxn ? `Edit ${activeV.fullLabel} (${editingTxn.voucherNo || 'Pending'})` : activeV.fullLabel}
+          width="max-w-2xl"
+        >
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${activeV.direction === 'in' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
               {activeV.direction === 'in' ? <ArrowDownCircle size={16}/> : <ArrowUpCircle size={16}/>}
@@ -455,10 +522,10 @@ export default function StockTransactions({ defaultVoucher } = {}) {
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
-              <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+              <Button type="button" variant="ghost" onClick={() => { setModalOpen(false); setEditingTxn(null); }}>Cancel</Button>
               <button type="submit" disabled={submitting}
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${activeV.activeCls}`}>
-                {submitting ? 'Saving…' : `Post ${activeV.label}`}
+                {submitting ? 'Saving…' : (editingTxn ? 'Save Changes' : `Post ${activeV.label}`)}
               </button>
             </div>
           </form>

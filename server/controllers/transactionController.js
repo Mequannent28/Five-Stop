@@ -152,6 +152,154 @@ const createTransaction = asyncHandler(async (req, res) => {
   res.status(201).json(populated);
 });
 
+// ── PUT /api/transactions/:id ─────────────────────────────────────────
+const updateTransaction = asyncHandler(async (req, res) => {
+  const transaction = await StockTransaction.findById(req.params.id);
+  if (!transaction) {
+    res.status(404);
+    throw new Error('Transaction not found');
+  }
+
+  if (transaction.status !== 'pending') {
+    res.status(400);
+    throw new Error(`Cannot edit transaction in "${transaction.status}" status. Only pending transactions can be edited.`);
+  }
+
+  const {
+    voucherType = transaction.voucherType,
+    voucherNo,
+    supplier,
+    items = [],
+    reason,
+    reference,
+    notes,
+    date,
+    attachments = [],
+    attachment = '',
+  } = req.body;
+
+  if (!VOUCHER_DIRECTION[voucherType]) {
+    res.status(400);
+    throw new Error(`Unknown voucher type: ${voucherType}`);
+  }
+
+  const newDirection = VOUCHER_DIRECTION[voucherType];
+  const oldDirection = transaction.type || VOUCHER_DIRECTION[transaction.voucherType];
+
+  if (!items.length) {
+    res.status(400);
+    throw new Error('At least one item is required.');
+  }
+
+  if ((voucherType === 'cash_grv' || voucherType === 'credit_grv') && !supplier) {
+    res.status(400);
+    throw new Error('Supplier is required for Goods Receiving Vouchers.');
+  }
+
+  // 1. Temporarily revert old stock impact to test new quantities cleanly
+  const oldItems = transaction.items?.length
+    ? transaction.items
+    : [{ material: transaction.material, quantity: transaction.quantity }];
+
+  for (const oldItem of oldItems) {
+    const mat = await RawMaterial.findById(oldItem.material);
+    if (mat) {
+      mat.currentStock += oldDirection === 'in' ? -oldItem.quantity : oldItem.quantity;
+      await mat.save();
+    }
+  }
+
+  // 2. Resolve new items and check stock sufficiency
+  const resolvedItems = [];
+  try {
+    for (const item of items) {
+      const mat = await RawMaterial.findById(item.material);
+      if (!mat) {
+        res.status(404);
+        throw new Error(`Material not found: ${item.material}`);
+      }
+      if (newDirection === 'out' && mat.currentStock < item.quantity) {
+        res.status(400);
+        throw new Error(
+          `Insufficient stock for "${mat.name}". Available: ${mat.currentStock} ${mat.unit}, requested: ${item.quantity}.`
+        );
+      }
+      const unitCost  = Number(item.unitCost) || mat.unitCost || 0;
+      const totalCost = unitCost * Number(item.quantity);
+      resolvedItems.push({ material: mat._id, quantity: Number(item.quantity), unitCost, totalCost, _doc: mat });
+    }
+  } catch (err) {
+    // Re-apply old stock if validation fails
+    for (const oldItem of oldItems) {
+      const mat = await RawMaterial.findById(oldItem.material);
+      if (mat) {
+        mat.currentStock += oldDirection === 'in' ? oldItem.quantity : -oldItem.quantity;
+        await mat.save();
+      }
+    }
+    throw err;
+  }
+
+  // 3. Apply new stock adjustments
+  for (const item of resolvedItems) {
+    item._doc.currentStock += newDirection === 'in' ? item.quantity : -item.quantity;
+    await item._doc.save();
+  }
+
+  // 4. Update transaction document
+  const totalAmount = resolvedItems.reduce((s, i) => s + i.totalCost, 0);
+  const formattedAttachments = Array.isArray(attachments) && attachments.length > 0
+    ? attachments.map(a => ({
+        url: a.url || a,
+        name: a.name || 'Receipt',
+        mimeType: a.mimeType || 'image/jpeg',
+        size: a.size || 0,
+        uploadedAt: a.uploadedAt || new Date(),
+      }))
+    : (attachment ? [{ url: attachment, name: 'Receipt', mimeType: 'image/jpeg', size: 0, uploadedAt: new Date() }] : []);
+
+  const firstItem = resolvedItems[0];
+
+  transaction.voucherType = voucherType;
+  if (voucherNo) transaction.voucherNo = voucherNo;
+  transaction.supplier    = supplier || undefined;
+  transaction.type        = newDirection;
+  transaction.material    = firstItem.material;
+  transaction.quantity    = firstItem.quantity;
+  transaction.unitCost    = firstItem.unitCost;
+  transaction.items       = resolvedItems.map(({ material, quantity, unitCost, totalCost }) => ({ material, quantity, unitCost, totalCost }));
+  transaction.reason      = reason || '';
+  transaction.reference   = reference || '';
+  transaction.notes       = notes || '';
+  if (date) transaction.date = new Date(date);
+  if (formattedAttachments.length > 0) {
+    transaction.attachments = formattedAttachments;
+    transaction.attachment = formattedAttachments[0].url;
+  }
+  transaction.totalAmount = totalAmount;
+
+  if (!transaction.trail) transaction.trail = [];
+  transaction.trail.push({
+    action: 'pending',
+    by: req.user._id,
+    byName: req.user.name,
+    byRole: req.user.role,
+    note: 'Voucher details updated',
+    at: new Date(),
+  });
+
+  await transaction.save();
+
+  const populated = await StockTransaction.findById(transaction._id)
+    .populate('material', 'name unit')
+    .populate('items.material', 'name unit unitCost')
+    .populate('supplier', 'name')
+    .populate('performedBy', 'name');
+
+  invalidateDashboardCache();
+  res.json(populated);
+});
+
 // ── DELETE /api/transactions/:id ──────────────────────────────────────
 const deleteTransaction = asyncHandler(async (req, res) => {
   const transaction = await StockTransaction.findById(req.params.id);
@@ -546,4 +694,4 @@ const importSales = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { getTransactions, createTransaction, deleteTransaction, getVoucherSummary, advanceTransaction, importSales };
+module.exports = { getTransactions, createTransaction, updateTransaction, deleteTransaction, getVoucherSummary, advanceTransaction, importSales };
