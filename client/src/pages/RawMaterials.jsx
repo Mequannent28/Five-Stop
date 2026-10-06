@@ -19,6 +19,14 @@ const UNITS = [
   { group: 'Other',   items: ['Portion', 'Serving', 'Tray', 'Batch', 'Pair', 'Set'] },
 ];
 
+// Common categories for hospitality / kitchen / store
+const CATEGORIES = [
+  { group: 'Food & Kitchen', items: ['Produce', 'Meat & Poultry', 'Fish & Seafood', 'Dairy & Eggs', 'Bakery & Pastry', 'Grains', 'Spices & Seasonings', 'Pantry', 'Frozen Foods'] },
+  { group: 'Beverages & Bar', items: ['Beverages', 'Soft Drinks & Juices', 'Beer & Wine', 'Liquor & Spirits', 'Coffee & Tea', 'Mineral Water'] },
+  { group: 'Housekeeping & Maintenance', items: ['Housekeeping', 'Cleaning Supplies', 'Linens & Bedding', 'Toiletries & Amenities', 'Disposables & Packaging', 'Maintenance & Hardware', 'Stationery'] },
+  { group: 'Other', items: ['General'] },
+];
+
 const statusBadge = (status) => {
   if (status === 'out_of_stock') return <Badge color="red">Out of stock</Badge>;
   if (status === 'low_stock') return <Badge color="amber">Low stock</Badge>;
@@ -32,6 +40,7 @@ const RawMaterials = () => {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [unitCustom, setUnitCustom] = useState(false); // true = show custom text input
+  const [categoryCustom, setCategoryCustom] = useState(false); // true = show custom text input
   const [importResult, setImportResult] = useState(null);
   const importRef = useRef();
   const { hasRole, can } = useAuth();
@@ -43,14 +52,32 @@ const RawMaterials = () => {
 
   useEffect(() => { load(); }, [search]);
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setUnitCustom(false); setModalOpen(true); };
+  // Extract unique categories currently in database
+  const existingCategories = useMemo(() => {
+    const set = new Set();
+    materials.forEach(m => {
+      if (m.category && m.category.trim()) set.add(m.category.trim());
+    });
+    return Array.from(set);
+  }, [materials]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setUnitCustom(false);
+    setCategoryCustom(false);
+    setModalOpen(true);
+  };
   const openEdit = (m) => {
     // Check if stored unit is in the preset list
     const allUnits = UNITS.flatMap(g => g.items);
-    const isPreset = allUnits.includes(m.unit);
+    const isPresetUnit = allUnits.includes(m.unit);
+    const allCategories = [...CATEGORIES.flatMap(g => g.items), ...existingCategories];
+    const isPresetCat = allCategories.includes(m.category);
     setEditing(m);
     setForm(m);
-    setUnitCustom(!isPreset && !!m.unit);
+    setUnitCustom(!isPresetUnit && !!m.unit);
+    setCategoryCustom(!isPresetCat && !!m.category);
     setModalOpen(true);
   };
 
@@ -234,8 +261,52 @@ const RawMaterials = () => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-ink-600">Category</label>
-              <input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brass-400" />
+              {categoryCustom ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                    placeholder="Type custom category…"
+                    className="flex-1 rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brass-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setCategoryCustom(false); setForm(f => ({ ...f, category: '' })); }}
+                    className="rounded-lg border border-ink-200 px-2.5 py-2 text-xs text-ink-500 hover:bg-ink-50 transition"
+                  >← List</button>
+                </div>
+              ) : (
+                <select
+                  value={form.category}
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') {
+                      setCategoryCustom(true);
+                      setForm(f => ({ ...f, category: '' }));
+                    } else {
+                      setForm({ ...form, category: e.target.value });
+                    }
+                  }}
+                  className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-brass-400 bg-white"
+                >
+                  <option value="">Select category…</option>
+                  {existingCategories.filter(c => !CATEGORIES.some(g => g.items.includes(c))).length > 0 && (
+                    <optgroup label="Existing in Stock">
+                      {existingCategories.filter(c => !CATEGORIES.some(g => g.items.includes(c))).map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {CATEGORIES.map(group => (
+                    <optgroup key={group.group} label={group.group}>
+                      {group.items.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                  <option value="__custom__">✏️ Custom…</option>
+                </select>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink-600">Unit *</label>
