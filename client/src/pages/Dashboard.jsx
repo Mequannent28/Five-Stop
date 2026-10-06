@@ -38,6 +38,8 @@ import {
   ShieldCheck,
   AlertOctagon,
   Clock,
+  ClipboardList,
+  Scale,
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -292,6 +294,18 @@ export default function Dashboard() {
             <CreditCard size={14} /> New Credit GRV
           </button>
           <button
+            onClick={() => navigate('/reports/inventory-count')}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
+          >
+            <ClipboardList size={14} /> Inventory Count
+          </button>
+          <button
+            onClick={() => navigate('/reports/stock-balance')}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-semibold text-blue-700 shadow-sm hover:bg-blue-100 transition"
+          >
+            <Scale size={14} /> Stock Balance
+          </button>
+          <button
             onClick={() => fetchSummary(true)}
             disabled={refreshing}
             className="inline-flex items-center gap-1 rounded-xl border border-ink-200 bg-white p-2 text-xs font-medium text-ink-600 hover:bg-ink-50 transition"
@@ -299,7 +313,6 @@ export default function Dashboard() {
           >
             <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
           </button>
-
         </div>
       </div>
 
@@ -396,6 +409,65 @@ export default function Dashboard() {
             <Link to="/transactions" className="text-xs font-medium text-ink-500 hover:text-ink-800">
               View all transactions →
             </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Inventory Count & Stock Balance Quick Access ── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* Inventory Count Card */}
+        <div
+          onClick={() => navigate('/reports/inventory-count')}
+          className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-600 to-emerald-800 p-5 shadow-soft cursor-pointer hover:shadow-lg hover:scale-[1.01] transition-all duration-200"
+        >
+          <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10 group-hover:scale-110 transition-transform duration-300" />
+          <div className="absolute -right-2 bottom-0 h-16 w-16 rounded-full bg-white/5" />
+          <div className="relative">
+            <div className="flex items-start justify-between">
+              <div className="rounded-xl bg-white/20 p-2.5">
+                <ClipboardList size={22} className="text-white" />
+              </div>
+              <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
+                Inventory
+              </span>
+            </div>
+            <h3 className="mt-4 text-lg font-black text-white leading-tight">
+              Inventory Count
+            </h3>
+            <p className="mt-1 text-xs text-emerald-100">
+              Physical count sheets per store — WAC, variance &amp; approval
+            </p>
+            <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-white/90 group-hover:gap-3 transition-all">
+              Open Count Sheet <ArrowRight size={14} />
+            </div>
+          </div>
+        </div>
+
+        {/* Stock Balance Card */}
+        <div
+          onClick={() => navigate('/reports/stock-balance')}
+          className="group relative overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-700 to-blue-900 p-5 shadow-soft cursor-pointer hover:shadow-lg hover:scale-[1.01] transition-all duration-200"
+        >
+          <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10 group-hover:scale-110 transition-transform duration-300" />
+          <div className="absolute -right-2 bottom-0 h-16 w-16 rounded-full bg-white/5" />
+          <div className="relative">
+            <div className="flex items-start justify-between">
+              <div className="rounded-xl bg-white/20 p-2.5">
+                <Scale size={22} className="text-white" />
+              </div>
+              <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
+                Reports
+              </span>
+            </div>
+            <h3 className="mt-4 text-lg font-black text-white leading-tight">
+              Stock Balance Sheet
+            </h3>
+            <p className="mt-1 text-xs text-blue-100">
+              Opening + Received − Issued = Closing balance ledger
+            </p>
+            <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-white/90 group-hover:gap-3 transition-all">
+              View Balance Sheet <ArrowRight size={14} />
+            </div>
           </div>
         </div>
       </div>

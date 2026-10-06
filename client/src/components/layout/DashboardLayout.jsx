@@ -21,6 +21,7 @@ const titles = {
   '/reports': 'Reports & Analytics',
   '/reports/summary': 'Overview Summary Report',
   '/reports/stock-balance': 'Stock Balance Sheet',
+  '/reports/inventory-count': 'Inventory Count',
   '/reports/daily': 'Daily Movement Report',
   '/reports/cash-grv': 'Cash GRV Report',
   '/reports/credit-grv': 'Credit GRV Report',

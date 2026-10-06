@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight,
   ShoppingBag, CreditCard, Leaf, TrendingUp, Flame, TrendingDown,
   BarChart2, Calendar, PackageOpen, Settings as SettingsIcon, UploadCloud,
-  Scale
+  Scale, ClipboardList
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -24,17 +24,18 @@ const STOCK_ITEMS = [
 
 // ── Reports sub-items ─────────────────────────────────────────────────
 const REPORT_ITEMS = [
-  { to: '/reports/summary',        label: 'Overview',              icon: BarChart2      },
-  { to: '/reports/stock-balance',  label: 'Stock Balance Sheet',   icon: Scale          },
-  { to: '/reports/daily',          label: 'Daily Report',          icon: Calendar       },
-  { to: '/reports/cash-grv',       label: 'Cash GRV Report',       icon: ShoppingBag    },
-  { to: '/reports/credit-grv',     label: 'Credit GRV Report',     icon: CreditCard     },
-  { to: '/reports/fresh-bazaar',   label: 'Fresh Bazaar Report',   icon: Leaf           },
-  { to: '/reports/pos-adjustment', label: '+ve Adjustment Report',  icon: TrendingUp     },
-  { to: '/reports/disposal',       label: 'Disposal Report',       icon: Flame          },
-  { to: '/reports/neg-adjustment', label: '−ve Adjustment Report', icon: TrendingDown   },
-  { to: '/reports/stock-levels',   label: 'Stock Levels',          icon: PackageOpen    },
-  { to: '/reports/purchases',      label: 'Purchase History',      icon: ShoppingCart   },
+  { to: '/reports/summary',          label: 'Overview',              icon: BarChart2      },
+  { to: '/reports/stock-balance',    label: 'Stock Balance Sheet',   icon: Scale          },
+  { to: '/reports/inventory-count',  label: 'Inventory Count',       icon: ClipboardList  },
+  { to: '/reports/daily',            label: 'Daily Report',          icon: Calendar       },
+  { to: '/reports/cash-grv',         label: 'Cash GRV Report',       icon: ShoppingBag    },
+  { to: '/reports/credit-grv',       label: 'Credit GRV Report',     icon: CreditCard     },
+  { to: '/reports/fresh-bazaar',     label: 'Fresh Bazaar Report',   icon: Leaf           },
+  { to: '/reports/pos-adjustment',   label: '+ve Adjustment Report', icon: TrendingUp     },
+  { to: '/reports/disposal',         label: 'Disposal Report',       icon: Flame          },
+  { to: '/reports/neg-adjustment',   label: '−ve Adjustment Report', icon: TrendingDown   },
+  { to: '/reports/stock-levels',     label: 'Stock Levels',          icon: PackageOpen    },
+  { to: '/reports/purchases',        label: 'Purchase History',      icon: ShoppingCart   },
 ];
 
 // ── Top-level items (excluding stock movements & reports handled below) ─

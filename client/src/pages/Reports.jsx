@@ -2,6 +2,9 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Printer, Scale, Search, History, X, RefreshCw,
   ChevronLeft, ChevronRight, Calendar, ArrowRight, CheckCircle, Clock,
+  ClipboardList, Store, PackageSearch, TrendingUp, TrendingDown,
+  Minus, Send, ShieldCheck, Trash2, Plus, AlertTriangle, BarChart3,
+  ChevronDown, ChevronUp, Eye, EyeOff, Save,
 } from 'lucide-react';
 import api from '../api/axios';
 import Card from '../components/ui/Card';
@@ -11,17 +14,18 @@ import ExportDropdown from '../components/ui/ExportDropdown';
 
 // Route → API endpoint map (used by the load function)
 const TABS = [
-  { key: 'summary',        label: 'Overview',            endpoint: null },
-  { key: 'stock_balance',  label: 'Stock Balance Sheet', endpoint: '/reports/stock-balance' },
-  { key: 'daily',          label: 'Daily Report',         endpoint: '/reports/daily' },
-  { key: 'cash_grv',       label: 'Cash GRV',             endpoint: '/reports/cash-grv' },
-  { key: 'credit_grv',     label: 'Credit GRV',           endpoint: '/reports/credit-grv' },
-  { key: 'fresh_bazaar',   label: 'Fresh Bazaar',         endpoint: '/reports/fresh-bazaar' },
-  { key: 'pos_adjustment', label: '+ve Adjustment',       endpoint: '/reports/pos-adjustment' },
-  { key: 'disposal',       label: 'Goods Disposal',       endpoint: '/reports/disposal' },
-  { key: 'neg_adjustment', label: '−ve Adjustment',       endpoint: '/reports/neg-adjustment' },
-  { key: 'stock',          label: 'Stock Levels',         endpoint: '/reports/stock-levels' },
-  { key: 'purchases',      label: 'Purchases',            endpoint: '/reports/purchases' },
+  { key: 'summary',           label: 'Overview',              endpoint: null },
+  { key: 'stock_balance',     label: 'Stock Balance Sheet',   endpoint: '/reports/stock-balance' },
+  { key: 'inventory_count',   label: 'Inventory Count',       endpoint: null },
+  { key: 'daily',             label: 'Daily Report',          endpoint: '/reports/daily' },
+  { key: 'cash_grv',          label: 'Cash GRV',              endpoint: '/reports/cash-grv' },
+  { key: 'credit_grv',        label: 'Credit GRV',            endpoint: '/reports/credit-grv' },
+  { key: 'fresh_bazaar',      label: 'Fresh Bazaar',          endpoint: '/reports/fresh-bazaar' },
+  { key: 'pos_adjustment',    label: '+ve Adjustment',        endpoint: '/reports/pos-adjustment' },
+  { key: 'disposal',          label: 'Goods Disposal',        endpoint: '/reports/disposal' },
+  { key: 'neg_adjustment',    label: '−ve Adjustment',        endpoint: '/reports/neg-adjustment' },
+  { key: 'stock',             label: 'Stock Levels',          endpoint: '/reports/stock-levels' },
+  { key: 'purchases',         label: 'Purchases',             endpoint: '/reports/purchases' },
 ];
 
 
@@ -96,6 +100,697 @@ const MaterialBreakdown = ({ data }) => (
     emptyMessage="No breakdown available."
   />
 );
+
+// ════════════════════════════════════════════════════════════════════
+// InventoryCount standalone component
+// ════════════════════════════════════════════════════════════════════
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December'
+];
+
+function InventoryCountPanel() {
+  const now = new Date();
+  const [stores, setStores]                 = useState([]);
+  const [counts, setCounts]                 = useState([]);
+  const [loadingList, setLoadingList]       = useState(false);
+  const [filterYear, setFilterYear]         = useState(now.getFullYear());
+  const [filterMonth, setFilterMonth]       = useState(now.getMonth() + 1);
+  const [filterStore, setFilterStore]       = useState('all');
+
+  // New count init form
+  const [showInitForm, setShowInitForm]     = useState(false);
+  const [initStore, setInitStore]           = useState('');
+  const [initYear, setInitYear]             = useState(now.getFullYear());
+  const [initMonth, setInitMonth]           = useState(now.getMonth() + 1);
+  const [initNotes, setInitNotes]           = useState('');
+  const [initLoading, setInitLoading]       = useState(false);
+  const [initError, setInitError]           = useState('');
+
+  // Active count editor
+  const [activeCount, setActiveCount]       = useState(null);
+  const [editorLoading, setEditorLoading]   = useState(false);
+  const [saving, setSaving]                 = useState(false);
+  const [saveError, setSaveError]           = useState('');
+  const [expandedStores, setExpandedStores] = useState({});
+  const [showUncounted, setShowUncounted]   = useState(true);
+  const [searchQ, setSearchQ]               = useState('');
+
+  // local edits buffer: materialId → physicalCount value
+  const [edits, setEdits] = useState({});
+
+  // ── Load stores ───────────────────────────────────────────────────
+  useEffect(() => {
+    api.get('/inventory-count/stores')
+      .then(r => {
+        setStores(r.data.stores || []);
+        if (r.data.stores?.length) setInitStore(r.data.stores[0]);
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Load count list ────────────────────────────────────────────────
+  const loadList = useCallback(async () => {
+    setLoadingList(true);
+    try {
+      const params = { year: filterYear, month: filterMonth };
+      if (filterStore !== 'all') params.store = filterStore;
+      const r = await api.get('/inventory-count', { params });
+      setCounts(r.data.counts || []);
+    } catch(e) {
+      console.error(e);
+    } finally {
+      setLoadingList(false);
+    }
+  }, [filterYear, filterMonth, filterStore]);
+
+  useEffect(() => { loadList(); }, [loadList]);
+
+  // ── Initialize a new count ─────────────────────────────────────────
+  const handleInit = async () => {
+    if (!initStore) return;
+    setInitLoading(true);
+    setInitError('');
+    try {
+      const r = await api.post('/inventory-count/initialize', {
+        periodYear: initYear,
+        periodMonth: initMonth,
+        storeLocation: initStore,
+        notes: initNotes,
+      });
+      setShowInitForm(false);
+      setInitNotes('');
+      await loadList();
+      openEditor(r.data.count._id);
+    } catch(e) {
+      setInitError(e.response?.data?.message || 'Failed to initialize count');
+    } finally {
+      setInitLoading(false);
+    }
+  };
+
+  // ── Open editor for a count ────────────────────────────────────────
+  const openEditor = async (id) => {
+    setEditorLoading(true);
+    setEdits({});
+    setSaveError('');
+    try {
+      const r = await api.get(`/inventory-count/${id}`);
+      setActiveCount(r.data.count);
+      // Auto-expand all stores
+      setExpandedStores({ [r.data.count.storeLocation]: true });
+    } catch(e) {
+      console.error(e);
+    } finally {
+      setEditorLoading(false);
+    }
+  };
+
+  // ── Save physical count edits ──────────────────────────────────────
+  const saveEdits = async () => {
+    if (!activeCount) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      const lines = Object.entries(edits).map(([material, physicalCount]) => ({
+        material,
+        physicalCount: physicalCount === '' ? null : Number(physicalCount),
+      }));
+      if (!lines.length) { setSaving(false); return; }
+      const r = await api.patch(`/inventory-count/${activeCount._id}/lines`, { lines });
+      setActiveCount(r.data.count);
+      setEdits({});
+    } catch(e) {
+      setSaveError(e.response?.data?.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Submit / Approve ───────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!activeCount) return;
+    // Auto-save first
+    if (Object.keys(edits).length) await saveEdits();
+    try {
+      const r = await api.post(`/inventory-count/${activeCount._id}/submit`);
+      setActiveCount(r.data.count);
+      await loadList();
+    } catch(e) {
+      setSaveError(e.response?.data?.message || 'Submit failed');
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!activeCount) return;
+    try {
+      const r = await api.post(`/inventory-count/${activeCount._id}/approve`);
+      setActiveCount(r.data.count);
+      await loadList();
+    } catch(e) {
+      setSaveError(e.response?.data?.message || 'Approval failed');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this draft count?')) return;
+    try {
+      await api.delete(`/inventory-count/${id}`);
+      if (activeCount?._id === id) setActiveCount(null);
+      await loadList();
+    } catch(e) {
+      alert(e.response?.data?.message || 'Delete failed');
+    }
+  };
+
+  const isEditable = activeCount && (activeCount.status === 'draft' || activeCount.status === 'submitted');
+  const canApprove = activeCount?.status === 'submitted';
+  const isLocked   = activeCount && (activeCount.status === 'approved' || activeCount.status === 'closed');
+
+  // ── Filter lines ──────────────────────────────────────────────────
+  const filteredLines = useMemo(() => {
+    if (!activeCount) return [];
+    return activeCount.lines.filter(line => {
+      if (searchQ && !line.materialName.toLowerCase().includes(searchQ.toLowerCase())) return false;
+      if (!showUncounted && !line.isCounted) return false;
+      return true;
+    });
+  }, [activeCount, searchQ, showUncounted]);
+
+  const counted   = activeCount?.lines.filter(l => l.isCounted).length || 0;
+  const total     = activeCount?.lines.length || 0;
+  const progress  = total > 0 ? Math.round((counted / total) * 100) : 0;
+
+  const statusColors = {
+    draft:     'bg-amber-100 text-amber-800',
+    submitted: 'bg-blue-100 text-blue-800',
+    approved:  'bg-emerald-100 text-emerald-800',
+    closed:    'bg-ink-100 text-ink-600',
+  };
+
+  // ════════════════════════════════════════════════════════════════
+  // RENDER
+  // ════════════════════════════════════════════════════════════════
+  return (
+    <div className="space-y-5">
+
+      {/* ── Header toolbar ─────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {/* Year */}
+          <div className="flex items-center gap-1.5 bg-white border border-ink-200 rounded-xl px-3 py-1.5 shadow-xs">
+            <ChevronLeft
+              size={15}
+              className="cursor-pointer text-ink-500 hover:text-blue-700 transition"
+              onClick={() => setFilterYear(y => y - 1)}
+            />
+            <span className="text-xs font-bold text-ink-800 min-w-[42px] text-center">{filterYear}</span>
+            <ChevronRight
+              size={15}
+              className="cursor-pointer text-ink-500 hover:text-blue-700 transition"
+              onClick={() => setFilterYear(y => y + 1)}
+            />
+          </div>
+          {/* Month */}
+          <select
+            value={filterMonth}
+            onChange={e => setFilterMonth(Number(e.target.value))}
+            className="text-xs font-semibold border border-ink-200 rounded-xl px-3 py-1.5 bg-white text-ink-800 outline-none focus:border-blue-500 cursor-pointer shadow-xs"
+          >
+            {MONTH_NAMES.map((m, i) => (
+              <option key={m} value={i + 1}>{m}</option>
+            ))}
+          </select>
+          {/* Store filter */}
+          <select
+            value={filterStore}
+            onChange={e => setFilterStore(e.target.value)}
+            className="text-xs font-semibold border border-ink-200 rounded-xl px-3 py-1.5 bg-white text-ink-800 outline-none focus:border-blue-500 cursor-pointer shadow-xs"
+          >
+            <option value="all">All Stores</option>
+            {stores.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <button
+          onClick={() => setShowInitForm(true)}
+          className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition"
+        >
+          <Plus size={15} /> New Count Sheet
+        </button>
+      </div>
+
+      {/* ── Init Form Modal ─────────────────────────────────────── */}
+      {showInitForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-ink-900 flex items-center gap-2">
+                <ClipboardList size={18} className="text-blue-700" /> Initialize Inventory Count
+              </h3>
+              <button onClick={() => { setShowInitForm(false); setInitError(''); }} className="text-ink-400 hover:text-red-500 transition">
+                <X size={18} />
+              </button>
+            </div>
+
+            {initError && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl px-3 py-2 text-xs">
+                <AlertTriangle size={14} /> {initError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-ink-600">Store Location</label>
+                <select
+                  value={initStore}
+                  onChange={e => setInitStore(e.target.value)}
+                  className="w-full rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-xs font-medium text-ink-900 outline-none focus:border-blue-500"
+                >
+                  {stores.map(s => <option key={s} value={s}>{s}</option>)}
+                  {!stores.length && <option value="">No stores found</option>}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-ink-600">Month</label>
+                <select
+                  value={initMonth}
+                  onChange={e => setInitMonth(Number(e.target.value))}
+                  className="w-full rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-xs font-medium text-ink-900 outline-none focus:border-blue-500"
+                >
+                  {MONTH_NAMES.map((m, i) => (
+                    <option key={m} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-ink-600">Year</label>
+                <input
+                  type="number"
+                  value={initYear}
+                  onChange={e => setInitYear(Number(e.target.value))}
+                  min="2020" max="2050"
+                  className="w-full rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-xs font-medium text-ink-900 outline-none focus:border-blue-500"
+                />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <label className="text-xs font-semibold text-ink-600">Notes (optional)</label>
+                <textarea
+                  value={initNotes}
+                  onChange={e => setInitNotes(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-xl border border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-900 outline-none focus:border-blue-500 resize-none"
+                  placeholder="e.g. Annual stock take..."
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                onClick={() => { setShowInitForm(false); setInitError(''); }}
+                className="px-4 py-2 rounded-xl border border-ink-200 text-xs font-semibold text-ink-700 hover:bg-ink-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleInit}
+                disabled={initLoading || !initStore}
+                className="px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold shadow transition disabled:opacity-60"
+              >
+                {initLoading ? 'Initializing…' : 'Initialize & Open'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Count List (session cards) ──────────────────────────── */}
+      {!activeCount && (
+        <div className="space-y-3">
+          {loadingList && (
+            <div className="flex items-center justify-center py-16">
+              <RefreshCw size={24} className="animate-spin text-blue-600" />
+            </div>
+          )}
+          {!loadingList && counts.length === 0 && (
+            <div className="flex flex-col items-center gap-3 py-20 text-ink-400">
+              <PackageSearch size={48} className="text-ink-200" />
+              <p className="text-sm font-medium">No count sheets for this period.</p>
+              <p className="text-xs">Click &ldquo;New Count Sheet&rdquo; to begin.</p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {counts.map(c => (
+              <div
+                key={c._id}
+                className="group bg-white rounded-2xl border border-ink-100 shadow-sm hover:shadow-md transition p-4 space-y-3 cursor-pointer"
+                onClick={() => openEditor(c._id)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                      <Store size={18} className="text-blue-700" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-ink-900 leading-tight">{c.storeLocation}</p>
+                      <p className="text-[10px] text-ink-500">{MONTH_NAMES[c.periodMonth - 1]} {c.periodYear}</p>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColors[c.status]}`}>
+                    {c.status}
+                  </span>
+                </div>
+                {/* Progress */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] text-ink-500">
+                    <span>{c.countedItems}/{c.totalItems} counted</span>
+                    <span>{c.totalItems > 0 ? Math.round((c.countedItems / c.totalItems) * 100) : 0}%</span>
+                  </div>
+                  <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-600 rounded-full transition-all"
+                      style={{ width: `${c.totalItems > 0 ? (c.countedItems / c.totalItems) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+                {/* Variance summary */}
+                <div className="flex items-center gap-3 text-[10px]">
+                  <span className="flex items-center gap-1 text-emerald-700">
+                    <TrendingUp size={10} /> +ETB {(c.positiveVariance || 0).toFixed(0)}
+                  </span>
+                  <span className="flex items-center gap-1 text-red-600">
+                    <TrendingDown size={10} /> ETB {(c.negativeVariance || 0).toFixed(0)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-ink-100">
+                  <button
+                    className="text-[10px] text-blue-700 font-bold flex items-center gap-1 group-hover:underline"
+                    onClick={() => openEditor(c._id)}
+                  >
+                    <Eye size={12} /> Open
+                  </button>
+                  {c.status === 'draft' && (
+                    <button
+                      className="text-[10px] text-red-500 font-semibold flex items-center gap-1 hover:text-red-700"
+                      onClick={e => { e.stopPropagation(); handleDelete(c._id); }}
+                    >
+                      <Trash2 size={11} /> Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Editor loading ─────────────────────────────────────── */}
+      {editorLoading && (
+        <div className="flex items-center justify-center py-24">
+          <RefreshCw size={28} className="animate-spin text-blue-600" />
+        </div>
+      )}
+
+      {/* ── EDITOR ─────────────────────────────────────────────── */}
+      {activeCount && !editorLoading && (
+        <div className="space-y-4">
+
+          {/* ── Editor top bar ── */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setActiveCount(null); setEdits({}); loadList(); }}
+                className="flex items-center gap-1.5 text-xs text-ink-500 hover:text-blue-700 font-semibold transition"
+              >
+                <ChevronLeft size={15} /> Back to List
+              </button>
+              <span className="text-ink-300">|</span>
+              <div className="flex items-center gap-2">
+                <Store size={15} className="text-blue-700" />
+                <span className="text-sm font-bold text-ink-900">{activeCount.title}</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${statusColors[activeCount.status]}`}>
+                  {activeCount.status}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isEditable && Object.keys(edits).length > 0 && (
+                <button
+                  onClick={saveEdits}
+                  disabled={saving}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow transition"
+                >
+                  <Save size={13} /> {saving ? 'Saving…' : `Save (${Object.keys(edits).length})`}
+                </button>
+              )}
+              {activeCount.status === 'draft' && (
+                <button
+                  onClick={handleSubmit}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow transition"
+                >
+                  <Send size={13} /> Submit for Approval
+                </button>
+              )}
+              {canApprove && (
+                <button
+                  onClick={handleApprove}
+                  className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow transition"
+                >
+                  <ShieldCheck size={13} /> Approve & Close
+                </button>
+              )}
+            </div>
+          </div>
+
+          {saveError && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2 text-xs">
+              <AlertTriangle size={14} /> {saveError}
+            </div>
+          )}
+
+          {/* ── Summary KPI cards ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-xs p-4">
+              <p className="text-[10px] font-semibold text-ink-500 uppercase tracking-wide">Progress</p>
+              <div className="mt-2">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="font-bold text-blue-700">{counted}/{total}</span>
+                  <span className="text-ink-500">{progress}%</span>
+                </div>
+                <div className="h-2 bg-ink-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${progress}%`, background: progress === 100 ? '#16a34a' : '#2563eb' }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-xs p-4">
+              <p className="text-[10px] font-semibold text-ink-500 uppercase tracking-wide">+ve Variance</p>
+              <p className="mt-1 text-lg font-black text-emerald-600">ETB {(activeCount.positiveVariance || 0).toFixed(2)}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-xs p-4">
+              <p className="text-[10px] font-semibold text-ink-500 uppercase tracking-wide">−ve Variance</p>
+              <p className="mt-1 text-lg font-black text-red-600">ETB {(activeCount.negativeVariance || 0).toFixed(2)}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-ink-100 shadow-xs p-4">
+              <p className="text-[10px] font-semibold text-ink-500 uppercase tracking-wide">Net Variance</p>
+              <p className={`mt-1 text-lg font-black ${(activeCount.netVarianceValue || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                ETB {(activeCount.netVarianceValue || 0).toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          {/* ── Search & filter bar ── */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 bg-white border border-ink-200 rounded-xl px-3 py-1.5 flex-1 min-w-[180px]">
+              <Search size={13} className="text-ink-400" />
+              <input
+                type="text"
+                placeholder="Search material…"
+                value={searchQ}
+                onChange={e => setSearchQ(e.target.value)}
+                className="flex-1 text-xs outline-none text-ink-900 bg-transparent"
+              />
+              {searchQ && <button onClick={() => setSearchQ('')}><X size={12} className="text-ink-400 hover:text-ink-700" /></button>}
+            </div>
+            <button
+              onClick={() => setShowUncounted(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                showUncounted
+                  ? 'bg-amber-50 border-amber-200 text-amber-800'
+                  : 'bg-white border-ink-200 text-ink-600'
+              }`}
+            >
+              {showUncounted ? <Eye size={13} /> : <EyeOff size={13} />}
+              {showUncounted ? 'Showing All' : 'Counted Only'}
+            </button>
+          </div>
+
+          {/* ── Count Table ── */}
+          <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden">
+            {/* Store header */}
+            <div
+              className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-blue-700 to-blue-900 cursor-pointer"
+              onClick={() => setExpandedStores(p => ({ ...p, [activeCount.storeLocation]: !p[activeCount.storeLocation] }))}
+            >
+              <div className="flex items-center gap-3">
+                <Store size={16} className="text-white/80" />
+                <span className="text-sm font-bold text-white">{activeCount.storeLocation}</span>
+                <span className="text-xs text-blue-200">{MONTH_NAMES[activeCount.periodMonth - 1]} {activeCount.periodYear}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-white/70">{counted}/{total} counted</span>
+                {expandedStores[activeCount.storeLocation]
+                  ? <ChevronUp size={16} className="text-white" />
+                  : <ChevronDown size={16} className="text-white" />
+                }
+              </div>
+            </div>
+
+            {expandedStores[activeCount.storeLocation] !== false && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-ink-50 text-ink-600">
+                      <th className="text-left px-4 py-2.5 font-semibold">#</th>
+                      <th className="text-left px-4 py-2.5 font-semibold">Material</th>
+                      <th className="text-left px-3 py-2.5 font-semibold">Unit</th>
+                      <th className="text-right px-3 py-2.5 font-semibold">Begin Bal.</th>
+                      <th className="text-right px-3 py-2.5 font-semibold">In</th>
+                      <th className="text-right px-3 py-2.5 font-semibold">Out</th>
+                      <th className="text-right px-3 py-2.5 font-semibold">Sys. Bal.</th>
+                      <th className="text-right px-3 py-2.5 font-semibold bg-blue-50">Physical Count</th>
+                      <th className="text-right px-3 py-2.5 font-semibold">Variance</th>
+                      <th className="text-right px-3 py-2.5 font-semibold">WAC (ETB)</th>
+                      <th className="text-right px-3 py-2.5 font-semibold">Var. Value</th>
+                      <th className="text-center px-3 py-2.5 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-ink-50">
+                    {filteredLines.length === 0 && (
+                      <tr>
+                        <td colSpan={12} className="text-center py-10 text-ink-400">No items found.</td>
+                      </tr>
+                    )}
+                    {filteredLines.map((line, idx) => {
+                      const editVal = edits[line.material];
+                      const displayCount = editVal !== undefined ? editVal : (line.physicalCount !== null ? line.physicalCount : '');
+                      const variance = line.isCounted ? line.variance : (editVal !== undefined && editVal !== '' ? Number(editVal) - line.systemBalance : null);
+                      const isPos = variance > 0;
+                      const isNeg = variance < 0;
+
+                      return (
+                        <tr
+                          key={line.material}
+                          className={`hover:bg-blue-50/40 transition-colors ${
+                            !line.isCounted && editVal === undefined ? 'bg-amber-50/30' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-2.5 text-ink-400">{idx + 1}</td>
+                          <td className="px-4 py-2.5">
+                            <span className="font-semibold text-ink-900">{line.materialName}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-ink-500">{line.unit}</td>
+                          <td className="px-3 py-2.5 text-right tabular text-ink-700">{(line.beginBalance || 0).toFixed(3)}</td>
+                          <td className="px-3 py-2.5 text-right tabular text-emerald-700 font-medium">{(line.inQty || 0).toFixed(3)}</td>
+                          <td className="px-3 py-2.5 text-right tabular text-red-600 font-medium">{(line.outQty || 0).toFixed(3)}</td>
+                          <td className="px-3 py-2.5 text-right tabular font-bold text-ink-900">{(line.systemBalance || 0).toFixed(3)}</td>
+                          <td className="px-3 py-2.5 text-right bg-blue-50/50">
+                            {isLocked ? (
+                              <span className="tabular font-bold text-blue-900">{line.physicalCount?.toFixed(3) ?? '—'}</span>
+                            ) : (
+                              <input
+                                type="number"
+                                step="0.001"
+                                min="0"
+                                value={displayCount}
+                                onChange={e => setEdits(prev => ({ ...prev, [line.material]: e.target.value }))}
+                                onBlur={e => {
+                                  if (e.target.value !== '' && e.target.value !== String(line.physicalCount)) {
+                                    // keep in buffer, save on explicit save
+                                  }
+                                }}
+                                className="w-24 text-right bg-white border border-blue-200 rounded-lg px-2 py-1 text-xs font-bold text-blue-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200 tabular"
+                                placeholder="Enter qty"
+                              />
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular">
+                            {variance !== null ? (
+                              <span className={`font-bold flex items-center justify-end gap-1 ${
+                                isPos ? 'text-emerald-600' : isNeg ? 'text-red-600' : 'text-ink-500'
+                              }`}>
+                                {isPos && <TrendingUp size={11} />}
+                                {isNeg && <TrendingDown size={11} />}
+                                {!isPos && !isNeg && <Minus size={11} />}
+                                {variance.toFixed(3)}
+                              </span>
+                            ) : <span className="text-ink-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular text-ink-700">{(line.wac || 0).toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-right tabular">
+                            {line.varianceValue !== 0 ? (
+                              <span className={`font-semibold ${line.varianceValue > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                ETB {line.varianceValue.toFixed(2)}
+                              </span>
+                            ) : <span className="text-ink-300">—</span>}
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            {line.isCounted ? (
+                              <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                <CheckCircle size={9} /> Counted
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                <Clock size={9} /> Pending
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ── Closing info (if approved) ── */}
+          {isLocked && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
+              <ShieldCheck size={20} className="text-emerald-700 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-emerald-800">Count Approved & Closed</p>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  Approved by {activeCount.approvedBy?.name || 'admin'} on{' '}
+                  {activeCount.approvedAt ? new Date(activeCount.approvedAt).toLocaleString() : '—'}.
+                  Closing balance locked.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Uncounted summary ── */}
+          {activeCount.status !== 'approved' && activeCount.status !== 'closed' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+              <AlertTriangle size={18} className="text-amber-700 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-amber-800">
+                  {activeCount.uncountedItems || 0} item{(activeCount.uncountedItems || 0) !== 1 ? 's' : ''} not yet counted
+                </p>
+                <p className="text-[10px] text-amber-700 mt-0.5">
+                  Uncounted items will use system balance as physical count upon approval.
+                </p>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Main component ────────────────────────────────────────────────────
 export default function Reports({ defaultTab } = {}) {
@@ -1405,6 +2100,14 @@ export default function Reports({ defaultTab } = {}) {
           />
         </div>
       )}
+
+      {/* ════════════════════════════════════════════════════════════════
+          INVENTORY COUNT
+      ════════════════════════════════════════════════════════════════ */}
+      {tab === 'inventory_count' && (
+        <InventoryCountPanel />
+      )}
+
     </div>
   );
 }

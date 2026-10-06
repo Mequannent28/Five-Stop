@@ -67,6 +67,7 @@ function App() {
         />
         <Route path="/reports/summary"        element={<ProtectedRoute capability="viewReports"><Reports defaultTab="summary"        /></ProtectedRoute>} />
         <Route path="/reports/stock-balance"  element={<ProtectedRoute capability="viewReports"><Reports defaultTab="stock_balance"  /></ProtectedRoute>} />
+        <Route path="/reports/inventory-count" element={<ProtectedRoute capability="viewReports"><Reports defaultTab="inventory_count" /></ProtectedRoute>} />
         <Route path="/reports/daily"          element={<ProtectedRoute capability="viewReports"><Reports defaultTab="daily"          /></ProtectedRoute>} />
         <Route path="/reports/cash-grv"       element={<ProtectedRoute capability="viewReports"><Reports defaultTab="cash_grv"       /></ProtectedRoute>} />
         <Route path="/reports/credit-grv"     element={<ProtectedRoute capability="viewReports"><Reports defaultTab="credit_grv"     /></ProtectedRoute>} />
