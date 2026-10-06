@@ -37,33 +37,33 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen w-full flex-col lg:flex-row bg-white selection:bg-rose-500 selection:text-white">
+    <div className="flex min-h-screen w-full flex-col lg:flex-row bg-white selection:bg-blue-600 selection:text-white">
       
       {/* ════════════════════════════════════════════════════════════════
-          LEFT COLUMN: Brand & Security Showcase
+          LEFT COLUMN: Brand & Security Showcase (Dashboard Blue Theme)
       ════════════════════════════════════════════════════════════════ */}
-      <div className="relative flex flex-col justify-between overflow-hidden bg-linear-to-br from-[#3b0d13] via-[#4a121a] to-[#20060a] p-8 text-white sm:p-12 lg:w-1/2 lg:p-16">
+      <div className="relative flex flex-col justify-between overflow-hidden bg-linear-to-br from-[#0c1838] via-[#172e6d] to-[#080e22] p-8 text-white sm:p-12 lg:w-1/2 lg:p-16">
         
-        {/* Subtle decorative background pattern / glow */}
-        <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-rose-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl" />
+        {/* Subtle decorative background pattern / ambient glow */}
+        <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-blue-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-cyan-500/15 blur-3xl" />
 
         {/* Top: Brand Logo */}
         <div className="relative z-10">
           <div className="flex items-center gap-3.5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 p-2.5 backdrop-blur-md border border-white/15 shadow-xl shadow-black/20">
-              <Warehouse className="h-full w-full text-rose-200" strokeWidth={2.2} />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 p-2.5 backdrop-blur-md border border-white/15 shadow-xl shadow-black/30">
+              <Warehouse className="h-full w-full text-blue-200" strokeWidth={2.2} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xl font-black tracking-tight uppercase text-white font-sans">
                   FIVE STOP
                 </span>
-                <span className="rounded-full bg-rose-500/30 border border-rose-400/30 px-2 py-0.5 text-[10px] font-bold tracking-wider text-rose-200 uppercase">
+                <span className="rounded-full bg-blue-500/30 border border-blue-400/30 px-2 py-0.5 text-[10px] font-bold tracking-wider text-blue-200 uppercase">
                   ENTERPRISE
                 </span>
               </div>
-              <p className="text-xs font-medium tracking-wide text-rose-200/70">
+              <p className="text-xs font-medium tracking-wide text-blue-200/70">
                 Hotel Stock &amp; Inventory Management System
               </p>
             </div>
@@ -73,14 +73,14 @@ const Login = () => {
         {/* Middle: Headline & Core Capabilities */}
         <div className="relative z-10 my-12 space-y-6 lg:my-0 lg:max-w-lg">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-rose-200 backdrop-blur-xs">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-blue-200 backdrop-blur-xs">
               <Sparkles size={13} className="text-amber-300" />
               <span>Version 2.0 · Multi-Department Stock Control</span>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-[40px] leading-tight">
               Hospitality Stock, Purchasing &amp; Recipe Ledger Desk
             </h1>
-            <p className="text-sm leading-relaxed text-rose-100/80">
+            <p className="text-sm leading-relaxed text-blue-100/80">
               Centralized real-time warehouse tracking, supplier price indexation, recipe consumption breakdown, and automated monthly ledger reconciliations.
             </p>
           </div>
@@ -88,14 +88,14 @@ const Login = () => {
           {/* Compliance & Audit Verified Card */}
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4.5 backdrop-blur-md transition hover:bg-white/10">
             <div className="flex items-start gap-3.5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/20 border border-rose-400/30 text-rose-300">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/20 border border-blue-400/30 text-sky-300">
                 <ShieldCheck size={20} strokeWidth={2.2} />
               </div>
               <div>
                 <h2 className="text-xs font-bold uppercase tracking-wider text-white">
                   Audit Trail &amp; Maker-Checker Compliant
                 </h2>
-                <p className="mt-1 text-xs leading-relaxed text-rose-200/70">
+                <p className="mt-1 text-xs leading-relaxed text-blue-200/70">
                   Enforces strict voucher authorization (Checked, Approved, Posted), perpetual inventory valuation, and tamper-proof user activity logs.
                 </p>
               </div>
@@ -104,7 +104,7 @@ const Login = () => {
         </div>
 
         {/* Bottom: Left Column Footer */}
-        <div className="relative z-10 pt-6 text-xs text-rose-200/50">
+        <div className="relative z-10 pt-6 text-xs text-blue-200/50">
           <p>© 2026 Five Stop Hotel &amp; Restaurant Management SC. All rights reserved.</p>
         </div>
       </div>
@@ -157,7 +157,7 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter institutional email or username"
-                  className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-[#4a121a] focus:ring-2 focus:ring-[#4a121a]/15 shadow-xs"
+                  className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 shadow-xs"
                 />
               </div>
             </div>
@@ -180,7 +180,7 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-11 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-[#4a121a] focus:ring-2 focus:ring-[#4a121a]/15 shadow-xs"
+                  className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-11 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 shadow-xs"
                 />
                 <button
                   type="button"
@@ -198,7 +198,7 @@ const Login = () => {
               id="login-submit"
               type="submit"
               disabled={loading}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#4a121a] hover:bg-[#380d14] py-3.5 text-sm font-semibold text-white shadow-md shadow-[#4a121a]/20 transition active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 py-3.5 text-sm font-semibold text-white shadow-md shadow-blue-600/25 transition active:scale-[0.99] disabled:opacity-60 cursor-pointer"
             >
               {loading ? (
                 <>
@@ -229,7 +229,7 @@ const Login = () => {
                   key={r.label}
                   type="button"
                   onClick={() => handleQuickFill(r.email)}
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:border-[#4a121a] hover:text-[#4a121a] hover:bg-rose-50/50 transition cursor-pointer shadow-2xs"
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50/50 transition cursor-pointer shadow-2xs"
                 >
                   {r.label}
                 </button>
