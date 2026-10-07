@@ -23,6 +23,32 @@ const run = async () => {
     console.log('Admin already exists, skipping.');
   }
 
+  const managerExists = await User.findOne({ email: 'manager@hotel.com' });
+  if (!managerExists) {
+    await User.create({
+      name: 'Hotel Manager',
+      email: 'manager@hotel.com',
+      password: 'admin123',
+      role: 'manager',
+    });
+    console.log('Created default manager -> manager@hotel.com / admin123');
+  } else {
+    console.log('Manager already exists, skipping.');
+  }
+
+  const storekeeperExists = await User.findOne({ email: 'storekeeper@hotel.com' });
+  if (!storekeeperExists) {
+    await User.create({
+      name: 'Store Keeper',
+      email: 'storekeeper@hotel.com',
+      password: 'admin123',
+      role: 'storekeeper',
+    });
+    console.log('Created default storekeeper -> storekeeper@hotel.com / admin123');
+  } else {
+    console.log('Storekeeper already exists, skipping.');
+  }
+
   const supplierCount = await Supplier.countDocuments();
   if (supplierCount === 0) {
     await Supplier.insertMany([

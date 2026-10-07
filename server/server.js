@@ -15,6 +15,28 @@ const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 connectDB();
 
+// ── Auto-seed default accounts on startup ─────────────────────────────
+const autoSeed = async () => {
+  try {
+    const User = require('./models/User');
+    const defaults = [
+      { name: 'Hotel Admin',   email: 'admin@hotel.com',       password: 'admin123', role: 'admin'       },
+      { name: 'Hotel Manager', email: 'manager@hotel.com',     password: 'admin123', role: 'manager'     },
+      { name: 'Store Keeper',  email: 'storekeeper@hotel.com', password: 'admin123', role: 'storekeeper' },
+    ];
+    for (const u of defaults) {
+      const exists = await User.findOne({ email: u.email });
+      if (!exists) {
+        await User.create(u);
+        console.log(`[SEED] Created ${u.role} -> ${u.email}`);
+      }
+    }
+  } catch (err) {
+    console.error('[SEED] Auto-seed error:', err.message);
+  }
+};
+autoSeed();
+
 const app = express();
 
 app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
