@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Plus, Search, Pencil, Trash2, Upload, Download, X, Zap } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Upload, Download, X, Zap, Boxes } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/ui/DataTable';
@@ -227,7 +227,13 @@ const RawMaterials = () => {
         </div>
       )}
 
-      <DataTable columns={columns} data={materials} emptyMessage="No raw materials yet. Add your first item." />
+      <DataTable
+        columns={columns}
+        data={materials}
+        emptyMessage="No raw materials yet. Add your first item."
+        title="Raw Materials Inventory"
+        icon={<Boxes size={15} />}
+      />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit material' : 'Add raw material'}>
         <form onSubmit={handleSubmit} className="space-y-3">

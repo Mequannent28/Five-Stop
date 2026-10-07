@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Truck } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/ui/DataTable';
@@ -89,7 +89,13 @@ const Suppliers = () => {
         </div>
       </div>
 
-      <DataTable columns={columns} data={suppliers} emptyMessage="No suppliers yet. Add your first one." />
+      <DataTable
+        columns={columns}
+        data={suppliers}
+        emptyMessage="No suppliers yet. Add your first one."
+        title="Supplier Directory"
+        icon={<Truck size={15} />}
+      />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit supplier' : 'Add supplier'}>
         <form onSubmit={handleSubmit} className="space-y-3">

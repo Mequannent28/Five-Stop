@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { Plus, Trash2, ChevronDown, ChevronRight, Eye, X } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Eye, X, ShoppingCart } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '../api/axios';
 import DataTable from '../components/ui/DataTable';
@@ -257,7 +257,13 @@ export default function Purchases() {
         </div>
       )}
 
-      <DataTable columns={columns} data={purchases} emptyMessage="No purchases recorded yet." />
+      <DataTable
+        columns={columns}
+        data={purchases}
+        emptyMessage="No purchases recorded yet."
+        title="Purchase Orders"
+        icon={<ShoppingCart size={15} />}
+      />
 
       {/* ── Create Modal ── */}
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Record a purchase" width="max-w-2xl">

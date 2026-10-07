@@ -85,7 +85,7 @@ const VoucherTable = ({ data, showSupplier = false, showReason = false }) => {
     { key: 'totalAmount', header: 'Total (ETB)', render: r => <span className="tabular font-medium">ETB {(r.totalAmount || 0).toFixed(2)}</span> },
     { key: 'performedBy', header: 'By', render: r => r.performedBy?.name || '—' },
   ];
-  return <DataTable columns={cols} data={data} emptyMessage="No records in this period." />;
+  return <DataTable columns={cols} data={data} emptyMessage="No records in this period." title="Transaction History" icon={<History size={15} />} />;
 };
 
 // ── Material breakdown table ──────────────────────────────────────────

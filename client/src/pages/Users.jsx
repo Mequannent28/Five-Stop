@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Users as UsersIcon } from 'lucide-react';
 import api from '../api/axios';
 import DataTable from '../components/ui/DataTable';
 import Badge from '../components/ui/Badge';
@@ -57,7 +57,12 @@ const Users = () => {
         <Button variant="brass" onClick={() => setModalOpen(true)}><Plus size={16} /> Add staff account</Button>
       </div>
 
-      <DataTable columns={columns} data={users} />
+      <DataTable
+        columns={columns}
+        data={users}
+        title="Staff Accounts"
+        icon={<UsersIcon size={15} />}
+      />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add staff account">
         <form onSubmit={handleSubmit} className="space-y-3">

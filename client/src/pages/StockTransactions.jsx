@@ -298,20 +298,49 @@ export default function StockTransactions({ defaultVoucher } = {}) {
       </div>
 
       {/* ── Transactions table ── */}
-      <div className="overflow-x-auto rounded-xl border border-ink-100 bg-white shadow-soft">
+      <div className="overflow-hidden rounded-xl border border-blue-200/70 bg-white shadow-soft">
+
+        {/* Blue banner header */}
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-2.5"
+          style={{ background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 60%, #3b82f6 100%)' }}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex-shrink-0 text-blue-200">
+              {headingV
+                ? <HeadingIcon size={15} />
+                : <CircleArrowDown size={15} />
+              }
+            </span>
+            <span className="font-bold text-sm text-white truncate">
+              {headingV ? headingV.fullLabel : 'All Stock Movements'}
+            </span>
+            <span className="hidden sm:inline text-xs font-medium text-blue-200">
+              {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </span>
+          </div>
+          <span className="flex-shrink-0 flex items-center gap-1.5 rounded-full bg-white/15 border border-white/25 px-3 py-0.5 text-xs font-bold text-white whitespace-nowrap">
+            {displayed.length}/{transactions.length} shown
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M3 8L6 5L9 8" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-ink-100 text-sm">
-          <thead className="bg-ink-50/60">
+          <thead className="bg-slate-50/80">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold text-ink-500 whitespace-nowrap">Date</th>
-              <th className="px-4 py-3 text-left font-semibold text-ink-500 whitespace-nowrap">Voucher No</th>
-              {!filterType && <th className="px-4 py-3 text-left font-semibold text-ink-500 whitespace-nowrap">Type</th>}
-              <th className="px-4 py-3 text-left font-semibold text-ink-500 whitespace-nowrap">Direction</th>
-              <th className="px-4 py-3 text-left font-semibold text-ink-500 whitespace-nowrap">Material(s)</th>
-              <th className="px-4 py-3 text-left font-semibold text-ink-500 whitespace-nowrap">Supplier</th>
-              <th className="px-4 py-3 text-right font-semibold text-ink-500 whitespace-nowrap">Total (ETB)</th>
-              <th className="px-4 py-3 text-left font-semibold text-ink-500 whitespace-nowrap">Status</th>
-              <th className="px-4 py-3 text-left font-semibold text-ink-500 whitespace-nowrap">By</th>
-              <th className="px-4 py-3 text-right font-semibold text-ink-500 whitespace-nowrap">Actions</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Date</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Voucher No</th>
+              {!filterType && <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Type</th>}
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Direction</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Material(s)</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Supplier</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Total (ETB)</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">By</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-ink-50">
@@ -407,6 +436,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
             })}
           </tbody>
         </table>
+        </div>
         <div className="border-t border-ink-100 px-4 py-2 text-xs text-ink-400">
           {displayed.length} record{displayed.length !== 1 ? 's' : ''}
         </div>
