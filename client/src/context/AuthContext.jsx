@@ -24,27 +24,18 @@ const DEFAULT_NAV_VISIBILITY = {
   staffAccounts:  { storekeeper: false, manager: false, admin: true },
 };
 
+/** Clear every settings-related key from localStorage */
+const clearSettingsCache = () => {
+  localStorage.removeItem('hotelStockPermissions');
+  localStorage.removeItem('hotelStockNavVisibility');
+};
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser]                     = useState(null);
+  const [rolePermissions, setRolePermissions] = useState(DEFAULT_PERMISSIONS);
+  const [navVisibility,   setNavVisibility]   = useState(DEFAULT_NAV_VISIBILITY);
 
-  const [rolePermissions, setRolePermissions] = useState(() => {
-    try {
-      const saved = localStorage.getItem('hotelStockPermissions');
-      return saved ? JSON.parse(saved) : DEFAULT_PERMISSIONS;
-    } catch {
-      return DEFAULT_PERMISSIONS;
-    }
-  });
-
-  const [navVisibility, setNavVisibility] = useState(() => {
-    try {
-      const saved = localStorage.getItem('hotelStockNavVisibility');
-      return saved ? JSON.parse(saved) : DEFAULT_NAV_VISIBILITY;
-    } catch {
-      return DEFAULT_NAV_VISIBILITY;
-    }
-  });
-
+  // loading stays true until BOTH the user AND the server settings are resolved
   const [loading, setLoading] = useState(true);
 
   const fetchPermissions = useCallback(async () => {
@@ -60,36 +51,55 @@ export const AuthProvider = ({ children }) => {
       }
       return res.data;
     } catch (err) {
-      console.warn('Could not fetch settings, using defaults/cached', err);
+      // Network failure: fall back to localStorage cache if available, else hardcoded defaults
+      try {
+        const cachedRP = localStorage.getItem('hotelStockPermissions');
+        const cachedNV = localStorage.getItem('hotelStockNavVisibility');
+        if (cachedRP) setRolePermissions(JSON.parse(cachedRP));
+        if (cachedNV) setNavVisibility(JSON.parse(cachedNV));
+      } catch { /* ignore parse errors */ }
+      console.warn('Could not fetch settings from server, using cache/defaults', err);
     }
     return null;
   }, []);
 
+  // On mount: restore user from localStorage, then AWAIT fetchPermissions before
+  // clearing the loading flag. This prevents a flash of wrong nav items.
   useEffect(() => {
-    const stored = localStorage.getItem('hotelStockAuth');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setUser(parsed);
-        fetchPermissions();
-      } catch {
-        localStorage.removeItem('hotelStockAuth');
+    const init = async () => {
+      const stored = localStorage.getItem('hotelStockAuth');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setUser(parsed);
+          // Fetch server settings BEFORE showing the app
+          await fetchPermissions();
+        } catch {
+          localStorage.removeItem('hotelStockAuth');
+        }
       }
-    }
-    setLoading(false);
+      // Only now allow the app to render
+      setLoading(false);
+    };
+    init();
   }, [fetchPermissions]);
 
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     localStorage.setItem('hotelStockAuth', JSON.stringify(data));
     setUser(data);
+    // Fetch authoritative settings right after login — no stale cache possible
     await fetchPermissions();
     return data;
   };
 
   const logout = () => {
     localStorage.removeItem('hotelStockAuth');
+    // Clear ALL cached settings so the next login always reads fresh server data
+    clearSettingsCache();
     setUser(null);
+    setRolePermissions(DEFAULT_PERMISSIONS);
+    setNavVisibility(DEFAULT_NAV_VISIBILITY);
   };
 
   const updateUser = (updatedData) => {
@@ -120,9 +130,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshPermissions = async (newSettings) => {
-    // newSettings can be the full settings object or just rolePermissions (legacy)
     if (newSettings) {
-      // Handle both shapes: full settings object OR bare rolePermissions map
       const rp = newSettings.rolePermissions ?? newSettings;
       const nv = newSettings.navVisibility ?? null;
 
