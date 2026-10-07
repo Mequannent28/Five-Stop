@@ -29,13 +29,25 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 
 const CAPABILITIES = [
-  { key: 'recordGoods', label: 'Record Goods Receiving (Cash/Credit GRV)' },
-  { key: 'checkReview', label: 'Check & Review Transactions (Stage 1)' },
-  { key: 'approveGoods', label: 'Approve Goods & Vouchers (Stage 2)' },
-  { key: 'postLedger', label: 'Post Documents to Ledger (Final Stage)' },
+  { key: 'recordGoods',      label: 'Record Goods Receiving (Cash/Credit GRV)' },
+  { key: 'checkReview',      label: 'Check & Review Transactions (Stage 1)' },
+  { key: 'approveGoods',     label: 'Approve Goods & Vouchers (Stage 2)' },
+  { key: 'postLedger',       label: 'Post Documents to Ledger (Final Stage)' },
   { key: 'voidTransactions', label: 'Void / Reverse Transactions' },
-  { key: 'viewReports', label: 'View Financial & Valuation Reports' },
-  { key: 'manageAccounts', label: 'Manage Staff Accounts & Passwords' },
+  { key: 'viewReports',      label: 'View Financial & Valuation Reports' },
+  { key: 'manageAccounts',   label: 'Manage Staff Accounts & Passwords' },
+];
+
+const NAV_ITEMS = [
+  { key: 'dashboard',      label: 'Dashboard' },
+  { key: 'rawMaterials',   label: 'Raw Materials' },
+  { key: 'products',       label: 'Products' },
+  { key: 'stockMovements', label: 'Stock Movements' },
+  { key: 'purchases',      label: 'Purchases' },
+  { key: 'suppliers',      label: 'Suppliers' },
+  { key: 'reports',        label: 'Reports' },
+  { key: 'analytics',      label: 'Analytics & P&L' },
+  { key: 'staffAccounts',  label: 'Staff Accounts' },
 ];
 
 export default function Settings() {
@@ -90,6 +102,17 @@ export default function Settings() {
       voidTransactions: { storekeeper: false, manager: false, admin: true },
       viewReports: { storekeeper: false, manager: true, admin: true },
       manageAccounts: { storekeeper: false, manager: false, admin: true }
+    },
+    navVisibility: {
+      dashboard:      { storekeeper: true,  manager: true,  admin: true },
+      rawMaterials:   { storekeeper: true,  manager: true,  admin: true },
+      products:       { storekeeper: true,  manager: true,  admin: true },
+      stockMovements: { storekeeper: true,  manager: true,  admin: true },
+      purchases:      { storekeeper: false, manager: true,  admin: true },
+      suppliers:      { storekeeper: false, manager: true,  admin: true },
+      reports:        { storekeeper: false, manager: true,  admin: true },
+      analytics:      { storekeeper: false, manager: true,  admin: true },
+      staffAccounts:  { storekeeper: false, manager: false, admin: true },
     },
     notes: '',
   });
@@ -269,8 +292,8 @@ export default function Settings() {
     try {
       const res = await api.put('/settings', systemForm);
       setSystemForm((prev) => ({ ...prev, ...res.data }));
-      if (res.data?.rolePermissions) {
-        await refreshPermissions(res.data.rolePermissions);
+      if (res.data?.rolePermissions || res.data?.navVisibility) {
+        await refreshPermissions(res.data);
       } else {
         await refreshPermissions();
       }
@@ -951,6 +974,61 @@ export default function Settings() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* ── Sidebar Navigation Visibility Matrix ── */}
+            <div className="mt-8 pt-6 border-t border-ink-100">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="rounded-lg bg-emerald-50 p-1.5 text-emerald-600">
+                  <Layers size={15} />
+                </span>
+                <h4 className="text-sm font-bold text-ink-900">Sidebar Navigation Visibility</h4>
+              </div>
+              <p className="text-xs text-ink-400 mb-4">
+                Control which sidebar menu items each role can see. Unchecking a section hides it completely for that role.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs text-left">
+                  <thead>
+                    <tr className="border-b border-ink-100 bg-ink-50/70 text-ink-600 font-semibold">
+                      <th className="py-2.5 px-3">Sidebar Section</th>
+                      <th className="py-2.5 px-3 text-center">Storekeeper</th>
+                      <th className="py-2.5 px-3 text-center">Manager</th>
+                      <th className="py-2.5 px-3 text-center">Admin</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-ink-50 text-ink-700">
+                    {NAV_ITEMS.map((nav) => (
+                      <tr key={nav.key}>
+                        <td className="py-2.5 px-3 font-medium">{nav.label}</td>
+                        {['storekeeper', 'manager', 'admin'].map((r) => (
+                          <td key={r} className="py-2.5 px-3 text-center">
+                            <input
+                              type="checkbox"
+                              disabled={!hasRole('admin')}
+                              checked={systemForm.navVisibility?.[nav.key]?.[r] ?? true}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setSystemForm(prev => ({
+                                  ...prev,
+                                  navVisibility: {
+                                    ...prev.navVisibility,
+                                    [nav.key]: {
+                                      ...prev.navVisibility?.[nav.key],
+                                      [r]: checked,
+                                    },
+                                  },
+                                }));
+                              }}
+                              className="h-4 w-4 rounded border-ink-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {hasRole('admin') && (

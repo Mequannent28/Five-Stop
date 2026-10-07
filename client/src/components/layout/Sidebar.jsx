@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight,
   ShoppingBag, CreditCard, Leaf, TrendingUp, Flame, TrendingDown,
   BarChart2, Calendar, PackageOpen, Settings as SettingsIcon, UploadCloud,
-  Scale, ClipboardList
+  Scale, ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -38,27 +38,15 @@ const REPORT_ITEMS = [
   { to: '/reports/purchases',        label: 'Purchase History',      icon: ShoppingCart   },
 ];
 
-// ── Top-level items (excluding stock movements & reports handled below) ─
-const NAV_BEFORE = [
-  { to: '/',          label: 'Dashboard',       icon: LayoutDashboard, roles: ['admin','manager','storekeeper'] },
-  { to: '/materials', label: 'Raw Materials',   icon: Boxes,           roles: ['admin','manager','storekeeper'] },
-  { to: '/products',  label: 'Products',        icon: UtensilsCrossed, roles: ['admin','manager','storekeeper'] },
-  { to: '/analytics', label: 'Analytics & P&L', icon: TrendingUp,      capability: 'viewReports', roles: ['admin','manager'] },
-];
-const NAV_AFTER = [
-  { to: '/purchases', label: 'Purchases',     icon: ShoppingCart, capability: 'recordGoods', roles: ['admin','manager'] },
-  { to: '/suppliers', label: 'Suppliers',     icon: Truck,        roles: ['admin','manager'] },
-];
-
 // ── Reusable sub-item link ────────────────────────────────────────────
 const SubLink = ({ to, label, icon: Icon, end = false, onClick }) => (
   <NavLink
-    to={to} end={end}
-    onClick={onClick}
+    to={to} end={end} onClick={onClick}
     className={({ isActive }) =>
       `flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium transition-all ${
         isActive ? 'bg-white/25 text-white font-semibold' : 'text-blue-200 hover:bg-white/10 hover:text-white'
-      }`}
+      }`
+    }
   >
     <Icon size={13} />
     {label}
@@ -87,7 +75,7 @@ const CollapsibleNav = ({ label, icon: Icon, isActive, open, onToggle, children 
 
 // ── Sidebar ───────────────────────────────────────────────────────────
 const Sidebar = ({ open, onClose }) => {
-  const { user, can } = useAuth();
+  const { user, canSeeNav } = useAuth();
   const location = useLocation();
 
   const onTransactions = location.pathname.startsWith('/transactions');
@@ -96,18 +84,12 @@ const Sidebar = ({ open, onClose }) => {
   const [stockOpen,  setStockOpen]  = useState(onTransactions);
   const [reportOpen, setReportOpen] = useState(onReports);
 
-  const canSeeStock   = can('recordGoods') || ['admin','manager','storekeeper'].includes(user?.role);
-  const canSeeReports = can('viewReports');
-
   const linkCls = (isActive) =>
     `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-      isActive ? 'bg-white/20 text-white shadow-sm backdrop-blur-sm' : 'text-blue-100 hover:bg-white/10 hover:text-white'
+      isActive
+        ? 'bg-white/20 text-white shadow-sm backdrop-blur-sm'
+        : 'text-blue-100 hover:bg-white/10 hover:text-white'
     }`;
-
-  const isItemVisible = (item) => {
-    if (item.capability) return can(item.capability);
-    return item.roles ? item.roles.includes(user?.role) : true;
-  };
 
   return (
     <>
@@ -124,9 +106,7 @@ const Sidebar = ({ open, onClose }) => {
             <svg viewBox="0 0 40 40" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect width="40" height="40" rx="8" fill="#1a56db"/>
               <text x="50%" y="55%" dominantBaseline="middle" textAnchor="middle"
-                fill="white" fontSize="13" fontWeight="bold">
-                5S
-              </text>
+                fill="white" fontSize="13" fontWeight="bold">5S</text>
             </svg>
           </div>
           <div>
@@ -138,16 +118,36 @@ const Sidebar = ({ open, onClose }) => {
         {/* Nav */}
         <nav className="mt-1 flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
 
-          {/* Before-group items */}
-          {NAV_BEFORE.filter(isItemVisible).map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} end={to === '/'} onClick={onClose}
-              className={({ isActive }) => linkCls(isActive)}>
-              <Icon size={18} strokeWidth={2} />{label}
+          {/* Dashboard */}
+          {canSeeNav('dashboard') && (
+            <NavLink to="/" end onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
+              <LayoutDashboard size={18} strokeWidth={2} /> Dashboard
             </NavLink>
-          ))}
+          )}
 
-          {/* ── Stock Movements ── */}
-          {canSeeStock && (
+          {/* Raw Materials */}
+          {canSeeNav('rawMaterials') && (
+            <NavLink to="/materials" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
+              <Boxes size={18} strokeWidth={2} /> Raw Materials
+            </NavLink>
+          )}
+
+          {/* Products */}
+          {canSeeNav('products') && (
+            <NavLink to="/products" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
+              <UtensilsCrossed size={18} strokeWidth={2} /> Products
+            </NavLink>
+          )}
+
+          {/* Analytics */}
+          {canSeeNav('analytics') && (
+            <NavLink to="/analytics" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
+              <TrendingUp size={18} strokeWidth={2} /> Analytics &amp; P&amp;L
+            </NavLink>
+          )}
+
+          {/* Stock Movements (collapsible) */}
+          {canSeeNav('stockMovements') && (
             <CollapsibleNav
               label="Stock Movements"
               icon={ArrowLeftRight}
@@ -161,18 +161,22 @@ const Sidebar = ({ open, onClose }) => {
             </CollapsibleNav>
           )}
 
-          {/* After-group items (Purchases, Suppliers) */}
-          {NAV_AFTER.filter(isItemVisible)
-            .filter(i => i.to !== '/reports')
-            .map(({ to, label, icon: Icon }) => (
-              <NavLink key={to} to={to} onClick={onClose}
-                className={({ isActive }) => linkCls(isActive)}>
-                <Icon size={18} strokeWidth={2} />{label}
-              </NavLink>
-          ))}
+          {/* Purchases */}
+          {canSeeNav('purchases') && (
+            <NavLink to="/purchases" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
+              <ShoppingCart size={18} strokeWidth={2} /> Purchases
+            </NavLink>
+          )}
 
-          {/* ── Reports ── */}
-          {canSeeReports && (
+          {/* Suppliers */}
+          {canSeeNav('suppliers') && (
+            <NavLink to="/suppliers" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
+              <Truck size={18} strokeWidth={2} /> Suppliers
+            </NavLink>
+          )}
+
+          {/* Reports (collapsible) */}
+          {canSeeNav('reports') && (
             <CollapsibleNav
               label="Reports"
               icon={FileBarChart}
@@ -187,16 +191,14 @@ const Sidebar = ({ open, onClose }) => {
           )}
 
           {/* Staff Accounts */}
-          {(can('manageAccounts') || user?.role === 'admin') && (
-            <NavLink to="/users" onClick={onClose}
-              className={({ isActive }) => linkCls(isActive)}>
+          {canSeeNav('staffAccounts') && (
+            <NavLink to="/users" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
               <Users size={18} strokeWidth={2} /> Staff Accounts
             </NavLink>
           )}
 
-          {/* Settings */}
-          <NavLink to="/settings" onClick={onClose}
-            className={({ isActive }) => linkCls(isActive)}>
+          {/* Settings — always visible to all authenticated users */}
+          <NavLink to="/settings" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
             <SettingsIcon size={18} strokeWidth={2} /> Settings
           </NavLink>
         </nav>
