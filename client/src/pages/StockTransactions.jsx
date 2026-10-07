@@ -215,7 +215,10 @@ export default function StockTransactions({ defaultVoucher } = {}) {
   const canDeleteRow = (t) =>
     canDelete && (isAdmin || ['pending','voided'].includes(t.status ?? 'pending'));
 
-  const deletableIds = displayed.filter(canDeleteRow).map(t => t._id);
+  // Admin can select all rows; others only pending/voided
+  const deletableIds = displayed
+    .filter(t => canDelete && (isAdmin || ['pending','voided'].includes(t.status ?? 'pending')))
+    .map(t => t._id);
   const allChecked   = deletableIds.length > 0 && deletableIds.every(id => selected.has(id));
   const someChecked  = deletableIds.some(id => selected.has(id));
   const toggleAll    = () => allChecked
@@ -385,11 +388,9 @@ export default function StockTransactions({ defaultVoucher } = {}) {
                 <tr key={t._id} className={`hover:bg-ink-50/40 ${selected.has(t._id) ? 'bg-red-50/40' : ''}`}>
                   {canDelete && (
                     <td className="px-4 py-3">
-                      {canDeleteRow(t) && (
-                        <input type="checkbox" checked={selected.has(t._id)}
-                          onChange={() => toggleOne(t._id)}
-                          className="h-4 w-4 rounded accent-red-600 cursor-pointer" />
-                      )}
+                      <input type="checkbox" checked={selected.has(t._id)}
+                        onChange={() => toggleOne(t._id)}
+                        className="h-4 w-4 rounded accent-red-600 cursor-pointer" />
                     </td>
                   )}
                   <td className="px-4 py-3 whitespace-nowrap text-xs text-ink-500">{new Date(t.date).toLocaleString()}</td>
