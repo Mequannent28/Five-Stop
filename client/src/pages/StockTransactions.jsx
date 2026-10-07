@@ -27,9 +27,10 @@ const emptyForm = key => ({ voucherType: key, voucherNo: '', supplier: '', reaso
 
 // ── Component ─────────────────────────────────────────────────────────
 export default function StockTransactions({ defaultVoucher } = {}) {
-  const { can } = useAuth();
+  const { can, hasRole } = useAuth();
   const canEdit   = can('recordGoods');
   const canDelete = can('voidTransactions');
+  const isAdmin   = hasRole('admin');
 
   // filterType comes from sidebar navigation (defaultVoucher) or stays null (All)
   const filterType = defaultVoucher ?? null;
@@ -202,7 +203,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
 
   const handleBulkDelete = async () => {
     const deletable = displayed.filter(t =>
-      ['pending','voided'].includes(t.status ?? 'pending') && selected.has(t._id)
+      canDelete && (isAdmin || ['pending','voided'].includes(t.status ?? 'pending')) && selected.has(t._id)
     );
     if (!deletable.length) return;
     if (!confirm(`Move ${deletable.length} transaction(s) to recycle bin?`)) return;
@@ -211,9 +212,10 @@ export default function StockTransactions({ defaultVoucher } = {}) {
   };
 
   /* ── selection helpers ── */
-  const deletableIds = displayed
-    .filter(t => canDelete && ['pending','voided'].includes(t.status ?? 'pending'))
-    .map(t => t._id);
+  const canDeleteRow = (t) =>
+    canDelete && (isAdmin || ['pending','voided'].includes(t.status ?? 'pending'));
+
+  const deletableIds = displayed.filter(canDeleteRow).map(t => t._id);
   const allChecked   = deletableIds.length > 0 && deletableIds.every(id => selected.has(id));
   const someChecked  = deletableIds.some(id => selected.has(id));
   const toggleAll    = () => allChecked
@@ -383,7 +385,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
                 <tr key={t._id} className={`hover:bg-ink-50/40 ${selected.has(t._id) ? 'bg-red-50/40' : ''}`}>
                   {canDelete && (
                     <td className="px-4 py-3">
-                      {['pending','voided'].includes(t.status ?? 'pending') && (
+                      {canDeleteRow(t) && (
                         <input type="checkbox" checked={selected.has(t._id)}
                           onChange={() => toggleOne(t._id)}
                           className="h-4 w-4 rounded accent-red-600 cursor-pointer" />
@@ -454,8 +456,8 @@ export default function StockTransactions({ defaultVoucher } = {}) {
                           {a.label}
                         </button>
                       ))}
-                      {/* Delete (only pending/voided and if user has voidTransactions capability) */}
-                      {canDelete && ['pending','voided'].includes(t.status ?? 'pending') && (
+                      {/* Delete — admin can delete any status; others only pending/voided */}
+                      {canDeleteRow(t) && (
                         <button onClick={() => handleDelete(t._id)}
                           className="rounded-md p-1.5 text-ink-400 hover:bg-red-50 hover:text-red-600 transition"
                           title="Delete transaction">
