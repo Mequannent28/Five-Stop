@@ -240,4 +240,191 @@ const importProductsExcel = asyncHandler(async (req, res) => {
 });
 
 
-module.exports = { getProducts, getProductById, createProduct, updateProduct, deleteProduct, bulkDeleteProducts, exportProductsExcel, importProductsExcel };
+// GET /api/products/export/recipe-template
+// Downloads an Excel workbook pre-filled with all active products and their current recipes.
+// Users edit this file and re-upload it to bulk-set ingredients.
+// Format per row: Product Code | Product Name | Ingredient Name | Quantity | Unit
+const exportRecipeTemplate = asyncHandler(async (req, res) => {
+  const products = await Product.find({ isActive: true })
+    .populate('ingredients.material', 'name unit')
+    .sort({ name: 1 });
+
+  const rows = [];
+
+  for (const p of products) {
+    if (p.ingredients && p.ingredients.length > 0) {
+      for (const ing of p.ingredients) {
+        rows.push({
+          'Product Code':    p.code || '',
+          'Product Name':    p.name,
+          'Ingredient Name': ing.material?.name || '',
+          'Quantity':        ing.quantity,
+          'Unit':            ing.material?.unit || '',
+        });
+      }
+    } else {
+      // Include products with no recipe so user can easily add one
+      rows.push({
+        'Product Code':    p.code || '',
+        'Product Name':    p.name,
+        'Ingredient Name': '',
+        'Quantity':        '',
+        'Unit':            '',
+      });
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = [14, 28, 26, 10, 10].map((w) => ({ wch: w }));
+
+  // Add a bright-yellow Instructions sheet so users know the format
+  const instructions = [
+    { 'HOW TO USE THIS TEMPLATE': '1. Do NOT rename or reorder columns.' },
+    { 'HOW TO USE THIS TEMPLATE': '2. "Product Code" OR "Product Name" must match an existing product.' },
+    { 'HOW TO USE THIS TEMPLATE': '3. "Ingredient Name" must exactly match a Raw Material name in the system.' },
+    { 'HOW TO USE THIS TEMPLATE': '4. "Quantity" is the amount of the ingredient per 1 unit of the product.' },
+    { 'HOW TO USE THIS TEMPLATE': '5. "Unit" is informational — the system reads the unit from the raw material.' },
+    { 'HOW TO USE THIS TEMPLATE': '6. To REPLACE a product\'s entire recipe: list all ingredients in consecutive rows.' },
+    { 'HOW TO USE THIS TEMPLATE': '7. Leave "Ingredient Name" blank to clear / skip that product\'s recipe.' },
+    { 'HOW TO USE THIS TEMPLATE': '8. Save as .xlsx and use the "Import Recipes" button in the Products page.' },
+  ];
+  const wsInfo = XLSX.utils.json_to_sheet(instructions);
+  wsInfo['!cols'] = [{ wch: 90 }];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Recipes');
+  XLSX.utils.book_append_sheet(wb, wsInfo, 'Instructions');
+
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Disposition', 'attachment; filename="recipe_template.xlsx"');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buf);
+});
+
+
+// POST /api/products/import/recipes
+// Accepts the recipe template Excel file and bulk-updates product ingredients.
+// Rows are grouped by Product Code / Name; all rows for the same product
+// collectively REPLACE that product's entire ingredient list.
+const importRecipesExcel = asyncHandler(async (req, res) => {
+  if (!req.file) { res.status(400); throw new Error('No file uploaded'); }
+
+  const wb   = XLSX.read(req.file.buffer, { type: 'buffer' });
+  const ws   = wb.Sheets[wb.SheetNames[0]]; // always read first sheet
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  // Filter out blank / header rows
+  const validRows = rows.filter((r) => {
+    const name = String(r['Product Name'] || '').trim();
+    const code = String(r['Product Code'] || '').trim();
+    return name || code;
+  });
+
+  const total  = validRows.length;
+  let updated  = 0;
+  let skipped  = 0;
+  const errors = [];
+
+  // Stream progress via SSE
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+  send({ type: 'start', total });
+
+  // Pre-load all active raw materials once (name → ObjectId map, case-insensitive)
+  const allMaterials = await RawMaterial.find({ isActive: { $ne: false } }).select('name unit').lean();
+  const materialMap  = new Map(allMaterials.map((m) => [m.name.trim().toLowerCase(), m]));
+
+  // Group rows by product identifier (code takes precedence over name)
+  // Map: productKey → { code, name, ingredientRows[] }
+  const productGroups = new Map();
+  for (const row of validRows) {
+    const code = String(row['Product Code'] || '').trim();
+    const name = String(row['Product Name'] || '').trim();
+    const key  = code || name.toLowerCase();
+    if (!productGroups.has(key)) {
+      productGroups.set(key, { code, name, rows: [] });
+    }
+    productGroups.get(key).rows.push(row);
+  }
+
+  let processed = 0;
+  for (const [, group] of productGroups) {
+    const { code, name, rows: groupRows } = group;
+
+    try {
+      // Resolve the product
+      let product = null;
+      if (code) {
+        const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        product = await Product.findOne({ code: { $regex: `^${escaped}-?$`, $options: 'i' }, isActive: true });
+      }
+      if (!product && name) {
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        product = await Product.findOne({ name: { $regex: `^${escaped}$`, $options: 'i' }, isActive: true });
+      }
+
+      if (!product) {
+        errors.push(`Product not found: "${code || name}" — skipped`);
+        skipped += groupRows.length;
+        processed += groupRows.length;
+        send({ type: 'progress', current: processed, total, percent: Math.round((processed / total) * 100), updated, skipped });
+        continue;
+      }
+
+      // Build ingredient array from all rows for this product
+      const ingredients = [];
+      for (const row of groupRows) {
+        const ingName = String(row['Ingredient Name'] || '').trim();
+        if (!ingName) continue; // blank ingredient = skip row (not an error)
+
+        const qty = parseFloat(row['Quantity']);
+        if (!qty || qty <= 0) {
+          errors.push(`Row for "${product.name}" — ingredient "${ingName}": invalid quantity "${row['Quantity']}"`);
+          continue;
+        }
+
+        const mat = materialMap.get(ingName.toLowerCase());
+        if (!mat) {
+          errors.push(`Row for "${product.name}" — raw material "${ingName}" not found in system`);
+          continue;
+        }
+
+        // Avoid duplicate ingredients for the same material in the same product
+        if (!ingredients.find((i) => i.material.toString() === mat._id.toString())) {
+          ingredients.push({ material: mat._id, quantity: qty });
+        }
+      }
+
+      // Replace the product's ingredient list
+      product.ingredients = ingredients;
+      await product.save();
+      updated++;
+    } catch (err) {
+      errors.push(`"${code || name}": ${err.message}`);
+      skipped++;
+    }
+
+    processed += groupRows.length;
+    send({
+      type:    'progress',
+      current: processed,
+      total,
+      percent: Math.round((processed / total) * 100),
+      updated,
+      skipped,
+    });
+  }
+
+  invalidateDashboardCache();
+  send({ type: 'done', updated, skipped, errors, total: productGroups.size });
+  res.end();
+});
+
+
+module.exports = { getProducts, getProductById, createProduct, updateProduct, deleteProduct, bulkDeleteProducts, exportProductsExcel, importProductsExcel, exportRecipeTemplate, importRecipesExcel };

@@ -29,7 +29,10 @@ const Products = () => {
   const [form, setForm] = useState(emptyForm);
   const [importResult, setImportResult] = useState(null);
   const [importProgress, setImportProgress] = useState(null); // { percent, current, total, created, updated, skipped }
+  const [recipeImportResult, setRecipeImportResult] = useState(null);
+  const [recipeImportProgress, setRecipeImportProgress] = useState(null);
   const importRef = useRef();
+  const recipeImportRef = useRef();
   const { hasRole, can } = useAuth();
   const canEdit = hasRole('admin', 'manager') || can('recordGoods');
 
@@ -229,6 +232,92 @@ const Products = () => {
     }
   };
 
+  // ── Download recipe template ──
+  const handleDownloadRecipeTemplate = async () => {
+    try {
+      const stored = localStorage.getItem('hotelStockAuth');
+      const token = stored ? JSON.parse(stored).token : '';
+      const baseURL = import.meta.env.VITE_API_URL || '/api';
+      const res = await fetch(`${baseURL}/products/export/recipe-template`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('Failed to download template');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'recipe_template.xlsx'; a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Could not download template: ' + err.message);
+    }
+  };
+
+  // ── Import recipes from Excel ──
+  const handleRecipeImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setRecipeImportResult(null);
+    setRecipeImportProgress({ percent: 0, current: 0, total: 0, updated: 0, skipped: 0, running: true });
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    const stored = localStorage.getItem('hotelStockAuth');
+    const token = stored ? JSON.parse(stored).token : '';
+    const baseURL = import.meta.env.VITE_API_URL || '/api';
+
+    try {
+      const response = await fetch(`${baseURL}/products/import/recipes`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const msg = JSON.parse(line.slice(6));
+            if (msg.type === 'start') {
+              setRecipeImportProgress(p => ({ ...p, total: msg.total }));
+            } else if (msg.type === 'progress') {
+              setRecipeImportProgress({
+                running: true,
+                percent: msg.percent,
+                current: msg.current,
+                total:   msg.total,
+                updated: msg.updated,
+                skipped: msg.skipped,
+              });
+            } else if (msg.type === 'done') {
+              setRecipeImportProgress(null);
+              setRecipeImportResult({
+                message: `Recipe import complete — ${msg.updated} product(s) updated, ${msg.skipped} skipped out of ${msg.total} products`,
+                errors: msg.errors || [],
+              });
+              load();
+            }
+          } catch { /* skip malformed SSE line */ }
+        }
+      }
+    } catch (err) {
+      setRecipeImportProgress(null);
+      setRecipeImportResult({ message: 'Import failed: ' + err.message, errors: [] });
+    }
+  };
+
   const recipeCost = (p) =>
     p.ingredients?.reduce((sum, ing) => sum + (ing.material?.unitCost ?? 0) * ing.quantity, 0) ?? 0;
 
@@ -291,6 +380,27 @@ const Products = () => {
           />
           <input ref={importRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
 
+          {/* Import Recipes button */}
+          {canEdit && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleDownloadRecipeTemplate}
+                title="Download recipe template (pre-filled with all products)"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+              >
+                <Download size={14} /> Recipe Template
+              </button>
+              <button
+                onClick={() => recipeImportRef.current?.click()}
+                title="Import ingredient recipes from Excel"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition"
+              >
+                <Upload size={14} /> Import Recipes
+              </button>
+              <input ref={recipeImportRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleRecipeImport} />
+            </div>
+          )}
+
           {canEdit && (
             <Button style={{ background: 'linear-gradient(135deg,#1a56db,#0d2d80)', color: 'white' }} onClick={openCreate}>
               <Plus size={16} /> Add product
@@ -334,6 +444,42 @@ const Products = () => {
             )}
           </div>
           <button onClick={() => setImportResult(null)} className="ml-4 text-blue-400 hover:text-blue-700"><X size={16} /></button>
+        </div>
+      )}
+
+      {/* Recipe import progress bar */}
+      {recipeImportProgress && (
+        <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-semibold text-violet-800">Importing recipes…</span>
+            <span className="tabular text-violet-700 font-bold">{recipeImportProgress.percent}%</span>
+          </div>
+          <div className="h-3 w-full overflow-hidden rounded-full bg-violet-200">
+            <div
+              className="h-full rounded-full bg-violet-600 transition-all duration-150"
+              style={{ width: `${recipeImportProgress.percent}%` }}
+            />
+          </div>
+          <div className="flex gap-4 text-xs text-violet-700">
+            <span>{recipeImportProgress.current} / {recipeImportProgress.total} rows processed</span>
+            <span className="text-emerald-700">✓ {recipeImportProgress.updated} products updated</span>
+            {recipeImportProgress.skipped > 0 && <span className="text-amber-700">⚠ {recipeImportProgress.skipped} skipped</span>}
+          </div>
+        </div>
+      )}
+
+      {/* Recipe import result */}
+      {recipeImportResult && (
+        <div className="flex items-start justify-between rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800">
+          <div>
+            <p className="font-semibold">{recipeImportResult.message}</p>
+            {recipeImportResult.errors?.length > 0 && (
+              <ul className="mt-1 list-disc pl-4 text-xs text-red-600 max-h-24 overflow-y-auto">
+                {recipeImportResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            )}
+          </div>
+          <button onClick={() => setRecipeImportResult(null)} className="ml-4 text-violet-400 hover:text-violet-700"><X size={16} /></button>
         </div>
       )}
 
