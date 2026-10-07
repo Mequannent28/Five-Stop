@@ -328,19 +328,19 @@ export default function StockTransactions({ defaultVoucher } = {}) {
         </div>
 
         <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-ink-100 text-sm">
-          <thead>
-            <tr style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}>
-              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Date</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Voucher No</th>
-              {!filterType && <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Type</th>}
-              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Direction</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Material(s)</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Supplier</th>
-              <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Total (ETB)</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Status</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">By</th>
-              <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Actions</th>
+        <table className="min-w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+          <thead style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}>
+            <tr>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Date</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Voucher No</th>
+              {!filterType && <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Type</th>}
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Direction</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Material(s)</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Supplier</th>
+              <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Total (ETB)</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Status</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>By</th>
+              <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-ink-50">
