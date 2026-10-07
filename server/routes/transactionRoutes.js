@@ -5,6 +5,9 @@ const {
   createTransaction,
   updateTransaction,
   deleteTransaction,
+  bulkDeleteTransactions,
+  restoreTransaction,
+  permanentDeleteTransaction,
   getVoucherSummary,
   advanceTransaction,
   importSales,
@@ -17,8 +20,11 @@ router.get('/summary', getVoucherSummary);
 router.get('/', getTransactions);
 router.post('/', authorizePermission('recordGoods'), createTransaction);
 router.post('/import-sales', authorizePermission('recordGoods'), importSales);
+router.delete('/bulk', authorizePermission('voidTransactions'), bulkDeleteTransactions);
 router.put('/:id', authorizePermission('recordGoods'), updateTransaction);
 router.post('/:id/advance', advanceTransaction);
+router.post('/:id/restore', authorizePermission('voidTransactions'), restoreTransaction);
+router.delete('/:id/permanent', authorizePermission('voidTransactions'), permanentDeleteTransaction);
 router.delete('/:id', authorizePermission('voidTransactions'), deleteTransaction);
 
 module.exports = router;

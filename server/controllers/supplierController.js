@@ -39,12 +39,41 @@ const updateSupplier = asyncHandler(async (req, res) => {
 
 const deleteSupplier = asyncHandler(async (req, res) => {
   const supplier = await Supplier.findById(req.params.id);
-  if (!supplier) {
-    res.status(404);
-    throw new Error('Supplier not found');
-  }
+  if (!supplier) { res.status(404); throw new Error('Supplier not found'); }
+  supplier.isActive    = false;
+  supplier.deletedAt   = new Date();
+  supplier.deletedBy   = req.user?.name || 'System';
+  supplier.deletedFrom = 'suppliers';
+  await supplier.save();
+  res.json({ message: 'Supplier moved to recycle bin.' });
+});
+
+const bulkDeleteSuppliers = asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+  if (!ids?.length) { res.status(400); throw new Error('No ids provided'); }
+  await Supplier.updateMany(
+    { _id: { $in: ids } },
+    { isActive: false, deletedAt: new Date(), deletedBy: req.user?.name || 'System', deletedFrom: 'suppliers' }
+  );
+  res.json({ message: `${ids.length} supplier(s) moved to recycle bin.` });
+});
+
+const restoreSupplier = asyncHandler(async (req, res) => {
+  const supplier = await Supplier.findById(req.params.id);
+  if (!supplier) { res.status(404); throw new Error('Supplier not found'); }
+  supplier.isActive    = true;
+  supplier.deletedAt   = null;
+  supplier.deletedBy   = null;
+  supplier.deletedFrom = null;
+  await supplier.save();
+  res.json({ message: 'Supplier restored.', supplier });
+});
+
+const permanentDeleteSupplier = asyncHandler(async (req, res) => {
+  const supplier = await Supplier.findById(req.params.id);
+  if (!supplier) { res.status(404); throw new Error('Supplier not found'); }
   await supplier.deleteOne();
-  res.json({ message: 'Supplier removed' });
+  res.json({ message: 'Supplier permanently deleted.' });
 });
 
 module.exports = {
@@ -53,4 +82,7 @@ module.exports = {
   createSupplier,
   updateSupplier,
   deleteSupplier,
+  bulkDeleteSuppliers,
+  restoreSupplier,
+  permanentDeleteSupplier,
 };

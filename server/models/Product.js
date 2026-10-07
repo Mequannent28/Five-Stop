@@ -19,6 +19,9 @@ const productSchema = new mongoose.Schema(
     sellingPrice: { type: Number, default: 0 },                      // Default Value
     ingredients: [ingredientSchema],
     isActive: { type: Boolean, default: true },
+    deletedAt:   { type: Date, default: null },
+    deletedBy:   { type: String, default: null },
+    deletedFrom: { type: String, default: 'products' },
   },
   { timestamps: true }
 );

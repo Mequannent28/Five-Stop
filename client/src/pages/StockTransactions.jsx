@@ -35,6 +35,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
   const filterType = defaultVoucher ?? null;
 
   const [transactions, setTransactions] = useState([]);
+  const [selected,     setSelected]     = useState(new Set());
   const [materials,    setMaterials]    = useState([]);
   const [suppliers,    setSuppliers]    = useState([]);
   const [search,       setSearch]       = useState('');
@@ -57,7 +58,10 @@ export default function StockTransactions({ defaultVoucher } = {}) {
 
   const load = useCallback(() => {
     const params = filterType ? { voucherType: filterType } : {};
-    api.get('/transactions', { params }).then(r => setTransactions(r.data));
+    api.get('/transactions', { params }).then(r => {
+      setTransactions(r.data);
+      setSelected(new Set());
+    });
   }, [filterType]);
 
   useEffect(() => { load(); }, [load]);
@@ -192,9 +196,32 @@ export default function StockTransactions({ defaultVoucher } = {}) {
   };
 
   const handleDelete = async id => {
-    if (!confirm('Delete this transaction and reverse its stock effect?')) return;
+    if (!confirm('Move this transaction to recycle bin and reverse its stock effect?')) return;
     await api.delete(`/transactions/${id}`); load();
   };
+
+  const handleBulkDelete = async () => {
+    const deletable = displayed.filter(t =>
+      ['pending','voided'].includes(t.status ?? 'pending') && selected.has(t._id)
+    );
+    if (!deletable.length) return;
+    if (!confirm(`Move ${deletable.length} transaction(s) to recycle bin?`)) return;
+    await api.delete('/transactions/bulk', { data: { ids: deletable.map(t => t._id) } });
+    load();
+  };
+
+  /* ── selection helpers ── */
+  const deletableIds = displayed
+    .filter(t => canDelete && ['pending','voided'].includes(t.status ?? 'pending'))
+    .map(t => t._id);
+  const allChecked   = deletableIds.length > 0 && deletableIds.every(id => selected.has(id));
+  const someChecked  = deletableIds.some(id => selected.has(id));
+  const toggleAll    = () => allChecked
+    ? setSelected(prev => { const n = new Set(prev); deletableIds.forEach(id => n.delete(id)); return n; })
+    : setSelected(prev => { const n = new Set(prev); deletableIds.forEach(id => n.add(id)); return n; });
+  const toggleOne = id => setSelected(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
 
   // ── Workflow helpers ──
   const NEXT_ACTIONS = {
@@ -297,6 +324,22 @@ export default function StockTransactions({ defaultVoucher } = {}) {
         </div>
       </div>
 
+      {/* ── Bulk delete bar ── */}
+      {someChecked && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5">
+          <span className="text-xs font-semibold text-red-800">{selected.size} selected</span>
+          <button
+            onClick={handleBulkDelete}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs font-semibold text-white transition"
+          >
+            <Trash2 size={13} /> Move to Recycle Bin
+          </button>
+          <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-red-400 hover:text-red-700">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* ── Transactions table ── */}
       <div className="overflow-hidden rounded-xl border border-blue-200/70 bg-white shadow-soft">
 
@@ -304,6 +347,14 @@ export default function StockTransactions({ defaultVoucher } = {}) {
         <table className="min-w-full text-sm" style={{ borderCollapse: 'collapse' }}>
           <thead style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}>
             <tr>
+              {canDelete && (
+                <th className="w-10 px-4 py-2.5" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>
+                  <input type="checkbox" checked={allChecked}
+                    ref={el => { if (el) el.indeterminate = someChecked && !allChecked; }}
+                    onChange={toggleAll}
+                    className="h-4 w-4 rounded cursor-pointer accent-white" />
+                </th>
+              )}
               <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Date</th>
               <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Voucher No</th>
               {!filterType && <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Type</th>}
@@ -329,7 +380,16 @@ export default function StockTransactions({ defaultVoucher } = {}) {
                 : `${t.material?.name ?? '—'}${t.quantity ? ' ×' + t.quantity : ''}`;
               const acts = actionsFor(t);
               return (
-                <tr key={t._id} className="hover:bg-ink-50/40">
+                <tr key={t._id} className={`hover:bg-ink-50/40 ${selected.has(t._id) ? 'bg-red-50/40' : ''}`}>
+                  {canDelete && (
+                    <td className="px-4 py-3">
+                      {['pending','voided'].includes(t.status ?? 'pending') && (
+                        <input type="checkbox" checked={selected.has(t._id)}
+                          onChange={() => toggleOne(t._id)}
+                          className="h-4 w-4 rounded accent-red-600 cursor-pointer" />
+                      )}
+                    </td>
+                  )}
                   <td className="px-4 py-3 whitespace-nowrap text-xs text-ink-500">{new Date(t.date).toLocaleString()}</td>
                   <td className="px-4 py-3 whitespace-nowrap font-mono text-xs text-ink-400">{t.voucherNo || '—'}</td>
                   {!filterType && (

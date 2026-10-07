@@ -69,6 +69,7 @@ app.use('/api/settings', require('./routes/settingRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/inventory-count', require('./routes/inventoryCountRoutes'));
+app.use('/api/recycle-bin',    require('./routes/recycleBinRoutes'));
 
 // Serve Frontend in production (for Aletcloud, Render, etc.)
 if (process.env.NODE_ENV === 'production') {

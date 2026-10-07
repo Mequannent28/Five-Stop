@@ -119,6 +119,10 @@ const stockTransactionSchema = new mongoose.Schema(
     ],
 
     totalAmount: { type: Number, default: 0 },
+    // Recycle bin fields
+    deletedAt:   { type: Date, default: null },
+    deletedBy:   { type: String, default: null },
+    deletedFrom: { type: String, default: 'transactions' },
   },
   { timestamps: true }
 );

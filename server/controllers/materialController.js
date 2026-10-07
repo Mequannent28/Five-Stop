@@ -57,13 +57,45 @@ const updateMaterial = asyncHandler(async (req, res) => {
 
 const deleteMaterial = asyncHandler(async (req, res) => {
   const material = await RawMaterial.findById(req.params.id);
-  if (!material) {
-    res.status(404);
-    throw new Error('Raw material not found');
-  }
+  if (!material) { res.status(404); throw new Error('Raw material not found'); }
+  material.isActive  = false;
+  material.deletedAt = new Date();
+  material.deletedBy = req.user?.name || 'System';
+  material.deletedFrom = 'materials';
+  await material.save();
+  invalidateDashboardCache();
+  res.json({ message: 'Raw material moved to recycle bin.' });
+});
+
+const bulkDeleteMaterials = asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+  if (!ids?.length) { res.status(400); throw new Error('No ids provided'); }
+  await RawMaterial.updateMany(
+    { _id: { $in: ids } },
+    { isActive: false, deletedAt: new Date(), deletedBy: req.user?.name || 'System', deletedFrom: 'materials' }
+  );
+  invalidateDashboardCache();
+  res.json({ message: `${ids.length} material(s) moved to recycle bin.` });
+});
+
+const restoreMaterial = asyncHandler(async (req, res) => {
+  const material = await RawMaterial.findById(req.params.id);
+  if (!material) { res.status(404); throw new Error('Raw material not found'); }
+  material.isActive    = true;
+  material.deletedAt   = null;
+  material.deletedBy   = null;
+  material.deletedFrom = null;
+  await material.save();
+  invalidateDashboardCache();
+  res.json({ message: 'Raw material restored.', material });
+});
+
+const permanentDeleteMaterial = asyncHandler(async (req, res) => {
+  const material = await RawMaterial.findById(req.params.id);
+  if (!material) { res.status(404); throw new Error('Raw material not found'); }
   await material.deleteOne();
   invalidateDashboardCache();
-  res.json({ message: 'Raw material removed' });
+  res.json({ message: 'Raw material permanently deleted.' });
 });
 
 
@@ -161,6 +193,9 @@ module.exports = {
   createMaterial,
   updateMaterial,
   deleteMaterial,
+  bulkDeleteMaterials,
+  restoreMaterial,
+  permanentDeleteMaterial,
   exportMaterialsExcel,
   importMaterialsExcel,
 };

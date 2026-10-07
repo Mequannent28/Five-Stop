@@ -7,7 +7,6 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import ExportDropdown from '../components/ui/ExportDropdown';
-
 const emptyForm = { code: '', name: '', category: '', unit: '', currentStock: 0, reorderLevel: 10, unitCost: 0, storeLocation: 'Main Store' };
 
 // Common units for hospitality / kitchen / store
@@ -36,21 +35,43 @@ const statusBadge = (status) => {
 const RawMaterials = () => {
   const [materials, setMaterials] = useState([]);
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState(new Set());
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [unitCustom, setUnitCustom] = useState(false); // true = show custom text input
-  const [categoryCustom, setCategoryCustom] = useState(false); // true = show custom text input
+  const [unitCustom, setUnitCustom] = useState(false);
+  const [categoryCustom, setCategoryCustom] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const importRef = useRef();
   const { hasRole, can } = useAuth();
   const canEdit = hasRole('admin', 'manager') || can('recordGoods');
 
   const load = () => {
-    api.get('/materials', { params: { search } }).then((res) => setMaterials(res.data));
+    api.get('/materials', { params: { search } }).then((res) => {
+      setMaterials(res.data);
+      setSelected(new Set());
+    });
   };
 
   useEffect(() => { load(); }, [search]);
+
+  /* ── selection ── */
+  const allIds     = materials.map(m => m._id);
+  const allChecked = allIds.length > 0 && allIds.every(id => selected.has(id));
+  const someChecked = allIds.some(id => selected.has(id));
+  const toggleAll  = () => allChecked
+    ? setSelected(new Set())
+    : setSelected(new Set(allIds));
+  const toggleOne = id => setSelected(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+
+  /* ── bulk delete ── */
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Move ${selected.size} material(s) to recycle bin?`)) return;
+    await api.delete('/materials/bulk', { data: { ids: [...selected] } });
+    load();
+  };
 
   // Extract unique categories currently in database
   const existingCategories = useMemo(() => {
@@ -105,7 +126,7 @@ const RawMaterials = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Remove this raw material? This cannot be undone.')) return;
+    if (!confirm('Move to recycle bin?')) return;
     await api.delete(`/materials/${id}`);
     load();
   };
@@ -138,6 +159,20 @@ const RawMaterials = () => {
   };
 
   const columns = [
+    ...(canEdit ? [{
+      key: '__check',
+      header: (
+        <input type="checkbox" checked={allChecked}
+          ref={el => { if (el) el.indeterminate = someChecked && !allChecked; }}
+          onChange={toggleAll}
+          className="h-4 w-4 rounded accent-blue-600 cursor-pointer" />
+      ),
+      render: (r) => (
+        <input type="checkbox" checked={selected.has(r._id)}
+          onChange={() => toggleOne(r._id)}
+          className="h-4 w-4 rounded accent-blue-600 cursor-pointer" />
+      ),
+    }] : []),
     { key: 'code', header: 'Code', render: (r) => <span className="font-mono text-xs text-ink-400">{r.code || '—'}</span> },
     { key: 'name', header: 'Material' },
     { key: 'category', header: 'Category' },
@@ -145,22 +180,15 @@ const RawMaterials = () => {
     { key: 'reorderLevel', header: 'Reorder at', render: (r) => <span className="tabular">{r.reorderLevel} {r.unit}</span> },
     { key: 'unitCost', header: 'Unit cost', render: (r) => <span className="tabular">ETB {r.unitCost}</span> },
     { key: 'status', header: 'Status', render: (r) => statusBadge(r.status) },
-    ...(canEdit
-      ? [{
-          key: 'actions',
-          header: '',
-          render: (r) => (
-            <div className="flex gap-2">
-              <button onClick={() => openEdit(r)} className="rounded-md p-1.5 text-ink-400 hover:bg-ink-50 hover:text-ink-700">
-                <Pencil size={15} />
-              </button>
-              <button onClick={() => handleDelete(r._id)} className="rounded-md p-1.5 text-ink-400 hover:bg-red-50 hover:text-red-600">
-                <Trash2 size={15} />
-              </button>
-            </div>
-          ),
-        }]
-      : []),
+    ...(canEdit ? [{
+      key: 'actions', header: '',
+      render: (r) => (
+        <div className="flex gap-2">
+          <button onClick={() => openEdit(r)} className="rounded-md p-1.5 text-ink-400 hover:bg-ink-50 hover:text-ink-700"><Pencil size={15} /></button>
+          <button onClick={() => handleDelete(r._id)} className="rounded-md p-1.5 text-ink-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>
+        </div>
+      ),
+    }] : []),
   ];
 
   const exportData = useMemo(() => {
@@ -217,6 +245,22 @@ const RawMaterials = () => {
           )}
         </div>
       </div>
+
+      {/* Bulk action bar */}
+      {someChecked && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5">
+          <span className="text-xs font-semibold text-red-800">{selected.size} selected</span>
+          <button
+            onClick={handleBulkDelete}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-700 px-3 py-1.5 text-xs font-semibold text-white transition"
+          >
+            <Trash2 size={13} /> Move to Recycle Bin
+          </button>
+          <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-red-400 hover:text-red-700">
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {importResult && (
         <div className="flex items-start justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">

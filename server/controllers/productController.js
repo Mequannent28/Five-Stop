@@ -62,24 +62,51 @@ const updateProduct = asyncHandler(async (req, res) => {
   res.json(populated);
 });
 
-// DELETE /api/products/:id  (soft delete)
+// DELETE /api/products/:id  (soft delete → recycle bin)
 const deleteProduct = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
   if (!product) { res.status(404); throw new Error('Product not found'); }
-  product.isActive = false;
+  product.isActive    = false;
+  product.deletedAt   = new Date();
+  product.deletedBy   = req.user?.name || 'System';
+  product.deletedFrom = 'products';
   await product.save();
   invalidateDashboardCache();
-  res.json({ message: 'Product removed' });
+  res.json({ message: 'Product moved to recycle bin.' });
 });
-
 
 // DELETE /api/products/bulk  (bulk soft delete)
 const bulkDeleteProducts = asyncHandler(async (req, res) => {
   const { ids } = req.body;
   if (!ids || !ids.length) { res.status(400); throw new Error('No ids provided'); }
-  await Product.updateMany({ _id: { $in: ids } }, { isActive: false });
+  await Product.updateMany(
+    { _id: { $in: ids } },
+    { isActive: false, deletedAt: new Date(), deletedBy: req.user?.name || 'System', deletedFrom: 'products' }
+  );
   invalidateDashboardCache();
-  res.json({ message: `${ids.length} product(s) deleted` });
+  res.json({ message: `${ids.length} product(s) moved to recycle bin.` });
+});
+
+// POST /api/products/:id/restore
+const restoreProduct = asyncHandler(async (req, res) => {
+  const product = await Product.findById(req.params.id);
+  if (!product) { res.status(404); throw new Error('Product not found'); }
+  product.isActive    = true;
+  product.deletedAt   = null;
+  product.deletedBy   = null;
+  product.deletedFrom = null;
+  await product.save();
+  invalidateDashboardCache();
+  res.json({ message: 'Product restored.', product });
+});
+
+// DELETE /api/products/:id/permanent
+const permanentDeleteProduct = asyncHandler(async (req, res) => {
+  const product = await Product.findById(req.params.id);
+  if (!product) { res.status(404); throw new Error('Product not found'); }
+  await product.deleteOne();
+  invalidateDashboardCache();
+  res.json({ message: 'Product permanently deleted.' });
 });
 
 
@@ -427,4 +454,4 @@ const importRecipesExcel = asyncHandler(async (req, res) => {
 });
 
 
-module.exports = { getProducts, getProductById, createProduct, updateProduct, deleteProduct, bulkDeleteProducts, exportProductsExcel, importProductsExcel, exportRecipeTemplate, importRecipesExcel };
+module.exports = { getProducts, getProductById, createProduct, updateProduct, deleteProduct, bulkDeleteProducts, restoreProduct, permanentDeleteProduct, exportProductsExcel, importProductsExcel, exportRecipeTemplate, importRecipesExcel };

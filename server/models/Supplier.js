@@ -10,6 +10,9 @@ const supplierSchema = new mongoose.Schema(
     category: { type: String, trim: true, default: 'General' },
     notes: { type: String, trim: true },
     isActive: { type: Boolean, default: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: String, default: null },
+    deletedFrom: { type: String, default: null },
   },
   { timestamps: true }
 );

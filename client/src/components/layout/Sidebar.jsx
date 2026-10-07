@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight,
   ShoppingBag, CreditCard, Leaf, TrendingUp, Flame, TrendingDown,
   BarChart2, Calendar, PackageOpen, Settings as SettingsIcon, UploadCloud,
-  Scale, ClipboardList,
+  Scale, ClipboardList, Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -194,6 +194,21 @@ const Sidebar = ({ open, onClose }) => {
           <NavLink to="/settings" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
             <SettingsIcon size={18} strokeWidth={2} /> Settings
           </NavLink>
+
+          {/* Recycle Bin — admin + manager only */}
+          {canSeeNav('staffAccounts') || user?.role === 'admin' || user?.role === 'manager' ? (
+            <NavLink to="/recycle-bin" onClick={onClose}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-red-500/30 text-white shadow-sm'
+                    : 'text-red-300 hover:bg-red-500/20 hover:text-white'
+                }`
+              }
+            >
+              <Trash2 size={18} strokeWidth={2} /> Recycle Bin
+            </NavLink>
+          ) : null}
         </nav>
 
         {/* User info */}

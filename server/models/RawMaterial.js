@@ -11,6 +11,9 @@ const rawMaterialSchema = new mongoose.Schema(
     unitCost: { type: Number, default: 0 },
     storeLocation: { type: String, trim: true, default: 'Main Store' },
     isActive: { type: Boolean, default: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: String, default: null },
+    deletedFrom: { type: String, default: null }, // 'materials' | 'suppliers' etc.
   },
   { timestamps: true }
 );

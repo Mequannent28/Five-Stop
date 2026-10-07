@@ -312,6 +312,7 @@ const deleteTransaction = asyncHandler(async (req, res) => {
 
   const direction = transaction.type || VOUCHER_DIRECTION[transaction.voucherType];
 
+  // Reverse stock impact
   const itemsToReverse = transaction.items?.length
     ? transaction.items
     : [{ material: transaction.material, quantity: transaction.quantity }];
@@ -324,9 +325,75 @@ const deleteTransaction = asyncHandler(async (req, res) => {
     }
   }
 
+  // Soft delete — move to recycle bin
+  transaction.deletedAt   = new Date();
+  transaction.deletedBy   = req.user?.name || 'System';
+  transaction.deletedFrom = 'transactions';
+  await transaction.save();
+
+  invalidateDashboardCache();
+  res.json({ message: 'Transaction moved to recycle bin and stock reversed.' });
+});
+
+const bulkDeleteTransactions = asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+  if (!ids?.length) { res.status(400); throw new Error('No ids provided'); }
+
+  const transactions = await StockTransaction.find({ _id: { $in: ids } });
+  for (const transaction of transactions) {
+    const direction = transaction.type || VOUCHER_DIRECTION[transaction.voucherType];
+    const items = transaction.items?.length
+      ? transaction.items
+      : [{ material: transaction.material, quantity: transaction.quantity }];
+    for (const item of items) {
+      const mat = await RawMaterial.findById(item.material);
+      if (mat) {
+        mat.currentStock += direction === 'in' ? -item.quantity : item.quantity;
+        await mat.save();
+      }
+    }
+    transaction.deletedAt   = new Date();
+    transaction.deletedBy   = req.user?.name || 'System';
+    transaction.deletedFrom = 'transactions';
+    await transaction.save();
+  }
+
+  invalidateDashboardCache();
+  res.json({ message: `${ids.length} transaction(s) moved to recycle bin.` });
+});
+
+const restoreTransaction = asyncHandler(async (req, res) => {
+  const transaction = await StockTransaction.findById(req.params.id);
+  if (!transaction) { res.status(404); throw new Error('Transaction not found'); }
+
+  // Re-apply stock impact
+  const direction = transaction.type || VOUCHER_DIRECTION[transaction.voucherType];
+  const items = transaction.items?.length
+    ? transaction.items
+    : [{ material: transaction.material, quantity: transaction.quantity }];
+  for (const item of items) {
+    const mat = await RawMaterial.findById(item.material);
+    if (mat) {
+      mat.currentStock += direction === 'in' ? item.quantity : -item.quantity;
+      await mat.save();
+    }
+  }
+
+  transaction.deletedAt   = null;
+  transaction.deletedBy   = null;
+  transaction.deletedFrom = null;
+  await transaction.save();
+
+  invalidateDashboardCache();
+  res.json({ message: 'Transaction restored and stock re-applied.', transaction });
+});
+
+const permanentDeleteTransaction = asyncHandler(async (req, res) => {
+  const transaction = await StockTransaction.findById(req.params.id);
+  if (!transaction) { res.status(404); throw new Error('Transaction not found'); }
   await transaction.deleteOne();
   invalidateDashboardCache();
-  res.json({ message: 'Transaction deleted and stock reversed.' });
+  res.json({ message: 'Transaction permanently deleted.' });
 });
 
 
@@ -699,4 +766,4 @@ const importSales = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { getTransactions, createTransaction, updateTransaction, deleteTransaction, getVoucherSummary, advanceTransaction, importSales };
+module.exports = { getTransactions, createTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, restoreTransaction, permanentDeleteTransaction, getVoucherSummary, advanceTransaction, importSales };

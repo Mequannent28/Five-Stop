@@ -7,6 +7,9 @@ const {
   createMaterial,
   updateMaterial,
   deleteMaterial,
+  bulkDeleteMaterials,
+  restoreMaterial,
+  permanentDeleteMaterial,
   exportMaterialsExcel,
   importMaterialsExcel,
 } = require('../controllers/materialController');
@@ -19,6 +22,11 @@ router.use(protect);
 // Excel import/export (before /:id to avoid conflict)
 router.get('/export/excel', authorize('admin', 'manager'), exportMaterialsExcel);
 router.post('/import/excel', authorize('admin', 'manager'), upload.single('file'), importMaterialsExcel);
+
+// Bulk + restore (before /:id)
+router.delete('/bulk',          authorize('admin', 'manager'), bulkDeleteMaterials);
+router.post('/:id/restore',     authorize('admin', 'manager'), restoreMaterial);
+router.delete('/:id/permanent', authorize('admin'), permanentDeleteMaterial);
 
 router.get('/', getMaterials);
 router.get('/:id', getMaterialById);
