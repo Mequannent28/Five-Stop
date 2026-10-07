@@ -329,18 +329,18 @@ export default function StockTransactions({ defaultVoucher } = {}) {
 
         <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-ink-100 text-sm">
-          <thead className="bg-slate-50/80">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Date</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Voucher No</th>
-              {!filterType && <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Type</th>}
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Direction</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Material(s)</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Supplier</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Total (ETB)</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">By</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Actions</th>
+          <thead>
+            <tr style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Date</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Voucher No</th>
+              {!filterType && <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Type</th>}
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Direction</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Material(s)</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Supplier</th>
+              <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Total (ETB)</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Status</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">By</th>
+              <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-blue-100 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-ink-50">

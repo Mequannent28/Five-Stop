@@ -69,13 +69,13 @@ const DataTable = ({
 
       {/* ── Table ── */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-ink-100 text-sm">
-          <thead className="bg-slate-50/80">
-            <tr>
+        <table className="min-w-full divide-y divide-blue-100 text-sm">
+          <thead>
+            <tr style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}>
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
+                  className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100"
                 >
                   {col.header}
                 </th>
