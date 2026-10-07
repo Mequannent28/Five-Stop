@@ -45,7 +45,6 @@ function CurvedLines() {
     </svg>
   );
 }
-
 /* ─── Floating-label input ──────────────────────────────────────── */
 const FloatingInput = React.forwardRef(function FloatingInput({
   id, label, type = 'text', value, onChange,
