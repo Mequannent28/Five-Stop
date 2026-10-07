@@ -1,338 +1,834 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  Warehouse, Eye, EyeOff, Lock, Mail, ArrowRight,
-  ShieldCheck, User, KeyRound, Sparkles, CheckCircle2,
-} from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const Login = () => {
-  const [email, setEmail] = useState('admin@hotel.com');
-  const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+/* ─── role quick-fill data ─────────────────────────────────────── */
+const ROLES = [
+  { label: 'Admin',       email: 'admin@hotel.com'       },
+  { label: 'Manager',     email: 'manager@hotel.com'     },
+  { label: 'Store Keeper',email: 'storekeeper@hotel.com' },
+];
 
+/* ─── Starburst / asterisk SVG logo mark ───────────────────────── */
+function Starburst() {
+  return (
+    <svg
+      width="64" height="64" viewBox="0 0 64 64"
+      fill="none" xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      {/* 3 crossing rounded strokes */}
+      <line x1="32" y1="4"  x2="32" y2="60" stroke="white" strokeWidth="7" strokeLinecap="round"/>
+      <line x1="4"  y1="32" x2="60" y2="32" stroke="white" strokeWidth="7" strokeLinecap="round"/>
+      <line x1="10" y1="10" x2="54" y2="54" stroke="white" strokeWidth="7" strokeLinecap="round"/>
+      <line x1="54" y1="10" x2="10" y2="54" stroke="white" strokeWidth="7" strokeLinecap="round"/>
+      <line x1="5"  y1="20" x2="59" y2="44" stroke="white" strokeWidth="5" strokeLinecap="round" opacity="0.5"/>
+      <line x1="5"  y1="44" x2="59" y2="20" stroke="white" strokeWidth="5" strokeLinecap="round" opacity="0.5"/>
+    </svg>
+  );
+}
+
+/* ─── Decorative curved SVG lines for left panel ───────────────── */
+function CurvedLines() {
+  return (
+    <svg
+      className="absolute inset-0 h-full w-full pointer-events-none"
+      viewBox="0 0 600 700" preserveAspectRatio="xMidYMid slice"
+      fill="none" xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <ellipse cx="580" cy="80"  rx="340" ry="340" stroke="white" strokeWidth="1.2" opacity="0.14"/>
+      <ellipse cx="580" cy="80"  rx="260" ry="260" stroke="white" strokeWidth="1.2" opacity="0.14"/>
+      <ellipse cx="580" cy="80"  rx="180" ry="180" stroke="white" strokeWidth="1.2" opacity="0.14"/>
+      <ellipse cx="580" cy="80"  rx="100" ry="100" stroke="white" strokeWidth="1.2" opacity="0.14"/>
+    </svg>
+  );
+}
+
+/* ─── Floating-label input ──────────────────────────────────────── */
+const FloatingInput = React.forwardRef(function FloatingInput({
+  id, label, type = 'text', value, onChange,
+  autoComplete, required, hasError, errorMsg,
+  suffix,
+}, ref) {
+  const filled = value.length > 0;
+  return (
+    <div className="login-field">
+      <div
+        className={[
+          'login-field__wrap',
+          hasError ? 'login-field__wrap--error' : '',
+        ].join(' ')}
+      >
+        <input
+          ref={ref}
+          id={id}
+          type={type}
+          value={value}
+          onChange={onChange}
+          autoComplete={autoComplete}
+          required={required}
+          placeholder=" "
+          aria-describedby={hasError ? `${id}-err` : undefined}
+          aria-invalid={hasError || undefined}
+          className="login-field__input"
+        />
+        <label htmlFor={id} className={['login-field__label', filled ? 'login-field__label--filled' : ''].join(' ')}>
+          {label}
+        </label>
+        {suffix && <span className="login-field__suffix">{suffix}</span>}
+      </div>
+      {hasError && (
+        <p id={`${id}-err`} role="alert" className="login-field__error">
+          {errorMsg}
+        </p>
+      )}
+    </div>
+  );
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   Login page
+═══════════════════════════════════════════════════════════════════ */
+export default function Login() {
+  const [email,    setEmail]    = useState('admin@hotel.com');
+  const [password, setPassword] = useState('');
+  const [showPw,   setShowPw]   = useState(false);
+  const [touched,  setTouched]  = useState({ email: false, password: false });
+  const [activeRole, setActiveRole] = useState('Admin');
+  const [serverError, setServerError] = useState('');
+  const [loading, setLoading]   = useState(false);
+
+  const { login }    = useAuth();
+  const navigate     = useNavigate();
+  const location     = useLocation();
+  const passwordRef  = useRef(null);
+
+  /* validation */
+  const emailErr    = touched.email    && !email.trim();
+  const passwordErr = touched.password && !password;
+
+  /* ── handlers (unchanged logic) ─────────────────────────────── */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setTouched({ email: true, password: true });
+    if (!email.trim() || !password) return;
+    setServerError('');
     setLoading(true);
     try {
       await login(email, password);
       navigate(location.state?.from || '/', { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials. Please verify your email and password.');
+      setServerError(
+        err.response?.data?.message ||
+        'Invalid credentials. Please verify your email and password.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickFill = (roleEmail) => {
-    setEmail(roleEmail);
+  const handleQuickFill = (role) => {
+    setEmail(role.email);
     setPassword('admin123');
-    setError('');
+    setActiveRole(role.label);
+    setServerError('');
+    setTouched({ email: false, password: false });
+    setTimeout(() => passwordRef.current?.focus(), 0);
   };
 
   return (
-    <div className="flex min-h-screen w-full flex-col lg:flex-row bg-white selection:bg-blue-600 selection:text-white">
-      
-      {/* ════════════════════════════════════════════════════════════════
-          LEFT COLUMN: Brand & Security Showcase (Refined High-End Brand Blue)
-      ════════════════════════════════════════════════════════════════ */}
-      <div
-        className="relative flex flex-col justify-between overflow-hidden p-8 text-white sm:p-12 lg:w-1/2 lg:p-16 shadow-2xl"
-        style={{
-          background: 'linear-gradient(150deg, #091f58 0%, #1742a8 50%, #0d286d 100%)',
-        }}
-      >
-        {/* Decorative background ambient glow circles */}
-        <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-sky-400/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-blue-500/25 blur-3xl" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:24px_24px] opacity-20" />
+    <>
+      {/* ── per-page scoped styles ─────────────────────────────── */}
+      <style>{`
+        /* font */
+        .login-root * { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 
-        {/* Top: Brand Logo & Title */}
-        <div className="relative z-10 pb-6 border-b border-white/15">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 p-3 backdrop-blur-md border border-white/30 shadow-xl shadow-blue-950/30">
-              <Warehouse className="h-full w-full text-white drop-shadow-sm" strokeWidth={2.2} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl font-black tracking-tight uppercase text-white font-sans drop-shadow-md">
-                  FIVE STOP
-                </span>
-                <span className="rounded-full bg-white/20 border border-white/30 px-2.5 py-0.5 text-[10px] font-bold tracking-widest text-white uppercase shadow-xs">
-                  ENTERPRISE
-                </span>
-              </div>
-              <p className="text-xs font-medium tracking-wide text-blue-100/90 mt-0.5">
-                Hotel &amp; Resort Stock Management System
-              </p>
-            </div>
+        /* ── layout ── */
+        .login-root {
+          display: grid;
+          grid-template-columns: 1.05fr 1fr;
+          min-height: 100dvh;
+          background: #fff;
+        }
+        @media (max-width: 900px) {
+          .login-root { grid-template-columns: 1fr; }
+        }
+
+        /* ── LEFT PANEL ── */
+        .login-hero {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: clamp(2rem, 5vw, 4rem);
+          overflow: hidden;
+          background: linear-gradient(160deg, #2b4bd0 0%, #1b34a8 55%, #0f2487 100%);
+          /* radial glow top-left */
+          background-image:
+            radial-gradient(ellipse 70% 55% at 0% 0%, #3b5bdb 0%, transparent 65%),
+            linear-gradient(160deg, #2b4bd0 0%, #1b34a8 55%, #0f2487 100%);
+          box-shadow: 12px 0 40px -10px rgba(15,36,135,.35);
+          color: #fff;
+        }
+        @media (max-width: 900px) {
+          .login-hero { padding: 2.5rem 1.75rem 2rem; }
+        }
+
+        .login-hero__content {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+          margin: auto 0;
+          padding: 3rem 0;
+          max-width: 34ch;
+        }
+        @media (max-width: 900px) {
+          .login-hero__content { padding: 2rem 0 1.5rem; max-width: 100%; }
+        }
+
+        .login-hero__heading {
+          font-size: clamp(40px, 5vw, 62px);
+          font-weight: 800;
+          line-height: 1.05;
+          letter-spacing: -0.03em;
+          margin: 0;
+        }
+
+        .login-hero__wave {
+          display: inline-block;
+          animation: wave 1s ease-in-out 0.3s 1 both;
+          transform-origin: 70% 80%;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .login-hero__wave { animation: none; }
+        }
+        @keyframes wave {
+          0%   { transform: rotate(0deg); }
+          20%  { transform: rotate(-15deg); }
+          50%  { transform: rotate(18deg); }
+          75%  { transform: rotate(-8deg); }
+          100% { transform: rotate(0deg); }
+        }
+
+        .login-hero__desc {
+          margin: 0;
+          font-size: 1rem;
+          line-height: 1.65;
+          color: #dbe4ff;
+          max-width: 40ch;
+        }
+
+        .login-hero__footer {
+          position: relative;
+          z-index: 1;
+          font-size: 0.72rem;
+          color: rgba(219,228,255,.65);
+          border-top: 1px solid rgba(255,255,255,.15);
+          padding-top: 1.25rem;
+        }
+
+        /* ══════════════════════════════════════════
+           RIGHT PANEL — always light, never dark
+        ══════════════════════════════════════════ */
+        .login-form-panel {
+          display: flex;
+          flex-direction: column;
+          /* soft blue-white gradient background */
+          background: linear-gradient(155deg, #f0f4ff 0%, #e8effe 40%, #f5f8ff 100%);
+          color-scheme: light;
+        }
+
+        .login-topbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: clamp(1.25rem, 2.5vw, 1.75rem) clamp(1.5rem, 5vw, 3rem);
+        }
+
+        .login-wordmark {
+          font-size: 1.15rem;
+          font-weight: 800;
+          letter-spacing: -0.025em;
+          line-height: 1;
+        }
+        .login-wordmark__five { color: #0f172a; }
+        .login-wordmark__stop { color: #2563eb; }
+
+        .login-status {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          font-size: 0.72rem;
+          color: #475569;
+          background: rgba(255,255,255,.75);
+          border: 1px solid #dbeafe;
+          padding: 0.3rem 0.7rem;
+          border-radius: 999px;
+          backdrop-filter: blur(4px);
+        }
+        .login-status__dot {
+          width: 7px; height: 7px;
+          border-radius: 50%;
+          background: #22c55e;
+          flex-shrink: 0;
+          box-shadow: 0 0 0 2px rgba(34,197,94,.25);
+          animation: pulse-dot 2s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .login-status__dot { animation: none; }
+        }
+        @keyframes pulse-dot {
+          0%, 100% { box-shadow: 0 0 0 2px rgba(34,197,94,.25); }
+          50%       { box-shadow: 0 0 0 5px rgba(34,197,94,.0); }
+        }
+
+        /* centred form card */
+        .login-form-wrap {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem clamp(1.25rem, 4vw, 2.5rem);
+        }
+
+        /* the white glassy card */
+        .login-form-block {
+          width: 100%;
+          max-width: 400px;
+          background: rgba(255,255,255,.92);
+          border: 1px solid rgba(219,234,254,.8);
+          border-radius: 20px;
+          box-shadow:
+            0 4px 6px -1px rgba(37,99,235,.06),
+            0 20px 50px -12px rgba(37,99,235,.12),
+            0 0 0 1px rgba(255,255,255,.6) inset;
+          padding: 2.25rem 2rem 1.75rem;
+          backdrop-filter: blur(12px);
+        }
+        @media (max-width: 900px) {
+          .login-form-block { padding: 1.75rem 1.5rem; }
+        }
+
+        /* tiny blue accent bar at top of card */
+        .login-form-block::before {
+          content: '';
+          display: block;
+          height: 3px;
+          border-radius: 3px 3px 0 0;
+          background: linear-gradient(90deg, #2563eb, #60a5fa);
+          margin: -2.25rem -2rem 1.75rem;
+          border-radius: 19px 19px 0 0;
+        }
+
+        .login-heading {
+          font-size: 1.5rem;
+          font-weight: 800;
+          color: #0f172a;
+          letter-spacing: -0.025em;
+          margin: 0 0 0.35rem;
+        }
+        .login-subtext {
+          font-size: 0.8rem;
+          color: #64748b;
+          line-height: 1.55;
+          margin: 0 0 1.5rem;
+        }
+
+        /* ── floating-label fields ── */
+        .login-field { margin-bottom: 1.25rem; }
+
+        .login-field__wrap {
+          position: relative;
+          background: #f8faff;
+          border: 1.5px solid #dbeafe;
+          border-radius: 10px;
+          transition: border-color .2s, box-shadow .2s, background .2s;
+        }
+        .login-field__wrap:focus-within {
+          border-color: #2563eb;
+          background: #fff;
+          box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+        }
+        .login-field__wrap--error {
+          border-color: #dc2626 !important;
+          box-shadow: 0 0 0 3px rgba(220,38,38,.08) !important;
+        }
+
+        .login-field__input {
+          display: block;
+          width: 100%;
+          padding: 1.45rem 2.5rem 0.5rem 0.9rem;
+          background: transparent;
+          border: none;
+          outline: none;
+          font-size: 0.875rem;
+          color: #0f172a;
+          font-family: inherit;
+          border-radius: 10px;
+        }
+        .login-field__input:-webkit-autofill {
+          -webkit-box-shadow: 0 0 0 100px #f8faff inset;
+          -webkit-text-fill-color: #0f172a;
+        }
+
+        .login-field__label {
+          position: absolute;
+          left: 0.9rem;
+          top: 50%;
+          transform: translateY(-50%);
+          font-size: 0.875rem;
+          color: #64748b;
+          pointer-events: none;
+          transition: top .18s, font-size .18s, color .18s, transform .18s;
+        }
+        .login-field__input:focus + .login-field__label,
+        .login-field__input:not(:placeholder-shown) + .login-field__label,
+        .login-field__label--filled {
+          top: 0.5rem;
+          transform: translateY(0);
+          font-size: 0.68rem;
+          color: #2563eb;
+          font-weight: 700;
+          letter-spacing: .02em;
+        }
+        .login-field__wrap--error .login-field__input:focus + .login-field__label,
+        .login-field__wrap--error .login-field__input:not(:placeholder-shown) + .login-field__label,
+        .login-field__wrap--error .login-field__label--filled { color: #dc2626; }
+
+        .login-field__suffix {
+          position: absolute;
+          right: 0.7rem;
+          top: 50%;
+          transform: translateY(-50%);
+          display: flex;
+          align-items: center;
+        }
+        .login-field__suffix button {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0.3rem;
+          color: #94a3b8;
+          display: flex;
+          align-items: center;
+          border-radius: 6px;
+          transition: color .15s;
+        }
+        .login-field__suffix button:hover { color: #2563eb; }
+        .login-field__suffix button:focus-visible {
+          outline: 2px solid #2563eb;
+          outline-offset: 2px;
+        }
+
+        .login-field__error {
+          margin: 0.3rem 0 0 0.15rem;
+          font-size: 0.7rem;
+          color: #dc2626;
+        }
+
+        /* ── banners ── */
+        .login-server-error {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.5rem;
+          background: #fef2f2;
+          border: 1px solid #fecaca;
+          border-radius: 10px;
+          padding: 0.65rem 0.85rem;
+          font-size: 0.78rem;
+          color: #dc2626;
+          margin-bottom: 1.2rem;
+        }
+        .login-timeout-banner {
+          background: #fffbeb;
+          border: 1px solid #fde68a;
+          border-radius: 10px;
+          padding: 0.65rem 0.85rem;
+          font-size: 0.78rem;
+          color: #92400e;
+          margin-bottom: 1.2rem;
+        }
+
+        /* ── primary button ── */
+        .login-btn-primary {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          width: 100%;
+          height: 50px;
+          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+          color: #fff;
+          font-size: 0.9rem;
+          font-weight: 700;
+          font-family: inherit;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: opacity .18s, transform .1s, box-shadow .18s;
+          box-shadow: 0 4px 14px rgba(37,99,235,.4), 0 1px 3px rgba(37,99,235,.3);
+          margin-top: 0.5rem;
+          letter-spacing: .01em;
+        }
+        .login-btn-primary:hover:not(:disabled) {
+          opacity: .92;
+          box-shadow: 0 6px 20px rgba(37,99,235,.45), 0 2px 6px rgba(37,99,235,.3);
+          transform: translateY(-1px);
+        }
+        .login-btn-primary:active:not(:disabled) { transform: scale(.988) translateY(0); }
+        .login-btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+        .login-btn-primary:focus-visible {
+          outline: 3px solid #93c5fd;
+          outline-offset: 2px;
+        }
+
+        .login-spinner {
+          width: 18px; height: 18px;
+          border: 2.5px solid rgba(255,255,255,.35);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: spin .7s linear infinite;
+          flex-shrink: 0;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .login-spinner { animation: none; border-top-color: rgba(255,255,255,.6); }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── divider ── */
+        .login-divider {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin: 1.4rem 0 0.9rem;
+          color: #94a3b8;
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+        }
+        .login-divider::before,
+        .login-divider::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: #e2e8f0;
+        }
+
+        /* ── role switcher ── */
+        .login-roles {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.45rem;
+        }
+        .login-role-btn {
+          padding: 0.5rem 0.25rem;
+          background: #fff;
+          border: 1.5px solid #dbeafe;
+          border-radius: 8px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: #334155;
+          font-family: inherit;
+          cursor: pointer;
+          transition: border-color .15s, background .15s, color .15s, box-shadow .15s;
+          text-align: center;
+          white-space: nowrap;
+        }
+        .login-role-btn:hover {
+          border-color: #2563eb;
+          color: #2563eb;
+          background: #eff6ff;
+          box-shadow: 0 2px 8px rgba(37,99,235,.12);
+        }
+        .login-role-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+        .login-role-btn--active {
+          border-color: #2563eb !important;
+          background: #eff6ff !important;
+          color: #2563eb !important;
+          box-shadow: 0 2px 8px rgba(37,99,235,.15) !important;
+        }
+
+        /* ── forgot password ── */
+        .login-forgot {
+          margin-top: 1rem;
+          text-align: center;
+          font-size: 0.77rem;
+          color: #64748b;
+        }
+        .login-forgot span {
+          color: #2563eb;
+          font-weight: 700;
+          cursor: pointer;
+          text-decoration: none;
+        }
+        .login-forgot span:hover { text-decoration: underline; }
+
+        /* ── right panel footer ── */
+        .login-footer {
+          padding: 0.9rem clamp(1.5rem, 5vw, 3rem) 1.25rem;
+          border-top: 1px solid rgba(219,234,254,.7);
+          font-size: 0.71rem;
+          color: #64748b;
+          background: rgba(255,255,255,.5);
+        }
+        .login-footer__top {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 0.4rem 0.9rem;
+          margin-bottom: 0.5rem;
+        }
+        .login-footer__name { font-weight: 700; color: #0f172a; }
+        .login-footer__pills { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+        .login-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          padding: 0.18rem 0.55rem;
+          border-radius: 999px;
+          font-size: 0.67rem;
+          font-weight: 700;
+          text-decoration: none;
+          transition: filter .15s;
+        }
+        .login-pill:hover { filter: brightness(.92); }
+        .login-pill--tg { background: #e0f2fe; color: #0369a1; }
+        .login-pill--wa { background: #dcfce7; color: #166534; }
+        .login-footer__phone { font-variant-numeric: tabular-nums; color: #0f172a; font-weight: 600; font-size: 0.73rem; }
+        .login-footer__bottom {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 0.35rem;
+        }
+        .login-footer__support {
+          color: #2563eb;
+          font-weight: 700;
+          cursor: pointer;
+          text-decoration: none;
+          font-size: 0.71rem;
+        }
+        .login-footer__support:hover { text-decoration: underline; }
+        .login-footer__auth { font-size: 0.68rem; color: #94a3b8; font-weight: 600; }
+
+        /* ── dark mode: keep the right panel always light ──────── */
+        @media (prefers-color-scheme: dark) {
+          /* force light on every element inside the right panel */
+          .login-form-panel,
+          .login-form-panel * {
+            color-scheme: light;
+          }
+          /* panel background stays the same light blue gradient */
+          .login-form-panel {
+            background: linear-gradient(155deg, #f0f4ff 0%, #e8effe 40%, #f5f8ff 100%);
+          }
+        }
+      `}</style>
+
+      <div className="login-root">
+
+        {/* ════════════════════ LEFT — HERO ════════════════════ */}
+        <section className="login-hero" aria-label="Application branding">
+          <CurvedLines />
+
+          {/* starburst logo */}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <Starburst />
           </div>
-        </div>
 
-        {/* Middle: Headline, Subtext & Verified Badge Card */}
-        <div className="relative z-10 my-8 space-y-7 lg:my-0 lg:max-w-xl">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-3.5 py-1 text-xs font-semibold text-white backdrop-blur-md shadow-xs">
-              <Sparkles size={13} className="text-amber-300 animate-pulse" />
-              <span>Multi-Store &amp; Kitchen Inventory Engine</span>
-            </div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-[42px] leading-[1.18] drop-shadow-sm">
-              Secure Inventory &amp; Store Ledger Desk
+          {/* headline + body */}
+          <div className="login-hero__content">
+            <h1 className="login-hero__heading">
+              Hello<br />
+              Five Stop!&nbsp;
+              <span className="login-hero__wave" role="img" aria-label="waving hand">👋</span>
             </h1>
-            <p className="text-sm sm:text-base leading-relaxed text-blue-50/90 font-normal">
-              Access the central store ledger for digital receiving verification (GRV), automated recipe costing, multi-tier Maker-Checker approvals, and perpetual stock reconciliations.
+            <p className="login-hero__desc">
+              Run every store and kitchen from one desk. Receive goods, cost recipes,
+              approve vouchers and balance the stock ledger without the paperwork.
             </p>
           </div>
 
-          {/* Compliance & Audit Verified Card (modeled after reference) */}
-          <div className="rounded-2xl border border-white/20 bg-white/10 p-5 backdrop-blur-md transition hover:bg-white/15 shadow-xl shadow-blue-950/20">
-            <div className="flex items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 border border-white/30 text-white shadow-xs">
-                <ShieldCheck size={22} strokeWidth={2.3} />
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-white">
-                  COMPLIANCE &amp; AUDIT VERIFIED
-                </h2>
-                <p className="text-xs leading-relaxed text-blue-100/90 font-normal">
-                  Fully compliant with perpetual stock accounting, voucher-based multi-tier authorization (Review, Approve, Post), and automated monthly ledger balancing.
-                </p>
-              </div>
+          {/* left footer */}
+          <footer className="login-hero__footer">
+            © 2026 Five Stop Hotel &amp; Resort Management SC. All rights reserved.
+          </footer>
+        </section>
+
+        {/* ════════════════════ RIGHT — FORM ════════════════════ */}
+        <main className="login-form-panel">
+
+          {/* top bar */}
+          <div className="login-topbar">
+            <span className="login-wordmark" aria-label="Five Stop">
+              <span className="login-wordmark__five">Five</span>
+              <span className="login-wordmark__stop">Stop</span>
+            </span>
+            <div className="login-status" aria-live="polite">
+              <span className="login-status__dot" aria-hidden="true" />
+              System online · Port 5000
             </div>
           </div>
-        </div>
 
-        {/* Bottom: Left Column Footer */}
-        <div className="relative z-10 pt-6 border-t border-white/10 flex flex-col gap-2.5 text-xs text-blue-100/80">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p>© 2026 Five Stop Hotel &amp; Resort Management SC.</p>
-            <div className="text-[11px] text-blue-100">
-              Developed &amp; Powered by <strong className="text-white font-semibold underline underline-offset-2">Mequannent Gashaw</strong>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2.5 pt-0.5 text-[11px]">
-            <a
-              href="https://t.me/+251918592028"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 px-2.5 py-1 font-medium text-white transition backdrop-blur-xs border border-white/20 shadow-2xs"
-            >
-              <svg className="w-3.5 h-3.5 fill-current text-sky-300" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.05-.2-.06-.05-.16-.03-.23-.02-.1.02-1.68 1.07-4.75 3.14-.45.31-.86.46-1.22.45-.4-.01-1.17-.23-1.74-.41-.7-.23-1.26-.35-1.21-.74.03-.2.3-.41.83-.62 3.25-1.42 5.42-2.35 6.52-2.8 3.11-1.29 3.75-1.51 4.18-1.52.09 0 .31.02.45.14.12.1.15.24.17.34-.01.07.01.21 0 .28z"/>
-              </svg>
-              <span>Telegram</span>
-            </a>
-            <a
-              href="https://wa.me/251918592028"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 px-2.5 py-1 font-medium text-white transition backdrop-blur-xs border border-white/20 shadow-2xs"
-            >
-              <svg className="w-3.5 h-3.5 fill-current text-emerald-300" viewBox="0 0 24 24">
-                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 15 3.8 13.47 3.8 11.91C3.81 7.37 7.5 3.67 12.05 3.67M9.13 7.42C8.94 7.42 8.64 7.49 8.38 7.78C8.12 8.06 7.39 8.75 7.39 10.15C7.39 11.55 8.41 12.9 8.55 13.09C8.69 13.28 10.55 16.14 13.4 17.37C14.08 17.66 14.61 17.84 15.02 17.97C15.7 18.19 16.32 18.16 16.81 18.08C17.36 18 18.5 17.39 18.74 16.72C18.98 16.05 18.98 15.48 18.91 15.36C18.84 15.24 18.65 15.17 18.36 15.03C18.08 14.89 16.7 14.21 16.44 14.12C16.19 14.02 16 13.98 15.82 14.26C15.63 14.54 15.11 15.17 14.95 15.36C14.79 15.54 14.63 15.57 14.35 15.42C14.06 15.28 13.15 14.98 12.07 14.02C11.23 13.27 10.66 12.35 10.5 12.07C10.34 11.78 10.48 11.63 10.63 11.49C10.76 11.36 10.92 11.15 11.06 10.98C11.21 10.82 11.25 10.7 11.35 10.51C11.44 10.32 11.39 10.16 11.32 10.02C11.25 9.88 10.7 8.53 10.47 7.98C10.25 7.44 10.02 7.52 9.85 7.51C9.69 7.51 9.5 7.42 9.13 7.42Z"/>
-              </svg>
-              <span>WhatsApp</span>
-            </a>
-            <a href="tel:0918592028" className="font-mono text-white/90 hover:text-white font-semibold pl-1">
-              0918592028
-            </a>
-          </div>
-        </div>
-      </div>
+          {/* centred form block */}
+          <div className="login-form-wrap">
+            <div className="login-form-block">
 
-      {/* ════════════════════════════════════════════════════════════════
-          RIGHT COLUMN: Sign In Form
-      ════════════════════════════════════════════════════════════════ */}
-      <div className="flex flex-1 flex-col justify-between bg-slate-50/50 p-8 sm:p-12 lg:p-16">
-        
-        {/* Top Right Utilities / Status */}
-        <div className="flex justify-end items-center gap-2">
-          <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-medium text-slate-500">System Online · Port 5000</span>
-        </div>
+              <h2 className="login-heading">Welcome back!</h2>
+              <p className="login-subtext">
+                Sign in with the credentials from Store Management or IT Administration.
+              </p>
 
-        {/* Main Sign In Form Area */}
-        <div className="mx-auto w-full max-w-md my-auto py-8">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              Sign In to Portal
-            </h2>
-            <p className="mt-1.5 text-sm text-slate-500">
-              Input system credentials authorized by Store Management or IT Administration.
-            </p>
-          </div>
-
-          {/* Session Timeout Notice */}
-          {location.state?.sessionExpired && !error && (
-            <div className="mb-6 flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50/90 p-3.5 text-xs text-amber-800 shadow-xs animate-in fade-in">
-              <span className="text-base leading-none">⏱️</span>
-              <div className="flex-1">
-                <p className="font-bold text-amber-900">Session Inactivity Timeout</p>
-                <p className="mt-0.5 text-[11px] text-amber-700 leading-relaxed">
-                  You were automatically signed out after {location.state?.timeoutMinutes || 2} minutes of inactivity to protect hotel inventory and financial records. Please sign in to resume.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-700 shadow-xs">
-              <span className="font-bold text-rose-600">⚠</span>
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            
-            {/* Email / Username */}
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Email / Institutional ID
-              </label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
-                  <User size={18} />
+              {/* session timeout notice */}
+              {location.state?.sessionExpired && !serverError && (
+                <div className="login-timeout-banner" role="alert">
+                  <strong>Session timeout —</strong> You were automatically signed out after{' '}
+                  {location.state?.timeoutMinutes || 2} minutes of inactivity. Please sign in again.
                 </div>
-                <input
+              )}
+
+              {/* server error */}
+              {serverError && (
+                <div className="login-server-error" role="alert">
+                  <span aria-hidden="true">⚠</span>
+                  <span>{serverError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} noValidate>
+
+                {/* email */}
+                <FloatingInput
                   id="login-email"
+                  label="Email / Institutional ID"
                   type="email"
-                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter institutional email or username"
-                  className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 shadow-xs"
-                />
-              </div>
-            </div>
-
-            {/* Password */}
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Password
-                </label>
-              </div>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
-                  <Lock size={18} />
-                </div>
-                <input
-                  id="login-password"
-                  type={showPw ? 'text' : 'password'}
+                  autoComplete="username"
                   required
+                  hasError={emailErr}
+                  errorMsg="Enter your email or institutional ID."
+                />
+
+                {/* password */}
+                <FloatingInput
+                  ref={passwordRef}
+                  id="login-password"
+                  label="Password"
+                  type={showPw ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-11 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 shadow-xs"
+                  autoComplete="current-password"
+                  required
+                  hasError={passwordErr}
+                  errorMsg="Enter your password."
+                  suffix={
+                    <button
+                      type="button"
+                      onClick={() => setShowPw((v) => !v)}
+                      aria-label={showPw ? 'Hide password' : 'Show password'}
+                    >
+                      {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+                    </button>
+                  }
                 />
+
+                {/* submit */}
                 <button
-                  type="button"
-                  onClick={() => setShowPw(!showPw)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 hover:text-slate-600 transition"
-                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  id="login-submit"
+                  type="submit"
+                  disabled={loading}
+                  className="login-btn-primary"
+                  aria-busy={loading}
                 >
-                  {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {loading ? (
+                    <>
+                      <span className="login-spinner" aria-hidden="true" />
+                      Signing in…
+                    </>
+                  ) : (
+                    'Sign in'
+                  )}
                 </button>
+              </form>
+
+              {/* role switcher */}
+              <div className="login-divider" aria-hidden="true">or sign in as</div>
+              <div
+                className="login-roles"
+                role="group"
+                aria-label="Quick role switcher"
+              >
+                {ROLES.map((r) => (
+                  <button
+                    key={r.label}
+                    type="button"
+                    onClick={() => handleQuickFill(r)}
+                    className={[
+                      'login-role-btn',
+                      activeRole === r.label ? 'login-role-btn--active' : '',
+                    ].join(' ')}
+                    aria-pressed={activeRole === r.label}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* forgot password */}
+              <p className="login-forgot">
+                Forgot your password?{' '}
+                <span role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && undefined}>
+                  Reset credentials
+                </span>
+              </p>
+
+            </div>
+          </div>
+
+          {/* right panel footer */}
+          <footer className="login-footer">
+            <div className="login-footer__top">
+              <span>Developed &amp; powered by <span className="login-footer__name">Mequannent Gashaw</span></span>
+              <div className="login-footer__pills">
+                <a
+                  href="https://t.me/+251918592028"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="login-pill login-pill--tg"
+                >
+                  Telegram
+                </a>
+                <a
+                  href="https://wa.me/251918592028"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="login-pill login-pill--wa"
+                >
+                  WhatsApp
+                </a>
+                <a href="tel:0918592028" className="login-footer__phone">0918592028</a>
               </div>
             </div>
-
-            {/* Submit Button */}
-            <button
-              id="login-submit"
-              type="submit"
-              disabled={loading}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 py-3.5 text-sm font-semibold text-white shadow-md shadow-blue-600/25 transition active:scale-[0.99] disabled:opacity-60 cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  <span>Authenticating…</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight size={17} />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Quick Demo Switcher / Role Badges */}
-          <div className="mt-8 pt-6 border-t border-slate-200">
-            <p className="mb-2.5 text-center text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-              Quick Role Switcher
-            </p>
-            <div className="flex flex-wrap justify-center gap-1.5">
-              {[
-                { label: 'Admin', email: 'admin@hotel.com' },
-                { label: 'Manager', email: 'manager@hotel.com' },
-                { label: 'Store Keeper', email: 'storekeeper@hotel.com' },
-              ].map((r) => (
-                <button
-                  key={r.label}
-                  type="button"
-                  onClick={() => handleQuickFill(r.email)}
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50/50 transition cursor-pointer shadow-2xs"
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Security / Access & Developer Note */}
-        <div className="flex flex-col gap-3 pt-6 text-xs text-slate-500 border-t border-slate-200/80">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
-            <div>
-              Developed &amp; Powered by <strong className="text-slate-800 font-semibold">Mequannent Gashaw</strong>
-            </div>
-            <div className="flex items-center gap-2">
+            <div className="login-footer__bottom">
               <a
-                href="https://t.me/+251918592028"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-md bg-sky-50 hover:bg-sky-100 text-sky-700 px-2 py-0.5 text-[11px] font-semibold border border-sky-200 transition"
+                href="mailto:support@fivestop.com"
+                className="login-footer__support"
               >
-                Telegram
+                Contact support
               </a>
-              <a
-                href="https://wa.me/251918592028"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[11px] font-semibold border border-emerald-200 transition"
-              >
-                WhatsApp
-              </a>
-              <a href="tel:0918592028" className="font-mono text-slate-700 font-semibold hover:text-blue-600">
-                0918592028
-              </a>
+              <span className="login-footer__auth">Authorized access only</span>
             </div>
-          </div>
-          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-            <div className="flex items-center gap-3 uppercase tracking-wider font-semibold">
-              <span className="hover:text-slate-700 transition cursor-pointer">RESET CREDENTIALS</span>
-              <span>·</span>
-              <span className="hover:text-slate-700 transition cursor-pointer">CONTACT SUPPORT</span>
-            </div>
-            <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
-              <KeyRound size={11} className="text-slate-600" />
-              <span>Authorized Access Only</span>
-            </div>
-          </div>
-        </div>
+          </footer>
+
+        </main>
       </div>
-
-    </div>
+    </>
   );
-};
-
-export default Login;
-
+}

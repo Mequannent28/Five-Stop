@@ -413,65 +413,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Inventory Count & Stock Balance Quick Access ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {/* Inventory Count Card */}
-        <div
-          onClick={() => navigate('/reports/inventory-count')}
-          className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-600 to-emerald-800 p-5 shadow-soft cursor-pointer hover:shadow-lg hover:scale-[1.01] transition-all duration-200"
-        >
-          <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10 group-hover:scale-110 transition-transform duration-300" />
-          <div className="absolute -right-2 bottom-0 h-16 w-16 rounded-full bg-white/5" />
-          <div className="relative">
-            <div className="flex items-start justify-between">
-              <div className="rounded-xl bg-white/20 p-2.5">
-                <ClipboardList size={22} className="text-white" />
-              </div>
-              <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
-                Inventory
-              </span>
-            </div>
-            <h3 className="mt-4 text-lg font-black text-white leading-tight">
-              Inventory Count
-            </h3>
-            <p className="mt-1 text-xs text-emerald-100">
-              Physical count sheets per store — WAC, variance &amp; approval
-            </p>
-            <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-white/90 group-hover:gap-3 transition-all">
-              Open Count Sheet <ArrowRight size={14} />
-            </div>
-          </div>
-        </div>
-
-        {/* Stock Balance Card */}
-        <div
-          onClick={() => navigate('/reports/stock-balance')}
-          className="group relative overflow-hidden rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-700 to-blue-900 p-5 shadow-soft cursor-pointer hover:shadow-lg hover:scale-[1.01] transition-all duration-200"
-        >
-          <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10 group-hover:scale-110 transition-transform duration-300" />
-          <div className="absolute -right-2 bottom-0 h-16 w-16 rounded-full bg-white/5" />
-          <div className="relative">
-            <div className="flex items-start justify-between">
-              <div className="rounded-xl bg-white/20 p-2.5">
-                <Scale size={22} className="text-white" />
-              </div>
-              <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wide">
-                Reports
-              </span>
-            </div>
-            <h3 className="mt-4 text-lg font-black text-white leading-tight">
-              Stock Balance Sheet
-            </h3>
-            <p className="mt-1 text-xs text-blue-100">
-              Opening + Received − Issued = Closing balance ledger
-            </p>
-            <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-white/90 group-hover:gap-3 transition-all">
-              View Balance Sheet <ArrowRight size={14} />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* ── Main Charts Row: Stock Movement & Category Pie Chart ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* 7-Day Stock Movement Curve / Bar Chart (8 Columns) */}
