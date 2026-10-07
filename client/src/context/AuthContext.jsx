@@ -18,7 +18,6 @@ const DEFAULT_NAV_VISIBILITY = {
   rawMaterials:   { storekeeper: true,  manager: true,  admin: true },
   products:       { storekeeper: true,  manager: true,  admin: true },
   stockMovements: { storekeeper: true,  manager: true,  admin: true },
-  purchases:      { storekeeper: false, manager: true,  admin: true },
   suppliers:      { storekeeper: false, manager: true,  admin: true },
   reports:        { storekeeper: false, manager: true,  admin: true },
   analytics:      { storekeeper: false, manager: true,  admin: true },

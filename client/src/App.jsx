@@ -6,7 +6,6 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import RawMaterials from './pages/RawMaterials';
 import StockTransactions from './pages/StockTransactions';
-import Purchases from './pages/Purchases';
 import Suppliers from './pages/Suppliers';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
@@ -45,14 +44,6 @@ function App() {
         <Route path="/transactions/disposal"       element={<StockTransactions defaultVoucher="disposal" />} />
         <Route path="/transactions/neg-adjustment" element={<StockTransactions defaultVoucher="neg_adjustment" />} />
         <Route path="/sales-import" element={<SalesImport />} />
-        <Route
-          path="/purchases"
-          element={
-            <ProtectedRoute capability="recordGoods">
-              <Purchases />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/suppliers"
           element={

@@ -161,13 +161,6 @@ const Sidebar = ({ open, onClose }) => {
             </CollapsibleNav>
           )}
 
-          {/* Purchases */}
-          {canSeeNav('purchases') && (
-            <NavLink to="/purchases" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
-              <ShoppingCart size={18} strokeWidth={2} /> Purchases
-            </NavLink>
-          )}
-
           {/* Suppliers */}
           {canSeeNav('suppliers') && (
             <NavLink to="/suppliers" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
