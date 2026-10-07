@@ -484,31 +484,31 @@ const Products = () => {
       )}
 
       {/* ── Table with inline checkboxes ── */}
-      <div className="overflow-x-auto rounded-xl border border-ink-100 bg-white shadow-soft">
-        <table className="min-w-full divide-y divide-ink-100 text-sm">
-          <thead className="bg-ink-50/60">
+      <div className="overflow-x-auto rounded-xl border border-blue-200/70 bg-white shadow-soft">
+        <table className="min-w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+          <thead style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}>
             <tr>
               {canEdit && (
-                <th className="w-10 px-4 py-3">
+                <th className="w-10 px-4 py-2.5" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>
                   <input
                     type="checkbox"
                     checked={allChecked}
                     ref={(el) => { if (el) el.indeterminate = someChecked && !allChecked; }}
                     onChange={toggleAll}
-                    className="h-4 w-4 rounded border-ink-300 accent-blue-600 cursor-pointer"
+                    className="h-4 w-4 rounded border-white/40 accent-white cursor-pointer"
                   />
                 </th>
               )}
-              <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-ink-500">Code</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-ink-500">Product</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-ink-500">Category</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-ink-500">UOM</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-ink-500">Ingredients</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-ink-500">Selling Price</th>
-              {canEdit && <th className="px-4 py-3" />}
+              <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Code</th>
+              <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Product</th>
+              <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Category</th>
+              <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>UOM</th>
+              <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Ingredients</th>
+              <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>Selling Price</th>
+              {canEdit && <th className="px-4 py-2.5" style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }} />}
             </tr>
           </thead>
-          <tbody className="divide-y divide-ink-50">
+          <tbody style={{ borderTop: 'none' }}>
             {products.length === 0 && (
               <tr>
                 <td colSpan={canEdit ? 8 : 6} className="px-4 py-10 text-center text-ink-400">
