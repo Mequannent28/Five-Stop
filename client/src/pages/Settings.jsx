@@ -158,9 +158,13 @@ export default function Settings() {
   const loadTgSubscribers = () => {
     if (!hasRole('admin')) return;
     setTgLoading(true);
+    setTgError('');
     api.get('/telegram/subscribers')
       .then(res => setTgSubscribers(res.data || []))
-      .catch(() => setTgError('Failed to load subscribers.'))
+      .catch(() => {
+        setTgError('Failed to load subscribers.');
+        setTimeout(() => setTgError(''), 3000);
+      })
       .finally(() => setTgLoading(false));
   };
   useEffect(() => {
