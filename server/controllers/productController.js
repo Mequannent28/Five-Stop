@@ -3,6 +3,7 @@ const XLSX = require('xlsx');
 const Product = require('../models/Product');
 const RawMaterial = require('../models/RawMaterial');
 const { invalidateDashboardCache } = require('./dashboardController');
+const tg = require('../utils/telegramNotifier');
 
 // GET /api/products
 const getProducts = asyncHandler(async (req, res) => {
@@ -39,6 +40,7 @@ const createProduct = asyncHandler(async (req, res) => {
   const { name, category, description, sellingPrice, ingredients, code } = req.body;
   const product = await Product.create({ code, name, category, description, sellingPrice, ingredients });
   const populated = await product.populate('ingredients.material', 'name unit unitCost');
+  tg.notifyProductCreated(populated, req.user);
   invalidateDashboardCache();
   res.status(201).json(populated);
 });
@@ -71,6 +73,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
   product.deletedBy   = req.user?.name || 'System';
   product.deletedFrom = 'products';
   await product.save();
+  tg.notifyProductDeleted(product, req.user);
   invalidateDashboardCache();
   res.json({ message: 'Product moved to recycle bin.' });
 });

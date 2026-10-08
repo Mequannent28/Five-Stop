@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const XLSX = require('xlsx');
 const RawMaterial = require('../models/RawMaterial');
 const { invalidateDashboardCache } = require('./dashboardController');
+const tg = require('../utils/telegramNotifier');
 
 const getMaterials = asyncHandler(async (req, res) => {
   const { search, status } = req.query;
@@ -38,6 +39,7 @@ const getMaterialById = asyncHandler(async (req, res) => {
 
 const createMaterial = asyncHandler(async (req, res) => {
   const material = await RawMaterial.create(req.body);
+  tg.notifyMaterialCreated(material, req.user);
   invalidateDashboardCache();
   res.status(201).json(material);
 });
@@ -51,6 +53,7 @@ const updateMaterial = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Raw material not found');
   }
+  tg.notifyMaterialUpdated(material, req.user);
   invalidateDashboardCache();
   res.json(material);
 });
@@ -63,6 +66,7 @@ const deleteMaterial = asyncHandler(async (req, res) => {
   material.deletedBy = req.user?.name || 'System';
   material.deletedFrom = 'materials';
   await material.save();
+  tg.notifyMaterialDeleted(material, req.user);
   invalidateDashboardCache();
   res.json({ message: 'Raw material moved to recycle bin.' });
 });

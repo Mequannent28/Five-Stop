@@ -1,6 +1,7 @@
-const asyncHandler = require('express-async-handler');
-const Setting = require('../models/Setting');
+const asyncHandler      = require('express-async-handler');
+const Setting           = require('../models/Setting');
 const { clearSettingsCache, DEFAULT_ROLE_PERMISSIONS } = require('../middleware/authMiddleware');
+const tg = require('../utils/telegramNotifier');
 
 const DEFAULT_NAV_VISIBILITY = {
   dashboard:      { storekeeper: true,  manager: true,  admin: true },
@@ -81,6 +82,7 @@ const updateSettings = asyncHandler(async (req, res) => {
 
   const updated = await settings.save();
   clearSettingsCache();
+  tg.notifySettingsChanged(req.body, req.user);
   res.json(updated);
 });
 

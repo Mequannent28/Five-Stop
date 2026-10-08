@@ -5,6 +5,7 @@ const Product           = require('../models/Product');
 const StockTransaction  = require('../models/StockTransaction');
 const { invalidateDashboardCache } = require('./dashboardController');
 const { VOUCHER_DIRECTION } = require('../models/StockTransaction');
+const tg = require('../utils/telegramNotifier');
 
 // GET /api/recycle-bin
 // Returns all soft-deleted items across all collections
@@ -39,6 +40,7 @@ const restoreItem = asyncHandler(async (req, res) => {
     if (!doc) { res.status(404); throw new Error('Item not found'); }
     doc.isActive = true; doc.deletedAt = null; doc.deletedBy = null; doc.deletedFrom = null;
     await doc.save();
+    tg.notifyRestored('Raw Material', doc.name, req.user);
     invalidateDashboardCache();
     return res.json({ message: 'Raw material restored.' });
   }
@@ -48,6 +50,7 @@ const restoreItem = asyncHandler(async (req, res) => {
     if (!doc) { res.status(404); throw new Error('Item not found'); }
     doc.isActive = true; doc.deletedAt = null; doc.deletedBy = null; doc.deletedFrom = null;
     await doc.save();
+    tg.notifyRestored('Supplier', doc.name, req.user);
     return res.json({ message: 'Supplier restored.' });
   }
 
@@ -56,6 +59,7 @@ const restoreItem = asyncHandler(async (req, res) => {
     if (!doc) { res.status(404); throw new Error('Item not found'); }
     doc.isActive = true; doc.deletedAt = null; doc.deletedBy = null; doc.deletedFrom = null;
     await doc.save();
+    tg.notifyRestored('Product', doc.name, req.user);
     invalidateDashboardCache();
     return res.json({ message: 'Product restored.' });
   }
@@ -75,6 +79,7 @@ const restoreItem = asyncHandler(async (req, res) => {
     }
     doc.deletedAt = null; doc.deletedBy = null; doc.deletedFrom = null;
     await doc.save();
+    tg.notifyRestored('Transaction', doc.voucherNo || doc._id.toString().slice(-6), req.user);
     invalidateDashboardCache();
     return res.json({ message: 'Transaction restored and stock re-applied.' });
   }
@@ -111,6 +116,7 @@ const emptyRecycleBin = asyncHandler(async (req, res) => {
     StockTransaction.deleteMany({ deletedAt: { $ne: null } }),
   ]);
   invalidateDashboardCache();
+  tg.notifyBinEmptied(req.user);
   res.json({ message: 'Recycle bin emptied.' });
 });
 

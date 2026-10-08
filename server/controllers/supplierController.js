@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const Supplier = require('../models/Supplier');
+const tg = require('../utils/telegramNotifier');
 
 const getSuppliers = asyncHandler(async (req, res) => {
   const { search } = req.query;
@@ -22,6 +23,7 @@ const getSupplierById = asyncHandler(async (req, res) => {
 
 const createSupplier = asyncHandler(async (req, res) => {
   const supplier = await Supplier.create(req.body);
+  tg.notifySupplierCreated(supplier, req.user);
   res.status(201).json(supplier);
 });
 
@@ -45,6 +47,7 @@ const deleteSupplier = asyncHandler(async (req, res) => {
   supplier.deletedBy   = req.user?.name || 'System';
   supplier.deletedFrom = 'suppliers';
   await supplier.save();
+  tg.notifySupplierDeleted(supplier, req.user);
   res.json({ message: 'Supplier moved to recycle bin.' });
 });
 

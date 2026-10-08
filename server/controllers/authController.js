@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
+const tg = require('../utils/telegramNotifier');
 
 // @desc  Register a new user (admin only, in practice)
 const registerUser = asyncHandler(async (req, res) => {
@@ -13,6 +14,8 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   const user = await User.create({ name, email, password, role });
+
+  tg.notifyUserCreated(user, req.user);
 
   res.status(201).json({
     _id: user._id,
@@ -39,6 +42,8 @@ const loginUser = asyncHandler(async (req, res) => {
     res.status(403);
     throw new Error('This account has been deactivated. Contact your administrator.');
   }
+
+  tg.notifyLogin(user);
 
   res.json({
     _id: user._id,

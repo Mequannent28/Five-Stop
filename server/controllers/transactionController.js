@@ -6,6 +6,7 @@ const RawMaterial = require('../models/RawMaterial');
 const User = require('../models/User');
 const { invalidateDashboardCache } = require('./dashboardController');
 const { hasPermission } = require('../middleware/authMiddleware');
+const tg = require('../utils/telegramNotifier');
 
 // ── helpers ───────────────────────────────────────────────────────────
 const verifyUserPassword = async (userId, password) => {
@@ -149,6 +150,7 @@ const createTransaction = asyncHandler(async (req, res) => {
     .populate('performedBy', 'name');
 
   invalidateDashboardCache();
+  tg.notifyTransaction(populated, req.user);
   res.status(201).json(populated);
 });
 
@@ -331,6 +333,7 @@ const deleteTransaction = asyncHandler(async (req, res) => {
   transaction.deletedFrom = 'transactions';
   await transaction.save();
 
+  tg.notifyTransactionDeleted(transaction, req.user);
   invalidateDashboardCache();
   res.json({ message: 'Transaction moved to recycle bin and stock reversed.' });
 });
@@ -496,6 +499,7 @@ const advanceTransaction = asyncHandler(async (req, res) => {
     .populate('supplier', 'name')
     .populate('performedBy checkedBy approvedBy postedBy', 'name role');
 
+  tg.notifyTransactionAdvanced(populated, action, actor);
   res.json({ message: `Voucher moved from "${prev}" → "${rule.to}"`, transaction: populated });
 });
 
