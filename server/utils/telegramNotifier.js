@@ -11,40 +11,46 @@
 const https = require('https');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT_ID   = process.env.TELEGRAM_CHAT_ID;
-const HOTEL     = 'Five Stop Hotel';
+// Support multiple recipients — comma-separated in TELEGRAM_CHAT_ID
+// e.g. TELEGRAM_CHAT_ID=7951472080,1286578760,-1001234567890
+const CHAT_IDS = (process.env.TELEGRAM_CHAT_ID || '')
+  .split(',')
+  .map(id => id.trim())
+  .filter(id => id && id !== 'your_chat_id_here');
+const HOTEL = 'Five Stop Hotel';
 
 // ── Low-level sender ─────────────────────────────────────────────
 function sendTelegram(text) {
-  if (!BOT_TOKEN || !CHAT_ID ||
-      BOT_TOKEN === 'your_bot_token_here' ||
-      CHAT_ID   === 'your_chat_id_here') return;
+  if (!BOT_TOKEN || BOT_TOKEN === 'your_bot_token_here') return;
+  if (!CHAT_IDS.length) return;
 
-  const body = JSON.stringify({
-    chat_id:    CHAT_ID,
-    text,
-    parse_mode: 'HTML',
-    disable_web_page_preview: true,
+  CHAT_IDS.forEach(chatId => {
+    const body = JSON.stringify({
+      chat_id:    chatId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+    });
+
+    const options = {
+      hostname: 'api.telegram.org',
+      path:     `/bot${BOT_TOKEN}/sendMessage`,
+      method:   'POST',
+      headers:  { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    };
+
+    const req = https.request(options, (res) => {
+      if (res.statusCode !== 200) {
+        let data = '';
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => console.warn(`[Telegram] Non-200 for chat ${chatId}:`, data));
+      }
+    });
+
+    req.on('error', (err) => console.warn(`[Telegram] Send error to ${chatId}:`, err.message));
+    req.write(body);
+    req.end();
   });
-
-  const options = {
-    hostname: 'api.telegram.org',
-    path:     `/bot${BOT_TOKEN}/sendMessage`,
-    method:   'POST',
-    headers:  { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-  };
-
-  const req = https.request(options, (res) => {
-    if (res.statusCode !== 200) {
-      let data = '';
-      res.on('data', chunk => { data += chunk; });
-      res.on('end', () => console.warn('[Telegram] Non-200 response:', data));
-    }
-  });
-
-  req.on('error', (err) => console.warn('[Telegram] Send error:', err.message));
-  req.write(body);
-  req.end();
 }
 
 // ── Timestamp helper ─────────────────────────────────────────────
