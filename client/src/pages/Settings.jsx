@@ -21,6 +21,7 @@ import {
   Upload,
   Trash2,
   Clock,
+  Send,
 } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -119,6 +120,13 @@ export default function Settings() {
   const [systemSuccess, setSystemSuccess] = useState('');
   const [systemError, setSystemError] = useState('');
 
+  // Telegram subscribers state (Admin)
+  const [tgSubscribers,   setTgSubscribers]   = useState([]);
+  const [tgLoading,       setTgLoading]       = useState(false);
+  const [tgRemoving,      setTgRemoving]      = useState(null); // chatId being removed
+  const [tgSuccess,       setTgSuccess]       = useState('');
+  const [tgError,         setTgError]         = useState('');
+
   // Sync profile when user updates
   useEffect(() => {
     if (user) {
@@ -145,6 +153,36 @@ export default function Settings() {
         .finally(() => setSystemLoading(false));
     }
   }, [user]);
+
+  // Load Telegram subscribers (admin only)
+  const loadTgSubscribers = () => {
+    if (!hasRole('admin')) return;
+    setTgLoading(true);
+    api.get('/telegram/subscribers')
+      .then(res => setTgSubscribers(res.data || []))
+      .catch(() => setTgError('Failed to load subscribers.'))
+      .finally(() => setTgLoading(false));
+  };
+  useEffect(() => {
+    if (currentTab === 'telegram' && hasRole('admin')) loadTgSubscribers();
+  }, [currentTab]);
+
+  // Handle Telegram subscriber removal
+  const handleRemoveTgSubscriber = async (chatId, name) => {
+    if (!window.confirm(`Remove "${name}" from bot subscribers? They will stop receiving notifications.`)) return;
+    setTgRemoving(chatId);
+    setTgError('');
+    try {
+      await api.delete(`/telegram/subscribers/${chatId}`);
+      setTgSuccess(`"${name}" removed from subscribers.`);
+      setTimeout(() => setTgSuccess(''), 4000);
+      loadTgSubscribers();
+    } catch (err) {
+      setTgError(err.response?.data?.message || 'Failed to remove subscriber.');
+    } finally {
+      setTgRemoving(null);
+    }
+  };
 
   // Handle Profile Update
   const handleProfileSubmit = async (e) => {
@@ -369,6 +407,19 @@ export default function Settings() {
         >
           <Layers size={16} /> Role Privileges
         </button>
+
+        {hasRole('admin') && (
+          <button
+            onClick={() => setTab('telegram')}
+            className={`flex items-center gap-2 border-b-2 px-3.5 py-3 text-sm font-semibold transition whitespace-nowrap ${
+              currentTab === 'telegram'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-ink-400 hover:text-ink-700'
+            }`}
+          >
+            <Send size={16} /> Telegram Subscribers
+          </button>
+        )}
       </div>
 
       {/* ── Tab 1: Profile ── */}
@@ -1050,6 +1101,105 @@ export default function Settings() {
               </div>
             )}
           </form>
+        </Card>
+      )}
+
+      {/* ── Tab 5: Telegram Subscribers (Admin only) ── */}
+      {currentTab === 'telegram' && hasRole('admin') && (
+        <Card className="max-w-3xl">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg bg-blue-50 p-1.5 text-blue-600">
+                <Send size={16} />
+              </span>
+              <div>
+                <h3 className="font-bold text-base text-ink-900">Telegram Bot Subscribers</h3>
+                <p className="text-xs text-ink-400 mt-0.5">
+                  Everyone who started <strong>@FivestopBot</strong> and receives notifications
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={loadTgSubscribers}
+              disabled={tgLoading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-600 hover:bg-ink-50 transition"
+            >
+              {tgLoading ? 'Loading…' : '↻ Refresh'}
+            </button>
+          </div>
+
+          {/* How to add people */}
+          <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
+            <p className="font-bold mb-1">📢 How to add someone</p>
+            <p>Share this link: <strong>t.me/FivestopBot</strong></p>
+            <p className="mt-0.5 text-blue-600">They tap <strong>Start</strong> → automatically subscribed ✅</p>
+          </div>
+
+          {tgSuccess && (
+            <div className="mb-3 flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
+              <CheckCircle2 size={15} className="flex-shrink-0" />
+              {tgSuccess}
+            </div>
+          )}
+          {tgError && (
+            <div className="mb-3 flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
+              <AlertCircle size={15} className="flex-shrink-0" />
+              {tgError}
+            </div>
+          )}
+
+          {/* Subscriber list */}
+          {tgLoading ? (
+            <div className="py-8 text-center text-xs text-ink-400">Loading subscribers…</div>
+          ) : tgSubscribers.length === 0 ? (
+            <div className="py-8 text-center">
+              <Send size={28} className="mx-auto mb-2 text-ink-200" />
+              <p className="text-sm font-semibold text-ink-400">No subscribers yet</p>
+              <p className="text-xs text-ink-300 mt-1">Share t.me/FivestopBot to get started</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-ink-100">
+              <table className="min-w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+                <thead style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}>
+                  <tr>
+                    {['#', 'Name', 'Username', 'Subscribed At', 'Action'].map(h => (
+                      <th key={h} className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100"
+                        style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tgSubscribers.map((sub, i) => (
+                    <tr key={sub.chatId} className="hover:bg-ink-50/40" style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td className="px-4 py-3 text-xs text-ink-400 tabular-nums">{i + 1}</td>
+                      <td className="px-4 py-3 font-semibold text-ink-800">{sub.name || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-blue-600">
+                        {sub.username ? `@${sub.username}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-ink-400">
+                        {sub.subscribedAt ? new Date(sub.subscribedAt).toLocaleString() : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleRemoveTgSubscriber(sub.chatId, sub.name)}
+                          disabled={tgRemoving === sub.chatId}
+                          className="inline-flex items-center gap-1 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 transition disabled:opacity-50"
+                        >
+                          <Trash2 size={12} />
+                          {tgRemoving === sub.chatId ? 'Removing…' : 'Remove'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="border-t border-ink-100 px-4 py-2 text-xs text-ink-400">
+                {tgSubscribers.length} subscriber{tgSubscribers.length !== 1 ? 's' : ''} total
+              </div>
+            </div>
+          )}
         </Card>
       )}
     </div>
