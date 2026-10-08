@@ -39,6 +39,11 @@ const settingSchema = new mongoose.Schema(
       type: Object,
       default: DEFAULT_NAV_VISIBILITY,
     },
+    // Telegram bot subscribers — array of { chatId, name, username, subscribedAt }
+    telegramSubscribers: {
+      type: Array,
+      default: [],
+    },
     notes: { type: String, default: 'Five Stop Hotel Management & Stock Control System' },
   },
   { timestamps: true }

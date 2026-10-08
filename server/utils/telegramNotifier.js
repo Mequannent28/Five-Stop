@@ -8,49 +8,64 @@
  * If either is missing the module silently no-ops (safe for dev).
  */
 
-const https = require('https');
+const https   = require('https');
+const Setting = require('../models/Setting');
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-// Support multiple recipients — comma-separated in TELEGRAM_CHAT_ID
-// e.g. TELEGRAM_CHAT_ID=7951472080,1286578760,-1001234567890
-const CHAT_IDS = (process.env.TELEGRAM_CHAT_ID || '')
+// Fallback: env-var chat IDs (used if DB has no subscribers yet)
+const ENV_CHAT_IDS = (process.env.TELEGRAM_CHAT_ID || '')
   .split(',')
   .map(id => id.trim())
   .filter(id => id && id !== 'your_chat_id_here');
 const HOTEL = 'Five Stop Hotel';
 
 // ── Low-level sender ─────────────────────────────────────────────
+async function getChatIds() {
+  try {
+    const settings = await Setting.findOne().select('telegramSubscribers').lean();
+    const dbIds = (settings?.telegramSubscribers || []).map(s => String(s.chatId));
+    // Merge DB subscribers with env fallback, deduplicated
+    const all = [...new Set([...dbIds, ...ENV_CHAT_IDS])];
+    return all.filter(Boolean);
+  } catch {
+    return ENV_CHAT_IDS;
+  }
+}
+
+function sendToOne(chatId, text) {
+  const body = JSON.stringify({
+    chat_id:    chatId,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+  });
+
+  const options = {
+    hostname: 'api.telegram.org',
+    path:     `/bot${BOT_TOKEN}/sendMessage`,
+    method:   'POST',
+    headers:  { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+  };
+
+  const req = https.request(options, (res) => {
+    if (res.statusCode !== 200) {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => console.warn(`[Telegram] Non-200 for chat ${chatId}:`, data));
+    }
+  });
+  req.on('error', (err) => console.warn(`[Telegram] Send error to ${chatId}:`, err.message));
+  req.write(body);
+  req.end();
+}
+
 function sendTelegram(text) {
   if (!BOT_TOKEN || BOT_TOKEN === 'your_bot_token_here') return;
-  if (!CHAT_IDS.length) return;
-
-  CHAT_IDS.forEach(chatId => {
-    const body = JSON.stringify({
-      chat_id:    chatId,
-      text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-    });
-
-    const options = {
-      hostname: 'api.telegram.org',
-      path:     `/bot${BOT_TOKEN}/sendMessage`,
-      method:   'POST',
-      headers:  { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-    };
-
-    const req = https.request(options, (res) => {
-      if (res.statusCode !== 200) {
-        let data = '';
-        res.on('data', chunk => { data += chunk; });
-        res.on('end', () => console.warn(`[Telegram] Non-200 for chat ${chatId}:`, data));
-      }
-    });
-
-    req.on('error', (err) => console.warn(`[Telegram] Send error to ${chatId}:`, err.message));
-    req.write(body);
-    req.end();
-  });
+  // Fire-and-forget async
+  getChatIds().then(ids => {
+    if (!ids.length) return;
+    ids.forEach(id => sendToOne(id, text));
+  }).catch(() => {});
 }
 
 // ── Timestamp helper ─────────────────────────────────────────────
