@@ -12,7 +12,6 @@ const DEFAULT_PERMISSIONS = {
   viewReports:      { storekeeper: false, manager: true,  admin: true },
   manageAccounts:   { storekeeper: false, manager: false, admin: true },
 };
-
 const DEFAULT_NAV_VISIBILITY = {
   dashboard:      { storekeeper: true,  manager: true,  admin: true },
   rawMaterials:   { storekeeper: true,  manager: true,  admin: true },

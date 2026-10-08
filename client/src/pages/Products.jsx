@@ -65,6 +65,7 @@ const Products = () => {
       return next;
     });
   };
+  
 
   // ── CRUD ──
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModalOpen(true); };
