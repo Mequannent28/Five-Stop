@@ -242,17 +242,22 @@ function notifyMaterialCreated(mat, user) {
   );
 }
 
-/** Raw material updated */
-function notifyMaterialUpdated(mat, user) {
+/** Raw material updated — shows exactly what changed */
+function notifyMaterialUpdated(mat, user, changes = []) {
+  const diffLines = changes.length
+    ? changes.map(c => `  • <b>${c.label}:</b>  <s>${c.from}</s> → <b>${c.to}</b>`).join('\n')
+    : '  • (no tracked fields changed)';
+
   sendTelegram(
 `🏨 <b>${HOTEL}</b>
 ━━━━━━━━━━━━━━━━━━━━
 ✏️ <b>RAW MATERIAL UPDATED</b>
 
-🏷 <b>Code:</b>          ${mat.code || '—'}
-📦 <b>Name:</b>          ${mat.name}
-📊 <b>Current Stock:</b> ${mat.currentStock} ${mat.unit}
-💰 <b>Unit Cost:</b>     ${etb(mat.unitCost)}
+🏷 <b>Code:</b> ${mat.code || '—'}
+📦 <b>Name:</b> ${mat.name}
+
+📝 <b>Changes:</b>
+${diffLines}
 
 👤 <b>Updated by:</b> ${user?.name || '—'}
 🕐 <b>Time:</b>       ${now()}
@@ -296,6 +301,25 @@ function notifySupplierCreated(supplier, user) {
   );
 }
 
+function notifySupplierUpdated(supplier, user, changes = []) {
+  if (!changes.length) return;
+  const diffLines = changes.map(c => `  • <b>${c.label}:</b>  <s>${c.from}</s> → <b>${c.to}</b>`).join('\n');
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+✏️ <b>SUPPLIER UPDATED</b>
+
+🏢 <b>Name:</b> ${supplier.name}
+
+📝 <b>Changes:</b>
+${diffLines}
+
+👤 <b>Updated by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>       ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
 function notifySupplierDeleted(supplier, user) {
   sendTelegram(
 `🏨 <b>${HOTEL}</b>
@@ -327,6 +351,26 @@ function notifyProductCreated(product, user) {
 
 👤 <b>Added by:</b> ${user?.name || '—'}
 🕐 <b>Time:</b>     ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyProductUpdated(product, user, changes = []) {
+  if (!changes.length) return; // Only notify if something actually changed
+  const diffLines = changes.map(c => `  • <b>${c.label}:</b>  <s>${c.from}</s> → <b>${c.to}</b>`).join('\n');
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+✏️ <b>PRODUCT UPDATED</b>
+
+🏷 <b>Code:</b> ${product.code || '—'}
+📦 <b>Name:</b> ${product.name}
+
+📝 <b>Changes:</b>
+${diffLines}
+
+👤 <b>Updated by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>       ${now()}
 ━━━━━━━━━━━━━━━━━━━━`
   );
 }
@@ -429,8 +473,10 @@ module.exports = {
   notifyMaterialUpdated,
   notifyMaterialDeleted,
   notifySupplierCreated,
+  notifySupplierUpdated,
   notifySupplierDeleted,
   notifyProductCreated,
+  notifyProductUpdated,
   notifyProductDeleted,
   notifySettingsChanged,
   notifyRestored,

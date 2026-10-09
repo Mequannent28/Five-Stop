@@ -52,14 +52,30 @@ const updateProduct = asyncHandler(async (req, res) => {
   if (!product) { res.status(404); throw new Error('Product not found'); }
 
   const { name, category, description, sellingPrice, ingredients } = req.body;
-  product.name = name ?? product.name;
-  product.category = category ?? product.category;
+
+  // Track price change before overwriting
+  const oldPrice = product.sellingPrice;
+  const oldIngCount = product.ingredients?.length || 0;
+
+  product.name        = name        ?? product.name;
+  product.category    = category    ?? product.category;
   product.description = description ?? product.description;
   product.sellingPrice = sellingPrice ?? product.sellingPrice;
   product.ingredients = ingredients ?? product.ingredients;
 
-  const updated = await product.save();
+  const updated   = await product.save();
   const populated = await updated.populate('ingredients.material', 'name unit unitCost');
+
+  // Build diff for notification
+  const changes = [];
+  if (name        !== undefined && name !== populated.name)               changes.push({ label: 'Name',           from: product.name,     to: name });
+  if (category    !== undefined && category !== populated.category)       changes.push({ label: 'Category',        from: product.category, to: category });
+  if (sellingPrice !== undefined && Number(sellingPrice) !== Number(oldPrice))
+    changes.push({ label: 'Selling Price', from: `ETB ${Number(oldPrice).toFixed(2)}`, to: `ETB ${Number(sellingPrice).toFixed(2)}` });
+  if (ingredients !== undefined && ingredients.length !== oldIngCount)
+    changes.push({ label: 'Ingredients',   from: `${oldIngCount} items`, to: `${ingredients.length} items` });
+
+  tg.notifyProductUpdated(populated, req.user, changes);
   invalidateDashboardCache();
   res.json(populated);
 });

@@ -28,14 +28,22 @@ const createSupplier = asyncHandler(async (req, res) => {
 });
 
 const updateSupplier = asyncHandler(async (req, res) => {
+  const before = await Supplier.findById(req.params.id).lean();
+  if (!before) { res.status(404); throw new Error('Supplier not found'); }
+
   const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true,
   });
-  if (!supplier) {
-    res.status(404);
-    throw new Error('Supplier not found');
-  }
+
+  // Diff key fields
+  const changes = ['name','category','contactPerson','phone','email'].reduce((acc, k) => {
+    if (req.body[k] !== undefined && String(before[k] || '') !== String(req.body[k] || ''))
+      acc.push({ label: k.charAt(0).toUpperCase() + k.slice(1), from: before[k] || '—', to: req.body[k] });
+    return acc;
+  }, []);
+
+  if (changes.length) tg.notifySupplierUpdated(supplier, req.user, changes);
   res.json(supplier);
 });
 

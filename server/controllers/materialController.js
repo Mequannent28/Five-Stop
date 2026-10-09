@@ -45,15 +45,35 @@ const createMaterial = asyncHandler(async (req, res) => {
 });
 
 const updateMaterial = asyncHandler(async (req, res) => {
+  // Fetch old values BEFORE update so we can diff them
+  const before = await RawMaterial.findById(req.params.id).lean();
+  if (!before) { res.status(404); throw new Error('Raw material not found'); }
+
   const material = await RawMaterial.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true,
   });
-  if (!material) {
-    res.status(404);
-    throw new Error('Raw material not found');
-  }
-  tg.notifyMaterialUpdated(material, req.user);
+
+  // Build a human-readable diff of what actually changed
+  const watchedFields = [
+    { key: 'name',          label: 'Name' },
+    { key: 'category',      label: 'Category' },
+    { key: 'unit',          label: 'Unit' },
+    { key: 'unitCost',      label: 'Unit Cost',      format: v => `ETB ${Number(v).toFixed(2)}` },
+    { key: 'currentStock',  label: 'Current Stock',  format: (v, m) => `${v} ${m?.unit || ''}` },
+    { key: 'reorderLevel',  label: 'Reorder Level',  format: (v, m) => `${v} ${m?.unit || ''}` },
+    { key: 'storeLocation', label: 'Store Location' },
+  ];
+
+  const changes = watchedFields
+    .filter(f => req.body[f.key] !== undefined && String(before[f.key]) !== String(req.body[f.key]))
+    .map(f => ({
+      label: f.label,
+      from:  f.format ? f.format(before[f.key], before) : String(before[f.key] ?? '—'),
+      to:    f.format ? f.format(req.body[f.key], material) : String(req.body[f.key]),
+    }));
+
+  tg.notifyMaterialUpdated(material, req.user, changes);
   invalidateDashboardCache();
   res.json(material);
 });
