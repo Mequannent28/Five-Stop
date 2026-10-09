@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const InventoryCount = require('../models/InventoryCount');
 const RawMaterial = require('../models/RawMaterial');
 const StockTransaction = require('../models/StockTransaction');
+const tg = require('../utils/telegramNotifier');
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -258,6 +259,7 @@ exports.submitCount = asyncHandler(async (req, res) => {
   doc.submittedAt = new Date();
   await doc.save();
 
+  tg.notifyInventoryCountSubmitted(doc, req.user);
   res.json({ count: doc, message: 'Count submitted for approval' });
 });
 
@@ -288,6 +290,7 @@ exports.approveCount = asyncHandler(async (req, res) => {
   }
 
   await doc.save();
+  tg.notifyInventoryCountApproved(doc, req.user);
   res.json({ count: doc, message: 'Count approved and closing balance set' });
 });
 

@@ -304,6 +304,7 @@ const updateTransaction = asyncHandler(async (req, res) => {
     .populate('performedBy', 'name');
 
   invalidateDashboardCache();
+  tg.notifyTransactionUpdated(populated, req.user);
   res.json(populated);
 });
 

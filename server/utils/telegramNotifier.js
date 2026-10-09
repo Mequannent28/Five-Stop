@@ -462,16 +462,138 @@ function notifyInventoryCountSubmitted(count, user) {
   );
 }
 
+// ── TRANSACTION UPDATED ──────────────────────────────────────────
+
+function notifyTransactionUpdated(txn, user) {
+  const label = VOUCHER_LABEL[txn.voucherType] || txn.voucherType;
+  const emoji = VOUCHER_EMOJI[txn.voucherType] || '📦';
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+${emoji} <b>${label.toUpperCase()} EDITED</b>
+
+🔖 <b>Voucher:</b> ${txn.voucherNo || '—'}
+💰 <b>New Total:</b> ${etb(txn.totalAmount)}
+📋 <b>Status:</b>   PENDING (reset)
+
+👤 <b>Edited by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>     ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+// ── BULK DELETE ───────────────────────────────────────────────────
+
+function notifyBulkDeleted(type, count, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+🗑️ <b>BULK DELETE</b>
+
+📂 <b>Type:</b>  ${type}
+🔢 <b>Count:</b> ${count} item(s) moved to recycle bin
+
+👤 <b>By:</b>   ${user?.name || '—'}
+🕐 <b>Time:</b> ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+// ── USER STATUS / ROLE CHANGES ────────────────────────────────────
+
+function notifyUserStatusChanged(user, status, changedBy) {
+  const emoji = status === 'enabled' ? '✅' : '🔴';
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+${emoji} <b>ACCOUNT ${status.toUpperCase()}</b>
+
+👤 <b>User:</b>  ${user.name}
+📧 <b>Email:</b> ${user.email}
+🎭 <b>Role:</b>  ${user.role.toUpperCase()}
+
+🛠 <b>Changed by:</b> ${changedBy?.name || '—'}
+🕐 <b>Time:</b>       ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyUserRoleChanged(user, oldRole, newRole, changedBy) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+🎭 <b>USER ROLE CHANGED</b>
+
+👤 <b>User:</b>     ${user.name}
+📧 <b>Email:</b>    ${user.email}
+🔄 <b>Role:</b>     <s>${oldRole.toUpperCase()}</s> → <b>${newRole.toUpperCase()}</b>
+
+🛠 <b>Changed by:</b> ${changedBy?.name || '—'}
+🕐 <b>Time:</b>       ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyUserDeleted(user, deletedBy) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+🗑️ <b>STAFF ACCOUNT DELETED</b>
+
+👤 <b>Name:</b>  ${user.name}
+📧 <b>Email:</b> ${user.email}
+🎭 <b>Role:</b>  ${user.role.toUpperCase()}
+
+🛠 <b>Deleted by:</b> ${deletedBy?.name || '—'}
+🕐 <b>Time:</b>       ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+// ── INVENTORY COUNT APPROVED ──────────────────────────────────────
+
+function notifyInventoryCountApproved(count, user) {
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const period = `${MONTHS[(count.periodMonth || 1) - 1]} ${count.periodYear || ''}`;
+  const varLines = [
+    count.positiveVariance ? `  📈 Positive: ${etb(count.positiveVariance)}` : null,
+    count.negativeVariance ? `  📉 Negative: ${etb(Math.abs(count.negativeVariance))}` : null,
+    `  📊 Net: ${etb(count.netVarianceValue || 0)}`,
+  ].filter(Boolean).join('\n');
+
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+✅ <b>INVENTORY COUNT APPROVED</b>
+
+🏪 <b>Store:</b>  ${count.storeLocation || 'Main Store'}
+📅 <b>Period:</b> ${period}
+📦 <b>Items:</b>  ${count.totalItems || 0} lines
+
+💹 <b>Variance Summary:</b>
+${varLines}
+
+👤 <b>Approved by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>        ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────
 module.exports = {
   notifyLogin,
   notifyUserCreated,
+  notifyUserStatusChanged,
+  notifyUserRoleChanged,
+  notifyUserDeleted,
   notifyTransaction,
+  notifyTransactionUpdated,
   notifyTransactionAdvanced,
   notifyTransactionDeleted,
   notifyMaterialCreated,
   notifyMaterialUpdated,
   notifyMaterialDeleted,
+  notifyBulkDeleted,
   notifySupplierCreated,
   notifySupplierUpdated,
   notifySupplierDeleted,
@@ -482,4 +604,5 @@ module.exports = {
   notifyRestored,
   notifyBinEmptied,
   notifyInventoryCountSubmitted,
+  notifyInventoryCountApproved,
 };

@@ -98,6 +98,7 @@ const bulkDeleteMaterials = asyncHandler(async (req, res) => {
     { _id: { $in: ids } },
     { isActive: false, deletedAt: new Date(), deletedBy: req.user?.name || 'System', deletedFrom: 'materials' }
   );
+  tg.notifyBulkDeleted('Raw Materials', ids.length, req.user);
   invalidateDashboardCache();
   res.json({ message: `${ids.length} material(s) moved to recycle bin.` });
 });
