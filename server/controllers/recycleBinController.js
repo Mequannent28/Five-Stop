@@ -67,14 +67,17 @@ const restoreItem = asyncHandler(async (req, res) => {
   if (type === 'transaction') {
     const doc = await StockTransaction.findById(id);
     if (!doc) { res.status(404); throw new Error('Item not found'); }
-    // Re-apply stock
+    // Re-apply stock only if it was checked/approved/posted
     const direction = doc.type || VOUCHER_DIRECTION[doc.voucherType];
-    const items = doc.items?.length ? doc.items : [{ material: doc.material, quantity: doc.quantity }];
-    for (const item of items) {
-      const mat = await RawMaterial.findById(item.material);
-      if (mat) {
-        mat.currentStock += direction === 'in' ? item.quantity : -item.quantity;
-        await mat.save();
+    const wasApplied = ['checked', 'approved', 'posted'].includes(doc.status ?? 'pending');
+    if (wasApplied) {
+      const items = doc.items?.length ? doc.items : [{ material: doc.material, quantity: doc.quantity }];
+      for (const item of items) {
+        const mat = await RawMaterial.findById(item.material);
+        if (mat) {
+          mat.currentStock += direction === 'in' ? item.quantity : -item.quantity;
+          await mat.save();
+        }
       }
     }
     doc.deletedAt = null; doc.deletedBy = null; doc.deletedFrom = null;

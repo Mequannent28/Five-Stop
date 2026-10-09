@@ -138,10 +138,9 @@ const createTransaction = asyncHandler(async (req, res) => {
 
   const transaction = await StockTransaction.create(txnData);
 
-  for (const item of resolvedItems) {
-    item._doc.currentStock += direction === 'in' ? item.quantity : -item.quantity;
-    await item._doc.save();
-  }
+  // ⚠️ Stock is NOT applied on creation (Pending status).
+  // Stock will be applied when the transaction is CHECKED (first approval stage).
+  // This ensures pending vouchers have zero effect on the balance sheet.
 
   const populated = await StockTransaction.findById(transaction._id)
     .populate('material', 'name unit')
@@ -198,61 +197,21 @@ const updateTransaction = asyncHandler(async (req, res) => {
     throw new Error('Supplier is required for Goods Receiving Vouchers.');
   }
 
-  // 1. Temporarily revert old stock impact to test new quantities cleanly
-  const oldItems = transaction.items?.length
-    ? transaction.items
-    : (transaction.material ? [{ material: transaction.material, quantity: transaction.quantity }] : []);
+  // ⚠️ Pending transactions have NO stock impact.
+  // Editing a pending voucher only updates document fields — no stock changes needed.
 
-  for (const oldItem of oldItems) {
-    const matId = oldItem.material?._id || oldItem.material;
-    if (matId) {
-      const mat = await RawMaterial.findById(matId);
-      if (mat) {
-        mat.currentStock += oldDirection === 'in' ? -oldItem.quantity : oldItem.quantity;
-        await mat.save();
-      }
-    }
-  }
-
-  // 2. Resolve new items and check stock sufficiency
+  // Resolve new items (validate materials + compute costs only)
   const resolvedItems = [];
-  try {
-    for (const item of items) {
-      const matId = item.material?._id || item.material;
-      const mat = await RawMaterial.findById(matId);
-      if (!mat) {
-        res.status(404);
-        throw new Error(`Material not found: ${matId}`);
-      }
-      if (newDirection === 'out' && mat.currentStock < Number(item.quantity)) {
-        res.status(400);
-        throw new Error(
-          `Insufficient stock for "${mat.name}". Available: ${mat.currentStock} ${mat.unit}, requested: ${item.quantity}.`
-        );
-      }
-      const unitCost  = Number(item.unitCost) || mat.unitCost || 0;
-      const totalCost = unitCost * Number(item.quantity);
-      resolvedItems.push({ material: mat._id, quantity: Number(item.quantity), unitCost, totalCost, _doc: mat });
+  for (const item of items) {
+    const matId = item.material?._id || item.material;
+    const mat = await RawMaterial.findById(matId);
+    if (!mat) {
+      res.status(404);
+      throw new Error(`Material not found: ${matId}`);
     }
-  } catch (err) {
-    // Re-apply old stock if validation fails
-    for (const oldItem of oldItems) {
-      const matId = oldItem.material?._id || oldItem.material;
-      if (matId) {
-        const mat = await RawMaterial.findById(matId);
-        if (mat) {
-          mat.currentStock += oldDirection === 'in' ? oldItem.quantity : -oldItem.quantity;
-          await mat.save();
-        }
-      }
-    }
-    throw err;
-  }
-
-  // 3. Apply new stock adjustments
-  for (const item of resolvedItems) {
-    item._doc.currentStock += newDirection === 'in' ? item.quantity : -item.quantity;
-    await item._doc.save();
+    const unitCost  = Number(item.unitCost) || mat.unitCost || 0;
+    const totalCost = unitCost * Number(item.quantity);
+    resolvedItems.push({ material: mat._id, quantity: Number(item.quantity), unitCost, totalCost, _doc: mat });
   }
 
   // 4. Update transaction document
@@ -315,16 +274,20 @@ const deleteTransaction = asyncHandler(async (req, res) => {
 
   const direction = transaction.type || VOUCHER_DIRECTION[transaction.voucherType];
 
-  // Reverse stock impact
-  const itemsToReverse = transaction.items?.length
-    ? transaction.items
-    : [{ material: transaction.material, quantity: transaction.quantity }];
+  // Only reverse stock if it was already applied (checked / approved / posted).
+  // Pending transactions never affected stock so nothing to reverse.
+  const wasApplied = ['checked', 'approved', 'posted'].includes(transaction.status ?? 'pending');
+  if (wasApplied) {
+    const itemsToReverse = transaction.items?.length
+      ? transaction.items
+      : [{ material: transaction.material, quantity: transaction.quantity }];
 
-  for (const item of itemsToReverse) {
-    const mat = await RawMaterial.findById(item.material);
-    if (mat) {
-      mat.currentStock += direction === 'in' ? -item.quantity : item.quantity;
-      await mat.save();
+    for (const item of itemsToReverse) {
+      const mat = await RawMaterial.findById(item.material);
+      if (mat) {
+        mat.currentStock += direction === 'in' ? -item.quantity : item.quantity;
+        await mat.save();
+      }
     }
   }
 
@@ -346,14 +309,18 @@ const bulkDeleteTransactions = asyncHandler(async (req, res) => {
   const transactions = await StockTransaction.find({ _id: { $in: ids } });
   for (const transaction of transactions) {
     const direction = transaction.type || VOUCHER_DIRECTION[transaction.voucherType];
-    const items = transaction.items?.length
-      ? transaction.items
-      : [{ material: transaction.material, quantity: transaction.quantity }];
-    for (const item of items) {
-      const mat = await RawMaterial.findById(item.material);
-      if (mat) {
-        mat.currentStock += direction === 'in' ? -item.quantity : item.quantity;
-        await mat.save();
+    // Only reverse stock if it was already applied (checked/approved/posted)
+    const wasApplied = ['checked', 'approved', 'posted'].includes(transaction.status ?? 'pending');
+    if (wasApplied) {
+      const items = transaction.items?.length
+        ? transaction.items
+        : [{ material: transaction.material, quantity: transaction.quantity }];
+      for (const item of items) {
+        const mat = await RawMaterial.findById(item.material);
+        if (mat) {
+          mat.currentStock += direction === 'in' ? -item.quantity : item.quantity;
+          await mat.save();
+        }
       }
     }
     transaction.deletedAt   = new Date();
@@ -370,16 +337,19 @@ const restoreTransaction = asyncHandler(async (req, res) => {
   const transaction = await StockTransaction.findById(req.params.id);
   if (!transaction) { res.status(404); throw new Error('Transaction not found'); }
 
-  // Re-apply stock impact
+  // Re-apply stock only if it was checked/approved/posted (i.e. stock was previously applied)
   const direction = transaction.type || VOUCHER_DIRECTION[transaction.voucherType];
-  const items = transaction.items?.length
-    ? transaction.items
-    : [{ material: transaction.material, quantity: transaction.quantity }];
-  for (const item of items) {
-    const mat = await RawMaterial.findById(item.material);
-    if (mat) {
-      mat.currentStock += direction === 'in' ? item.quantity : -item.quantity;
-      await mat.save();
+  const wasApplied = ['checked', 'approved', 'posted'].includes(transaction.status ?? 'pending');
+  if (wasApplied) {
+    const items = transaction.items?.length
+      ? transaction.items
+      : [{ material: transaction.material, quantity: transaction.quantity }];
+    for (const item of items) {
+      const mat = await RawMaterial.findById(item.material);
+      if (mat) {
+        mat.currentStock += direction === 'in' ? item.quantity : -item.quantity;
+        await mat.save();
+      }
     }
   }
 
@@ -477,16 +447,38 @@ const advanceTransaction = asyncHandler(async (req, res) => {
   if (action === 'approve') { txn.approvedBy = actor._id; txn.approvedAt = new Date(); }
   if (action === 'post')    { txn.postedBy   = actor._id; txn.postedAt   = new Date(); }
 
-  if (action === 'void') {
-    const direction = txn.type || VOUCHER_DIRECTION[txn.voucherType];
-    const itemsToReverse = txn.items?.length
-      ? txn.items
-      : [{ material: txn.material, quantity: txn.quantity }];
-    for (const item of itemsToReverse) {
+  // ── STOCK IMPACT RULES ────────────────────────────────────────────
+  // CHECKED  → apply stock (first time it affects the balance sheet)
+  // APPROVED → no change (stock already applied at check)
+  // POSTED   → no change (stock already applied at check)
+  // VOIDED   → reverse stock (only if it was checked/approved/posted)
+
+  const direction = txn.type || VOUCHER_DIRECTION[txn.voucherType];
+  const stockItems = txn.items?.length
+    ? txn.items
+    : [{ material: txn.material, quantity: txn.quantity }];
+
+  if (action === 'check') {
+    // Apply stock for the first time
+    for (const item of stockItems) {
       const mat = await RawMaterial.findById(item.material);
       if (mat) {
-        mat.currentStock += direction === 'in' ? -item.quantity : item.quantity;
+        mat.currentStock += direction === 'in' ? item.quantity : -item.quantity;
         await mat.save();
+      }
+    }
+  }
+
+  if (action === 'void') {
+    // Only reverse stock if it was already applied (i.e. was checked/approved/posted)
+    const wasApplied = ['checked', 'approved', 'posted'].includes(prev);
+    if (wasApplied) {
+      for (const item of stockItems) {
+        const mat = await RawMaterial.findById(item.material);
+        if (mat) {
+          mat.currentStock += direction === 'in' ? -item.quantity : item.quantity;
+          await mat.save();
+        }
       }
     }
   }
