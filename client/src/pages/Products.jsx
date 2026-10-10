@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import ExportDropdown from '../components/ui/ExportDropdown';
+import Pagination from '../components/ui/Pagination';
 
 const emptyForm = {
   code: '',
@@ -22,6 +23,8 @@ const Products = () => {
   const [materials, setMaterials] = useState([]);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(new Set());
+  const [page, setPage]         = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -130,13 +133,11 @@ const Products = () => {
     await api.delete(`/products/${id}`);
     load();
   };
-
   const handleBulkDelete = async () => {
     if (!confirm(`Delete ${selected.size} selected product(s)? This cannot be undone.`)) return;
     await api.delete('/products/bulk', { data: { ids: [...selected] } });
     load();
   };
-
   // ── Ingredient builder ──
   const addIngredient = () =>
     setForm((f) => ({ ...f, ingredients: [...f.ingredients, { material: '', materialName: '', unit: '', quantity: 1 }] }));
@@ -179,7 +180,6 @@ const Products = () => {
     const stored = localStorage.getItem('hotelStockAuth');
     const token = stored ? JSON.parse(stored).token : '';
     const baseURL = import.meta.env.VITE_API_URL || '/api';
-
     try {
       const response = await fetch(`${baseURL}/products/import/excel`, {
         method: 'POST',
@@ -335,6 +335,13 @@ const Products = () => {
     }));
   }, [products]);
 
+  // Paginated slice for the table
+  const pagedProducts = React.useMemo(
+    () => products.slice((page - 1) * pageSize, page * pageSize),
+    [products, page, pageSize]
+  );
+  // Reset to page 1 on search
+  React.useEffect(() => { setPage(1); }, [search]);
   const pdfColumns = [
     { header: 'Code', accessor: 'Code' },
     { header: 'Product Name', accessor: 'Product Name' },
@@ -485,7 +492,8 @@ const Products = () => {
       )}
 
       {/* ── Table with inline checkboxes ── */}
-      <div className="overflow-x-auto rounded-xl border border-blue-200/70 bg-white shadow-soft">
+      <div className="overflow-hidden rounded-xl border border-blue-200/70 bg-white shadow-soft">
+        <div className="overflow-x-auto">
         <table className="min-w-full text-sm" style={{ borderCollapse: 'collapse' }}>
           <thead style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}>
             <tr>
@@ -517,7 +525,7 @@ const Products = () => {
                 </td>
               </tr>
             )}
-            {products.map((p) => (
+            {pagedProducts.map((p) => (
               <tr
                 key={p._id}
                 className={`hover:bg-ink-50/50 ${selected.has(p._id) ? 'bg-blue-50/60' : ''}`}
@@ -565,15 +573,16 @@ const Products = () => {
             ))}
           </tbody>
         </table>
+        </div>{/* end overflow-x-auto */}
 
-        {/* Selection status bar */}
-        {canEdit && products.length > 0 && (
-          <div className="border-t border-ink-100 px-4 py-2 text-xs text-ink-400">
-            {selected.size > 0
-              ? <span className="text-blue-600 font-medium">{selected.size} of {products.length} selected</span>
-              : `${products.length} product${products.length !== 1 ? 's' : ''}`}
-          </div>
-        )}
+        {/* Pagination */}
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={products.length}
+          onPage={setPage}
+          onPageSize={(s) => { setPageSize(s); setPage(1); }}
+        />
       </div>
 
       {/* ── Add / Edit Modal ── */}

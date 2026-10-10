@@ -1,11 +1,20 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import Pagination from './Pagination';
 
 const DataTable = ({
   columns,
   data,
   emptyMessage = 'No records found.',
+  defaultPageSize = 10,
 }) => {
-  const count = data.length;
+  const [page, setPage]         = useState(1);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
+
+  // Reset to page 1 when data changes (e.g. after search)
+  useEffect(() => { setPage(1); }, [data.length]);
+
+  const total     = data.length;
+  const paginated = data.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="overflow-hidden rounded-xl border border-blue-200/70 bg-white shadow-soft">
@@ -27,14 +36,14 @@ const DataTable = ({
             </tr>
           </thead>
           <tbody>
-            {data.length === 0 && (
+            {total === 0 && (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-10 text-center text-ink-400">
                   {emptyMessage}
                 </td>
               </tr>
             )}
-            {data.map((row, i) => (
+            {paginated.map((row, i) => (
               <tr
                 key={row._id || i}
                 className="hover:bg-blue-50/30 transition-colors"
@@ -51,10 +60,14 @@ const DataTable = ({
         </table>
       </div>
 
-      {/* ── Footer count ── */}
-      <div className="border-t border-ink-100 px-4 py-2 text-xs text-ink-400">
-        {count} {count === 1 ? 'record' : 'records'}
-      </div>
+      {/* ── Pagination footer ── */}
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPage={setPage}
+        onPageSize={(s) => { setPageSize(s); setPage(1); }}
+      />
     </div>
   );
 };

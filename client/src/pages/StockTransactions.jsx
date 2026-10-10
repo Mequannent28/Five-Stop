@@ -10,6 +10,7 @@ import WorkflowBadge from '../components/ui/WorkflowBadge';
 import ApproveModal, { TrailTimeline } from '../components/ui/ApproveModal';
 import ExportDropdown from '../components/ui/ExportDropdown';
 import AttachmentUploader, { AttachmentViewer } from '../components/ui/AttachmentUploader';
+import Pagination from '../components/ui/Pagination';
 import { useAuth } from '../context/AuthContext';
 
 // ── Voucher config ────────────────────────────────────────────────────
@@ -76,6 +77,13 @@ export default function StockTransactions({ defaultVoucher } = {}) {
     const mat = t.material?.name ?? t.items?.[0]?.material?.name ?? '';
     return (mat + (t.voucherNo ?? '') + (t.supplier?.name ?? '')).toLowerCase().includes(search.toLowerCase());
   });
+
+  // ── Pagination ──
+  const [page, setPage]         = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  // Reset to page 1 whenever search or filter changes
+  React.useEffect(() => { setPage(1); }, [search, filterType]);
+  const paginated = displayed.slice((page - 1) * pageSize, page * pageSize);
 
   // Export Data for Excel & CSV
   const exportData = useMemo(() => {
@@ -376,7 +384,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
             {displayed.length === 0 && (
               <tr><td colSpan={filterType ? 9 : 10} className="px-4 py-12 text-center text-ink-400">No transactions found.</td></tr>
             )}
-            {displayed.map(t => {
+            {paginated.map(t => {
               const v = voucherByKey[t.voucherType];
               const Icon = v?.icon ?? CircleArrowDown;
               const isIn = t.type === 'in';
@@ -473,9 +481,13 @@ export default function StockTransactions({ defaultVoucher } = {}) {
           </tbody>
         </table>
         </div>
-        <div className="border-t border-ink-100 px-4 py-2 text-xs text-ink-400">
-          {displayed.length} record{displayed.length !== 1 ? 's' : ''}
-        </div>
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={displayed.length}
+          onPage={setPage}
+          onPageSize={(s) => { setPageSize(s); setPage(1); }}
+        />
       </div>
 
       {/* ── Voucher Form Modal ── */}
