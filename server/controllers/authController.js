@@ -207,11 +207,8 @@ const requestOtp = asyncHandler(async (req, res) => {
   );
 
   if (!matchedSub) {
-    // Don't reveal whether the phone is registered — generic response
-    return res.json({
-      message: 'If this number is registered, an OTP has been sent.',
-      userId: null,
-    });
+    res.status(403);
+    throw new Error('This phone number is not registered or not authorized. Contact your administrator.');
   }
 
   // ── Find the system user whose phone matches ────────────────────
@@ -222,8 +219,8 @@ const requestOtp = asyncHandler(async (req, res) => {
   ] });
 
   if (!user) {
-    // Phone registered in Telegram but no matching system user — still generic response
-    return res.json({ message: 'If this number is registered, an OTP has been sent.', userId: null });
+    res.status(403);
+    throw new Error('This phone number is not linked to any active system account. Contact your administrator.');
   }
 
   // ── Generate OTP ────────────────────────────────────────────────
