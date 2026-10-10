@@ -181,72 +181,62 @@ function sendTelegramDirect(chatId, text) {
   req.end();
 }
 
-// @desc  Request OTP — sends 6-digit code to user's Telegram
+// @desc  Request OTP — sends 6-digit code to the phone-linked Telegram chat
 // @route POST /api/auth/request-otp
 // @access Public
 const requestOtp = asyncHandler(async (req, res) => {
   const { phone } = req.body;
   if (!phone) { res.status(400); throw new Error('Phone number is required'); }
 
-  // Normalize phone — strip spaces, handle both 09... and +2519...
-  const normalized = phone.replace(/\s+/g, '');
+  const normalized = phone.replace(/\s+/g, '').replace(/^00251/, '+251');
 
-  // Find user by phone (try both formats)
-  const user = await User.findOne({
-    phone: { $regex: normalized.replace(/^\+251/, '0').replace(/^0/, '(0|\\+2519)'), $options: 'i' },
-    isActive: true,
-  }) || await User.findOne({ phone: normalized, isActive: true });
+  // ── Look up the phone in the registered subscriber list ────────────
+  // Admin must have linked this phone via Settings → Telegram Subscribers.
+  const Setting = require('../models/Setting');
+  const settings = await Setting.findOne().select('telegramSubscribers').lean();
+  const subscribers = settings?.telegramSubscribers || [];
+
+  // Match by phone field (normalize both sides: treat 09x == +2519x)
+  const normalize = (p = '') =>
+    String(p).replace(/\s+/g, '')
+             .replace(/^00251/, '+251')
+             .replace(/^\+251/, '0');   // collapse to 09x for comparison
+
+  const matchedSub = subscribers.find(s =>
+    s.phone && normalize(s.phone) === normalize(normalized)
+  );
+
+  if (!matchedSub) {
+    // Don't reveal whether the phone is registered — generic response
+    return res.json({
+      message: 'If this number is registered, an OTP has been sent.',
+      userId: null,
+    });
+  }
+
+  // ── Find the system user whose phone matches ────────────────────
+  const user = await User.findOne({ isActive: true, $or: [
+    { phone: normalized },
+    { phone: normalize(normalized) },
+    { phone: { $regex: normalize(normalized).replace(/^\+/, '\\+'), $options: 'i' } },
+  ] });
 
   if (!user) {
-    // Don't reveal whether the phone exists — generic message
-    return res.json({ message: 'If this number is registered, an OTP has been sent.' });
+    // Phone registered in Telegram but no matching system user — still generic response
+    return res.json({ message: 'If this number is registered, an OTP has been sent.', userId: null });
   }
 
-  if (!user.phone) {
-    res.status(400);
-    throw new Error('This account has no phone number registered. Contact admin.');
-  }
-
-  // Generate 6-digit OTP
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  // ── Generate OTP ────────────────────────────────────────────────
+  const otp    = String(Math.floor(100000 + Math.random() * 900000));
   const expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-  // Hash OTP before storing
   const salt = await bcrypt.genSalt(10);
   user.otpHash   = await bcrypt.hash(otp, salt);
   user.otpExpiry = expiry;
   await user.save();
 
-  // Look up the user's Telegram chat ID from subscribers
-  const Setting = require('../models/Setting');
-  const settings = await Setting.findOne().select('telegramSubscribers').lean();
-  const subscribers = settings?.telegramSubscribers || [];
-
-  // Match subscriber by name similarity or just send to all? 
-  // Best approach: store chatId on the User model — but since we don't have it yet,
-  // we send to all subscribers and include the user's name so only they act on it.
-  // If the user has a chatId linked, we'd use that. For now, send to all subscribers.
-  const ENV_IDS = (process.env.TELEGRAM_CHAT_ID || '').split(',').map(s => s.trim()).filter(Boolean);
-  const allChatIds = [...new Set([
-    ...subscribers.map(s => s.chatId),
-    ...ENV_IDS,
-  ])];
-
-  // Find if this specific user has a subscriber entry matching their phone
-  // (subscriber name may match user name — best effort)
-  const userSub = subscribers.find(s =>
-    s.name?.toLowerCase().includes(user.name?.split(' ')[0]?.toLowerCase()) ||
-    ENV_IDS.includes(s.chatId)
-  );
-
-  const targetChatId = userSub?.chatId || ENV_IDS[0];
-
-  if (!targetChatId) {
-    res.status(400);
-    throw new Error('No Telegram account linked. Please message @FivestopBot first to link your account.');
-  }
-
-  sendTelegramDirect(targetChatId,
+  // ── Send OTP to the subscriber's exact Telegram chat ───────────
+  sendTelegramDirect(matchedSub.chatId,
 `🏨 <b>Five Stop Hotel</b>
 ━━━━━━━━━━━━━━━━━━━━
 🔐 <b>Login OTP Code</b>
@@ -260,11 +250,10 @@ Do not share this code with anyone.
 ━━━━━━━━━━━━━━━━━━━━`
   );
 
-  // Return masked name so frontend can show "OTP sent to [Name]"
   res.json({
     message: 'OTP sent to your Telegram.',
     maskedName: user.name.split(' ')[0] + ' ' + (user.name.split(' ')[1]?.[0] || '') + '.',
-    userId: user._id, // needed for verify step
+    userId: user._id,
   });
 });
 

@@ -141,6 +141,38 @@ const getSubscribers = asyncHandler(async (req, res) => {
   res.json(settings?.telegramSubscribers || []);
 });
 
+// ── PUT /api/telegram/subscribers/:chatId/phone (admin only) ─────
+// Register or update the phone number for a subscriber.
+// This is what links a Telegram account to an allowed OTP phone number.
+const updateSubscriberPhone = asyncHandler(async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) { res.status(400); throw new Error('Phone number is required'); }
+
+  const settings = await Setting.findOne();
+  if (!settings) { res.status(404); throw new Error('Settings not found'); }
+
+  const subscribers = settings.telegramSubscribers || [];
+  const idx = subscribers.findIndex(s => String(s.chatId) === String(req.params.chatId));
+  if (idx === -1) { res.status(404); throw new Error('Subscriber not found'); }
+
+  // Normalize phone — trim whitespace
+  const normalized = String(phone).trim();
+
+  // Check for duplicate phone
+  const duplicate = subscribers.find((s, i) => i !== idx && s.phone === normalized);
+  if (duplicate) {
+    res.status(400);
+    throw new Error(`Phone ${normalized} is already registered to ${duplicate.name}`);
+  }
+
+  subscribers[idx] = { ...subscribers[idx], phone: normalized };
+  settings.telegramSubscribers = subscribers;
+  settings.markModified('telegramSubscribers');
+  await settings.save();
+
+  res.json({ message: 'Phone registered.', subscriber: subscribers[idx] });
+});
+
 // ── DELETE /api/telegram/subscribers/:chatId (admin only) ────────
 const removeSubscriber = asyncHandler(async (req, res) => {
   const settings = await Setting.findOne();
@@ -154,4 +186,4 @@ const removeSubscriber = asyncHandler(async (req, res) => {
   res.json({ message: 'Subscriber removed.' });
 });
 
-module.exports = { handleWebhook, getSubscribers, removeSubscriber };
+module.exports = { handleWebhook, getSubscribers, updateSubscriberPhone, removeSubscriber };

@@ -123,9 +123,13 @@ export default function Settings() {
   // Telegram subscribers state (Admin)
   const [tgSubscribers,   setTgSubscribers]   = useState([]);
   const [tgLoading,       setTgLoading]       = useState(false);
-  const [tgRemoving,      setTgRemoving]      = useState(null); // chatId being removed
+  const [tgRemoving,      setTgRemoving]      = useState(null);
   const [tgSuccess,       setTgSuccess]       = useState('');
   const [tgError,         setTgError]         = useState('');
+  // Phone registration inline edit state
+  const [tgEditPhone,     setTgEditPhone]     = useState(null);  // chatId being edited
+  const [tgPhoneVal,      setTgPhoneVal]      = useState('');
+  const [tgPhoneSaving,   setTgPhoneSaving]   = useState(false);
 
   // Sync profile when user updates
   useEffect(() => {
@@ -186,6 +190,24 @@ export default function Settings() {
     } finally {
       setTgRemoving(null);
     }
+  };
+
+  // Handle phone number registration for a subscriber
+  const handleRegisterPhone = async (chatId) => {
+    if (!tgPhoneVal.trim()) return;
+    setTgPhoneSaving(true);
+    setTgError('');
+    try {
+      await api.put(`/telegram/subscribers/${chatId}/phone`, { phone: tgPhoneVal.trim() });
+      setTgSuccess('Phone number registered — this number can now receive OTP codes.');
+      setTimeout(() => setTgSuccess(''), 5000);
+      setTgEditPhone(null);
+      setTgPhoneVal('');
+      loadTgSubscribers();
+    } catch (err) {
+      setTgError(err.response?.data?.message || 'Failed to register phone.');
+    } finally {
+      setTgPhoneSaving(false); }
   };
 
   // Handle Profile Update
@@ -270,7 +292,6 @@ export default function Settings() {
       e.target.value = '';
     }
   };
-
   // Handle Remove Profile Photo
   const handleRemoveAvatar = async () => {
     if (!window.confirm('Are you sure you want to remove your profile photo?')) return;
@@ -287,7 +308,6 @@ export default function Settings() {
       setAvatarUploading(false);
     }
   };
-
   // Handle Password Update
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
@@ -300,13 +320,11 @@ export default function Settings() {
       setPasswordSaving(false);
       return;
     }
-
     if (passwordForm.newPassword.length < 6) {
       setPasswordError('New password must be at least 6 characters long.');
       setPasswordSaving(false);
       return;
     }
-
     try {
       await api.put('/auth/password', {
         currentPassword: passwordForm.currentPassword,
@@ -321,14 +339,12 @@ export default function Settings() {
       setPasswordSaving(false);
     }
   };
-
   // Handle System Settings Update
   const handleSystemSubmit = async (e) => {
     e.preventDefault();
     setSystemSaving(true);
     setSystemSuccess('');
     setSystemError('');
-
     try {
       const res = await api.put('/settings', systemForm);
       setSystemForm((prev) => ({ ...prev, ...res.data }));
@@ -462,7 +478,6 @@ export default function Settings() {
                 />
               </label>
             </div>
-
             {/* Photo Action Buttons */}
             <div className="flex items-center gap-2 mb-2">
               <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-xs hover:bg-ink-50 hover:border-ink-300 transition">
@@ -489,7 +504,6 @@ export default function Settings() {
                 </button>
               )}
             </div>
-
             <h3 className="font-display text-lg font-bold text-ink-900">{user?.name}</h3>
             <p className="text-xs text-ink-400 mt-0.5">{user?.email}</p>
 
@@ -514,7 +528,6 @@ export default function Settings() {
               </div>
             </div>
           </Card>
-
           {/* Edit Profile Form */}
           <Card className="lg:col-span-2">
             <h3 className="font-display text-base font-bold text-ink-900 mb-1">
@@ -554,7 +567,6 @@ export default function Settings() {
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-ink-700 mb-1">
                   Email Address (Login Account)
@@ -571,7 +583,6 @@ export default function Settings() {
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs font-semibold text-ink-700 mb-1">
                   Contact Phone Number
@@ -587,7 +598,6 @@ export default function Settings() {
                   />
                 </div>
               </div>
-
               <div className="pt-2 flex justify-end">
                 <Button type="submit" disabled={profileSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
                   <Save size={15} /> {profileSaving ? 'Saving…' : 'Save Changes'}
@@ -597,7 +607,6 @@ export default function Settings() {
           </Card>
         </div>
       )}
-
       {/* ── Tab 2: Security & Password ── */}
       {currentTab === 'security' && (
         <div className="max-w-2xl">
@@ -1135,8 +1144,9 @@ export default function Settings() {
           {/* How to add people */}
           <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
             <p className="font-bold mb-1">📢 How to add someone</p>
-            <p>Share this link: <strong>t.me/FivestopBot</strong></p>
-            <p className="mt-0.5 text-blue-600">They tap <strong>Start</strong> → automatically subscribed ✅</p>
+            <p>1. Share <strong>t.me/FivestopBot</strong> — they tap Start to subscribe.</p>
+            <p className="mt-0.5">2. Come back here and click <strong>"Register Phone"</strong> next to their name.</p>
+            <p className="mt-0.5 text-blue-600">Only subscribers with a registered phone can receive OTP login codes.</p>
           </div>
 
           {tgSuccess && (
@@ -1166,7 +1176,7 @@ export default function Settings() {
               <table className="min-w-full text-sm" style={{ borderCollapse: 'collapse' }}>
                 <thead style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}>
                   <tr>
-                    {['#', 'Name', 'Username', 'Subscribed At', 'Action'].map(h => (
+                    {['#', 'Name', 'Username', 'Phone (OTP)', 'Subscribed At', 'Actions'].map(h => (
                       <th key={h} className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100"
                         style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>
                         {h}
@@ -1182,7 +1192,55 @@ export default function Settings() {
                       <td className="px-4 py-3 text-xs text-blue-600">
                         {sub.username ? `@${sub.username}` : '—'}
                       </td>
-                      <td className="px-4 py-3 text-xs text-ink-400">
+
+                      {/* Phone column with inline register/edit */}
+                      <td className="px-4 py-3 min-w-[180px]">
+                        {tgEditPhone === sub.chatId ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="tel"
+                              value={tgPhoneVal}
+                              onChange={e => setTgPhoneVal(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleRegisterPhone(sub.chatId);
+                                if (e.key === 'Escape') { setTgEditPhone(null); setTgPhoneVal(''); }
+                              }}
+                              placeholder="e.g. 0918592028"
+                              autoFocus
+                              className="w-32 rounded-lg border border-blue-300 px-2 py-1 text-xs outline-none focus:border-blue-500"
+                            />
+                            <button
+                              onClick={() => handleRegisterPhone(sub.chatId)}
+                              disabled={tgPhoneSaving}
+                              className="rounded-lg bg-blue-600 hover:bg-blue-700 px-2 py-1 text-[10px] font-bold text-white transition disabled:opacity-50"
+                            >
+                              {tgPhoneSaving ? '…' : 'Save'}
+                            </button>
+                            <button
+                              onClick={() => { setTgEditPhone(null); setTgPhoneVal(''); }}
+                              className="text-ink-400 hover:text-ink-600 text-xs"
+                            >✕</button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {sub.phone ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                ✅ {sub.phone}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-ink-300 italic">Not registered</span>
+                            )}
+                            <button
+                              onClick={() => { setTgEditPhone(sub.chatId); setTgPhoneVal(sub.phone || ''); setTgError(''); }}
+                              className="text-[10px] font-semibold text-blue-500 hover:text-blue-700 hover:underline"
+                            >
+                              {sub.phone ? 'Edit' : '+ Register'}
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3 text-xs text-ink-400 whitespace-nowrap">
                         {sub.subscribedAt ? new Date(sub.subscribedAt).toLocaleString() : '—'}
                       </td>
                       <td className="px-4 py-3">
@@ -1201,6 +1259,8 @@ export default function Settings() {
               </table>
               <div className="border-t border-ink-100 px-4 py-2 text-xs text-ink-400">
                 {tgSubscribers.length} subscriber{tgSubscribers.length !== 1 ? 's' : ''} total
+                {' · '}
+                {tgSubscribers.filter(s => s.phone).length} with registered phone
               </div>
             </div>
           )}
