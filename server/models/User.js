@@ -14,6 +14,9 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, trim: true, default: '' },
     avatar: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
+    // OTP fields for 2-step login
+    otpHash:   { type: String, default: null },
+    otpExpiry: { type: Date,   default: null },
   },
   { timestamps: true }
 );

@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Phone, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
 
 /* ─── role quick-fill data ─────────────────────────────────────── */
 const ROLES = [
@@ -91,7 +92,19 @@ const FloatingInput = React.forwardRef(function FloatingInput({
    Login page
 ═══════════════════════════════════════════════════════════════════ */
 export default function Login() {
-  const [email,    setEmail]    = useState('admin@hotel.com');
+  // ── OTP gate state ──────────────────────────────────────────
+  const [step,       setStep]       = useState('phone');  // 'phone' | 'otp' | 'login'
+  const [phone,      setPhone]      = useState('');
+  const [otp,        setOtp]        = useState('');
+  const [otpToken,   setOtpToken]   = useState('');       // short-lived JWT after OTP verified
+  const [userId,     setUserId]     = useState('');
+  const [maskedName, setMaskedName] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError,   setOtpError]   = useState('');
+  const [resendTimer, setResendTimer] = useState(0);       // countdown seconds
+
+  // ── Login form state ────────────────────────────────────────
+  const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [showPw,   setShowPw]   = useState(false);
   const [touched,  setTouched]  = useState({ email: false, password: false });
@@ -103,6 +116,56 @@ export default function Login() {
   const navigate     = useNavigate();
   const location     = useLocation();
   const passwordRef  = useRef(null);
+  const otpRefs      = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
+
+  // ── Resend countdown ────────────────────────────────────────
+  React.useEffect(() => {
+    if (resendTimer <= 0) return;
+    const t = setTimeout(() => setResendTimer(r => r - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendTimer]);
+
+  // ── Step 1: Request OTP ─────────────────────────────────────
+  const handleRequestOtp = async (e) => {
+    e.preventDefault();
+    if (!phone.trim()) { setOtpError('Please enter your phone number.'); return; }
+    setOtpLoading(true); setOtpError('');
+    try {
+      const res = await api.post('/auth/request-otp', { phone: phone.trim() });
+      setUserId(res.data.userId || '');
+      setMaskedName(res.data.maskedName || '');
+      setStep('otp');
+      setResendTimer(60);
+    } catch (err) {
+      setOtpError(err.response?.data?.message || 'Failed to send OTP. Please try again.');
+    } finally { setOtpLoading(false); }
+  };
+
+  // ── Step 2: Verify OTP ──────────────────────────────────────
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (otp.length < 6) { setOtpError('Please enter the full 6-digit OTP.'); return; }
+    setOtpLoading(true); setOtpError('');
+    try {
+      const res = await api.post('/auth/verify-otp', { userId, otp });
+      setOtpToken(res.data.otpToken);
+      setStep('login');
+      setOtp('');
+    } catch (err) {
+      setOtpError(err.response?.data?.message || 'Invalid OTP. Please try again.');
+      setOtp('');
+      otpRefs[0]?.current?.focus();
+    } finally { setOtpLoading(false); }
+  };
+
+  // Handle OTP digit box input
+  const handleOtpKey = (idx, value) => {
+    const digits = otp.split('');
+    digits[idx] = value.slice(-1);
+    const newOtp = digits.join('').slice(0, 6);
+    setOtp(newOtp);
+    if (value && idx < 5) otpRefs[idx + 1]?.current?.focus();
+  };
 
   /* validation */
   const emailErr    = touched.email    && !email.trim();
@@ -116,7 +179,7 @@ export default function Login() {
     setServerError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, otpToken);
       navigate(location.state?.from || '/', { replace: true });
     } catch (err) {
       setServerError(
@@ -552,6 +615,59 @@ export default function Login() {
           box-shadow: 0 2px 8px rgba(37,99,235,.15) !important;
         }
 
+        /* ── OTP steps ── */
+        .otp-step { animation: fadeIn .25s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+        .otp-step__title {
+          font-size: 1.4rem; font-weight: 800; color: #0f172a;
+          letter-spacing: -.025em; margin: 0 0 .3rem;
+        }
+        .otp-step__sub {
+          font-size: .8rem; color: #64748b; line-height: 1.5; margin: 0 0 1.6rem;
+        }
+        .otp-boxes {
+          display: flex; gap: .55rem; justify-content: center; margin: 1.5rem 0;
+        }
+        .otp-box {
+          width: 44px; height: 52px;
+          border: 2px solid #dbeafe; border-radius: 10px;
+          background: #f8faff; font-size: 1.4rem; font-weight: 800;
+          color: #0f172a; text-align: center;
+          outline: none; transition: border-color .18s, box-shadow .18s;
+          font-family: inherit;
+        }
+        .otp-box:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); background: #fff; }
+        .otp-resend {
+          text-align: center; font-size: .76rem; color: #64748b; margin-top: .5rem;
+        }
+        .otp-resend button {
+          color: #2563eb; font-weight: 700; background: none; border: none;
+          cursor: pointer; font-family: inherit; font-size: .76rem;
+        }
+        .otp-resend button:disabled { color: #94a3b8; cursor: default; }
+        .otp-verified-badge {
+          display: inline-flex; align-items: center; gap: .4rem;
+          background: #f0fdf4; border: 1px solid #bbf7d0;
+          color: #166534; border-radius: 999px; padding: .25rem .75rem;
+          font-size: .72rem; font-weight: 700; margin-bottom: 1.2rem;
+        }
+        .phone-input-wrap {
+          display: flex; align-items: center; gap: .5rem;
+          background: #f8faff; border: 1.5px solid #dbeafe;
+          border-radius: 10px; transition: border-color .2s, box-shadow .2s;
+          padding: 0 .9rem;
+        }
+        .phone-input-wrap:focus-within {
+          border-color: #2563eb; background: #fff;
+          box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+        }
+        .phone-input-wrap input {
+          flex: 1; border: none; outline: none; background: transparent;
+          font-size: .875rem; color: #0f172a; padding: 1.1rem 0;
+          font-family: inherit;
+        }
+
         /* ── forgot password ── */
         .login-forgot {
           margin-top: 1rem;
@@ -679,115 +795,208 @@ export default function Login() {
           <div className="login-form-wrap">
             <div className="login-form-block">
 
-              <h2 className="login-heading">Welcome back!</h2>
-              <p className="login-subtext">
-                Sign in with the credentials from Store Management or IT Administration.
-              </p>
+              {/* ══ STEP 1: Phone number ══ */}
+              {step === 'phone' && (
+                <div className="otp-step">
+                  <h2 className="otp-step__title">Verify your identity</h2>
+                  <p className="otp-step__sub">
+                    Enter your registered phone number. We'll send a one-time code to your Telegram.
+                  </p>
 
-              {/* session timeout notice */}
-              {location.state?.sessionExpired && !serverError && (
-                <div className="login-timeout-banner" role="alert">
-                  <strong>Session timeout —</strong> You were automatically signed out after{' '}
-                  {location.state?.timeoutMinutes || 2} minutes of inactivity. Please sign in again.
-                </div>
-              )}
-
-              {/* server error */}
-              {serverError && (
-                <div className="login-server-error" role="alert">
-                  <span aria-hidden="true">⚠</span>
-                  <span>{serverError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} noValidate>
-
-                {/* email */}
-                <FloatingInput
-                  id="login-email"
-                  label="Email / Institutional ID"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="username"
-                  required
-                  hasError={emailErr}
-                  errorMsg="Enter your email or institutional ID."
-                />
-
-                {/* password */}
-                <FloatingInput
-                  ref={passwordRef}
-                  id="login-password"
-                  label="Password"
-                  type={showPw ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  required
-                  hasError={passwordErr}
-                  errorMsg="Enter your password."
-                  suffix={
-                    <button
-                      type="button"
-                      onClick={() => setShowPw((v) => !v)}
-                      aria-label={showPw ? 'Hide password' : 'Show password'}
-                    >
-                      {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
-                    </button>
-                  }
-                />
-
-                {/* submit */}
-                <button
-                  id="login-submit"
-                  type="submit"
-                  disabled={loading}
-                  className="login-btn-primary"
-                  aria-busy={loading}
-                >
-                  {loading ? (
-                    <>
-                      <span className="login-spinner" aria-hidden="true" />
-                      Signing in…
-                    </>
-                  ) : (
-                    'Sign in'
+                  {otpError && (
+                    <div className="login-server-error" role="alert">
+                      <span aria-hidden="true">⚠</span><span>{otpError}</span>
+                    </div>
                   )}
-                </button>
-              </form>
 
-              {/* role switcher */}
-              <div className="login-divider" aria-hidden="true">or sign in as</div>
-              <div
-                className="login-roles"
-                role="group"
-                aria-label="Quick role switcher"
-              >
-                {ROLES.map((r) => (
-                  <button
-                    key={r.label}
-                    type="button"
-                    onClick={() => handleQuickFill(r)}
-                    className={[
-                      'login-role-btn',
-                      activeRole === r.label ? 'login-role-btn--active' : '',
-                    ].join(' ')}
-                    aria-pressed={activeRole === r.label}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+                  <form onSubmit={handleRequestOtp}>
+                    <label style={{ fontSize: '.7rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: '.4rem' }}>
+                      Phone Number
+                    </label>
+                    <div className="phone-input-wrap">
+                      <Phone size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={e => { setPhone(e.target.value); setOtpError(''); }}
+                        placeholder="e.g. 0918592028 or +251918592028"
+                        autoComplete="tel"
+                        required
+                      />
+                    </div>
 
-              {/* forgot password */}
-              <p className="login-forgot">
-                Forgot your password?{' '}
-                <span role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && undefined}>
-                  Reset credentials
-                </span>
-              </p>
+                    <button
+                      type="submit"
+                      disabled={otpLoading}
+                      className="login-btn-primary"
+                      style={{ marginTop: '1.2rem' }}
+                    >
+                      {otpLoading ? (
+                        <><span className="login-spinner" aria-hidden="true" />Sending OTP…</>
+                      ) : (
+                        <>Send OTP via Telegram <ArrowRight size={16} /></>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              )}
 
+              {/* ══ STEP 2: Enter OTP ══ */}
+              {step === 'otp' && (
+                <div className="otp-step">
+                  <h2 className="otp-step__title">Enter OTP</h2>
+                  <p className="otp-step__sub">
+                    A 6-digit code was sent to <strong>{maskedName ? maskedName + "'s" : 'your'}</strong> Telegram.{' '}
+                    Check <strong>@FivestopBot</strong> and enter the code below.
+                  </p>
+
+                  {otpError && (
+                    <div className="login-server-error" role="alert">
+                      <span aria-hidden="true">⚠</span><span>{otpError}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleVerifyOtp}>
+                    <div className="otp-boxes">
+                      {[0,1,2,3,4,5].map(idx => (
+                        <input
+                          key={idx}
+                          ref={otpRefs[idx]}
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={1}
+                          value={otp[idx] || ''}
+                          onChange={e => handleOtpKey(idx, e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Backspace' && !otp[idx] && idx > 0) {
+                              otpRefs[idx - 1]?.current?.focus();
+                            }
+                          }}
+                          onPaste={e => {
+                            const text = e.clipboardData.getData('text').replace(/\D/g,'').slice(0,6);
+                            if (text) { setOtp(text); setTimeout(() => otpRefs[Math.min(text.length, 5)]?.current?.focus(), 0); }
+                            e.preventDefault();
+                          }}
+                          className="otp-box"
+                          autoFocus={idx === 0}
+                          aria-label={`OTP digit ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={otpLoading || otp.length < 6}
+                      className="login-btn-primary"
+                    >
+                      {otpLoading ? (
+                        <><span className="login-spinner" aria-hidden="true" />Verifying…</>
+                      ) : 'Verify Code'}
+                    </button>
+                  </form>
+
+                  <div className="otp-resend">
+                    {resendTimer > 0
+                      ? <span>Resend in {resendTimer}s</span>
+                      : <><span>Didn't receive it? </span>
+                          <button type="button" onClick={() => { setStep('phone'); setOtp(''); setOtpError(''); }}>
+                            Go back & resend
+                          </button>
+                        </>
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* ══ STEP 3: Email + Password login ══ */}
+              {step === 'login' && (
+                <div className="otp-step">
+
+                  {/* OTP verified badge */}
+                  <div className="otp-verified-badge">
+                    ✅ Phone verified — sign in to continue
+                  </div>
+
+                  <h2 className="login-heading">Welcome back!</h2>
+                  <p className="login-subtext">
+                    Sign in with the credentials from Store Management or IT Administration.
+                  </p>
+
+                  {/* session timeout notice */}
+                  {location.state?.sessionExpired && !serverError && (
+                    <div className="login-timeout-banner" role="alert">
+                      <strong>Session timeout —</strong> You were automatically signed out after{' '}
+                      {location.state?.timeoutMinutes || 2} minutes of inactivity. Please sign in again.
+                    </div>
+                  )}
+
+                  {serverError && (
+                    <div className="login-server-error" role="alert">
+                      <span aria-hidden="true">⚠</span>
+                      <span>{serverError}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSubmit} noValidate>
+                    <FloatingInput
+                      id="login-email"
+                      label="Email / Institutional ID"
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      autoComplete="username"
+                      required
+                      hasError={touched.email && !email.trim()}
+                      errorMsg="Enter your email or institutional ID."
+                    />
+                    <FloatingInput
+                      ref={passwordRef}
+                      id="login-password"
+                      label="Password"
+                      type={showPw ? 'text' : 'password'}
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      autoComplete="current-password"
+                      required
+                      hasError={touched.password && !password}
+                      errorMsg="Enter your password."
+                      suffix={
+                        <button type="button" onClick={() => setShowPw(v => !v)}
+                          aria-label={showPw ? 'Hide password' : 'Show password'}>
+                          {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+                        </button>
+                      }
+                    />
+
+                    <button
+                      id="login-submit" type="submit" disabled={loading}
+                      className="login-btn-primary" aria-busy={loading}
+                    >
+                      {loading ? (
+                        <><span className="login-spinner" aria-hidden="true" />Signing in…</>
+                      ) : 'Sign in'}
+                    </button>
+                  </form>
+
+                  {/* role switcher */}
+                  <div className="login-divider" aria-hidden="true">or sign in as</div>
+                  <div className="login-roles" role="group" aria-label="Quick role switcher">
+                    {ROLES.map(r => (
+                      <button key={r.label} type="button"
+                        onClick={() => handleQuickFill(r)}
+                        className={['login-role-btn', activeRole === r.label ? 'login-role-btn--active' : ''].join(' ')}
+                        aria-pressed={activeRole === r.label}>
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="login-forgot">
+                    Forgot your password?{' '}
+                    <span role="button" tabIndex={0}>Reset credentials</span>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

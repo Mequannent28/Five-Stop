@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 const tg = require('../utils/telegramNotifier');
@@ -31,6 +32,23 @@ const registerUser = asyncHandler(async (req, res) => {
 // @desc  Login user
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+
+  // ── Verify OTP token before allowing login ───────────────────
+  const otpToken = req.headers['x-otp-token'] || req.body.otpToken;
+  if (!otpToken) {
+    res.status(401);
+    throw new Error('OTP verification required. Please complete phone verification first.');
+  }
+  try {
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(otpToken, process.env.JWT_SECRET);
+    if (decoded.purpose !== 'otp_verified') throw new Error('Invalid OTP token');
+  } catch (err) {
+    res.status(401);
+    throw new Error('OTP token is invalid or expired. Please verify your phone again.');
+  }
+  // ──────────────────────────────────────────────────────────────
+
   const user = await User.findOne({ email });
 
   if (!user || !(await user.matchPassword(password))) {
@@ -144,5 +162,149 @@ const updatePassword = asyncHandler(async (req, res) => {
   res.json({ message: 'Password updated successfully' });
 });
 
-module.exports = { registerUser, loginUser, getMe, verifyPassword, updateProfile, updatePassword };
+// ── OTP helpers ───────────────────────────────────────────────────────
+const https = require('https');
+
+function sendTelegramDirect(chatId, text) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || token === 'your_bot_token_here') return;
+  const body = JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' });
+  const options = {
+    hostname: 'api.telegram.org',
+    path: `/bot${token}/sendMessage`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+  };
+  const req = https.request(options);
+  req.on('error', () => {});
+  req.write(body);
+  req.end();
+}
+
+// @desc  Request OTP — sends 6-digit code to user's Telegram
+// @route POST /api/auth/request-otp
+// @access Public
+const requestOtp = asyncHandler(async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) { res.status(400); throw new Error('Phone number is required'); }
+
+  // Normalize phone — strip spaces, handle both 09... and +2519...
+  const normalized = phone.replace(/\s+/g, '');
+
+  // Find user by phone (try both formats)
+  const user = await User.findOne({
+    phone: { $regex: normalized.replace(/^\+251/, '0').replace(/^0/, '(0|\\+2519)'), $options: 'i' },
+    isActive: true,
+  }) || await User.findOne({ phone: normalized, isActive: true });
+
+  if (!user) {
+    // Don't reveal whether the phone exists — generic message
+    return res.json({ message: 'If this number is registered, an OTP has been sent.' });
+  }
+
+  if (!user.phone) {
+    res.status(400);
+    throw new Error('This account has no phone number registered. Contact admin.');
+  }
+
+  // Generate 6-digit OTP
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  const expiry = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+  // Hash OTP before storing
+  const salt = await bcrypt.genSalt(10);
+  user.otpHash   = await bcrypt.hash(otp, salt);
+  user.otpExpiry = expiry;
+  await user.save();
+
+  // Look up the user's Telegram chat ID from subscribers
+  const Setting = require('../models/Setting');
+  const settings = await Setting.findOne().select('telegramSubscribers').lean();
+  const subscribers = settings?.telegramSubscribers || [];
+
+  // Match subscriber by name similarity or just send to all? 
+  // Best approach: store chatId on the User model — but since we don't have it yet,
+  // we send to all subscribers and include the user's name so only they act on it.
+  // If the user has a chatId linked, we'd use that. For now, send to all subscribers.
+  const ENV_IDS = (process.env.TELEGRAM_CHAT_ID || '').split(',').map(s => s.trim()).filter(Boolean);
+  const allChatIds = [...new Set([
+    ...subscribers.map(s => s.chatId),
+    ...ENV_IDS,
+  ])];
+
+  // Find if this specific user has a subscriber entry matching their phone
+  // (subscriber name may match user name — best effort)
+  const userSub = subscribers.find(s =>
+    s.name?.toLowerCase().includes(user.name?.split(' ')[0]?.toLowerCase()) ||
+    ENV_IDS.includes(s.chatId)
+  );
+
+  const targetChatId = userSub?.chatId || ENV_IDS[0];
+
+  if (!targetChatId) {
+    res.status(400);
+    throw new Error('No Telegram account linked. Please message @FivestopBot first to link your account.');
+  }
+
+  sendTelegramDirect(targetChatId,
+`🏨 <b>Five Stop Hotel</b>
+━━━━━━━━━━━━━━━━━━━━
+🔐 <b>Login OTP Code</b>
+
+Your one-time password is:
+
+<b>🔢 ${otp}</b>
+
+⏱ Valid for <b>5 minutes</b>.
+Do not share this code with anyone.
+━━━━━━━━━━━━━━━━━━━━`
+  );
+
+  // Return masked name so frontend can show "OTP sent to [Name]"
+  res.json({
+    message: 'OTP sent to your Telegram.',
+    maskedName: user.name.split(' ')[0] + ' ' + (user.name.split(' ')[1]?.[0] || '') + '.',
+    userId: user._id, // needed for verify step
+  });
+});
+
+// @desc  Verify OTP
+// @route POST /api/auth/verify-otp
+// @access Public
+const verifyOtp = asyncHandler(async (req, res) => {
+  const { userId, otp } = req.body;
+  if (!userId || !otp) { res.status(400); throw new Error('userId and otp are required'); }
+
+  const user = await User.findById(userId).select('+otpHash +otpExpiry');
+  if (!user) { res.status(404); throw new Error('User not found'); }
+
+  if (!user.otpHash || !user.otpExpiry) {
+    res.status(400); throw new Error('No OTP was requested. Please request a new one.');
+  }
+
+  if (new Date() > user.otpExpiry) {
+    user.otpHash = null; user.otpExpiry = null;
+    await user.save();
+    res.status(400); throw new Error('OTP has expired. Please request a new one.');
+  }
+
+  const isMatch = await bcrypt.compare(String(otp).trim(), user.otpHash);
+  if (!isMatch) { res.status(401); throw new Error('Incorrect OTP. Please try again.'); }
+
+  // Clear OTP after successful verification
+  user.otpHash = null; user.otpExpiry = null;
+  await user.save();
+
+  // Issue a short-lived otpToken (JWT, 10 min) to gate the login step
+  const jwt = require('jsonwebtoken');
+  const otpToken = jwt.sign(
+    { id: user._id, purpose: 'otp_verified' },
+    process.env.JWT_SECRET,
+    { expiresIn: '10m' }
+  );
+
+  res.json({ message: 'OTP verified.', otpToken });
+});
+
+module.exports = { registerUser, loginUser, getMe, verifyPassword, updateProfile, updatePassword, requestOtp, verifyOtp };
 

@@ -83,8 +83,10 @@ export const AuthProvider = ({ children }) => {
     init();
   }, [fetchPermissions]);
 
-  const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
+  const login = async (email, password, otpToken) => {
+    const { data } = await api.post('/auth/login', { email, password }, {
+      headers: { 'x-otp-token': otpToken || '' },
+    });
     localStorage.setItem('hotelStockAuth', JSON.stringify(data));
     setUser(data);
     // Fetch authoritative settings right after login — no stale cache possible
