@@ -69,16 +69,21 @@ export default function Consumption() {
   // Pagination
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [loadError, setLoadError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const params = {};
       if (filterCat) params.category = filterCat;
       const res = await api.get('/consumption', { params });
-      setRecords(res.data);
+      setRecords(Array.isArray(res.data) ? res.data : []);
       setPage(1);
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error('Consumption load error:', err);
+      setLoadError(err.response?.data?.message || err.message || 'Failed to load records.');
+    }
     finally { setLoading(false); }
   }, [filterCat]);
 
@@ -261,6 +266,14 @@ export default function Consumption() {
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
+
+      {/* ── Load error ── */}
+      {loadError && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          ⚠ {loadError}
+          <button onClick={() => setLoadError('')} className="ml-auto text-red-400 hover:text-red-700"><X size={14} /></button>
+        </div>
+      )}
 
       {/* ── Table ── */}
       <div className="overflow-hidden rounded-xl border border-blue-200/70 bg-white shadow-soft">

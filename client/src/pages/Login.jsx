@@ -819,7 +819,7 @@ export default function Login() {
                         type="tel"
                         value={phone}
                         onChange={e => { setPhone(e.target.value); setOtpError(''); }}
-                        placeholder="e.g. 0918592028 or +251918592028"
+                        placeholder="e.g. 0911192xxx or +2517012xxx"
                         autoComplete="tel"
                         required
                       />
