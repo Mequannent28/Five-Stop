@@ -49,7 +49,7 @@ const getConsumptions = asyncHandler(async (req, res) => {
     .sort({ date: -1 });
 
   // Filter out soft-deleted records in JS (handles null, undefined, and missing field)
-  const active = records.filter(r => !r.deletedAt);
+  const active = (records || []).filter(r => !r.deletedAt);
   res.json(active);
 });
 

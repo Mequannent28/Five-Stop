@@ -78,7 +78,8 @@ export default function Consumption() {
       const params = {};
       if (filterCat) params.category = filterCat;
       const res = await api.get('/consumption', { params });
-      setRecords(Array.isArray(res.data) ? res.data : []);
+      const data = res.data;
+      setRecords(Array.isArray(data) ? data : []);
       setPage(1);
     } catch (err) {
       console.error('Consumption load error:', err);
@@ -92,9 +93,10 @@ export default function Consumption() {
 
   /* ── filtered + paginated ── */
   const filtered = useMemo(() => {
-    if (!search) return records;
+    const safe = Array.isArray(records) ? records : [];
+    if (!search) return safe;
     const q = search.toLowerCase();
-    return records.filter(r =>
+    return safe.filter(r =>
       r.voucherNo?.toLowerCase().includes(q) ||
       r.beneficiary?.toLowerCase().includes(q) ||
       r.department?.toLowerCase().includes(q)
@@ -178,7 +180,7 @@ export default function Consumption() {
   };
 
   /* ── export data ── */
-  const exportData = useMemo(() => records.map(r => ({
+  const exportData = useMemo(() => (Array.isArray(records) ? records : []).map(r => ({
     'Voucher No':    r.voucherNo || '—',
     'Date':          new Date(r.date).toLocaleDateString(),
     'Category':      catByKey[r.category]?.label || r.category,
