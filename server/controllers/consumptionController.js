@@ -84,7 +84,7 @@ const createConsumption = asyncHandler(async (req, res) => {
       .populate('ingredients.material', 'name unit unitCost');
     if (!product) { res.status(404); throw new Error(`Product not found: ${item.product}`); }
 
-    const recipeCost = product.ingredients.reduce((sum, ing) =>
+    const recipeCost = (product.ingredients || []).reduce((sum, ing) =>
       sum + (ing.material?.unitCost ?? 0) * ing.quantity, 0);
     const totalCost = recipeCost * Number(item.quantity);
     totalRecipeCost += totalCost;
@@ -257,7 +257,7 @@ const getConsumptionSummary = asyncHandler(async (req, res) => {
   res.json({
     year: y,
     month: m,
-    totalCost:    records.reduce((s, r) => s + (r.totalRecipeCost || 0), 0),
+    totalCost:    (records || []).reduce((s, r) => s + (r.totalRecipeCost || 0), 0),
     totalRecords: records.length,
     byCategory:   summary,
   });
