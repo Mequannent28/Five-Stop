@@ -173,6 +173,9 @@ const addSubscriber = asyncHandler(async (req, res) => {
 
   res.status(201).json({ message: 'Subscriber added.', subscriber: newSub });
 });
+
+// ── GET /api/telegram/subscribers (admin only) ───────────────────
+const getSubscribers = asyncHandler(async (req, res) => {
   const settings = await Setting.findOne();
   res.json(settings?.telegramSubscribers || []);
 });
