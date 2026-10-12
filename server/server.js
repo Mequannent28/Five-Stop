@@ -96,7 +96,37 @@ const PORT = process.env.PORT || 5000;
 
 // Listen on port unless we are in Vercel's serverless environment
 if (!process.env.VERCEL) {
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+
+    // ── Keep-alive ping every 10 minutes ──────────────────────────
+    // Prevents free-tier hosting (Aletcloud, Render) from sleeping.
+    // Only runs if a PUBLIC_URL env var is set (set it in Aletcloud
+    // to your server URL, e.g. https://five-stop.app.aletcloud.com)
+    const publicUrl = process.env.PUBLIC_URL;
+    if (publicUrl) {
+      const https = require('https');
+      const http  = require('http');
+      const INTERVAL = 10 * 60 * 1000; // 10 minutes
+
+      setInterval(() => {
+        try {
+          const url = new URL(`${publicUrl}/api/health`);
+          const lib = url.protocol === 'https:' ? https : http;
+          lib.get(url.toString(), (res) => {
+            console.log(`[KEEP-ALIVE] Pinged ${url.toString()} — status ${res.statusCode}`);
+            res.resume();
+          }).on('error', (err) => {
+            console.warn('[KEEP-ALIVE] Ping failed:', err.message);
+          });
+        } catch (err) {
+          console.warn('[KEEP-ALIVE] Invalid PUBLIC_URL:', err.message);
+        }
+      }, INTERVAL);
+
+      console.log(`[KEEP-ALIVE] Server ping active every 10 min → ${publicUrl}/api/health`);
+    }
+  });
 }
 
 module.exports = app;
