@@ -32,7 +32,8 @@ async function applyConsumptionStock(items, reverse = false) {
 // ── GET /api/consumption ──────────────────────────────────────────
 const getConsumptions = asyncHandler(async (req, res) => {
   const { category, status, from, to } = req.query;
-  const filter = { $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] };
+  // No deletedAt filter in DB query — filter in JS to handle all storage variants
+  const filter = {};
   if (category) filter.category = category;
   if (status)   filter.status   = status;
   if (from || to) {
@@ -47,7 +48,9 @@ const getConsumptions = asyncHandler(async (req, res) => {
     .populate('approvedBy', 'name')
     .sort({ date: -1 });
 
-  res.json(records);
+  // Filter out soft-deleted records in JS (handles null, undefined, and missing field)
+  const active = records.filter(r => !r.deletedAt);
+  res.json(active);
 });
 
 // ── GET /api/consumption/:id ──────────────────────────────────────
