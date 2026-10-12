@@ -32,7 +32,7 @@ async function applyConsumptionStock(items, reverse = false) {
 // ── GET /api/consumption ──────────────────────────────────────────
 const getConsumptions = asyncHandler(async (req, res) => {
   const { category, status, from, to } = req.query;
-  const filter = { deletedAt: { $in: [null, undefined] } };
+  const filter = { $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] };
   if (category) filter.category = category;
   if (status)   filter.status   = status;
   if (from || to) {
@@ -235,9 +235,9 @@ const getConsumptionSummary = asyncHandler(async (req, res) => {
   const to   = new Date(y, m, 0, 23, 59, 59);
 
   const records = await Consumption.find({
-    deletedAt: { $in: [null, undefined] },
-    status:    'approved',
-    date:      { $gte: from, $lte: to },
+    $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+    status: 'approved',
+    date:   { $gte: from, $lte: to },
   });
 
   const summary = {};
