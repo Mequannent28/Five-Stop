@@ -217,16 +217,36 @@ const requestOtp = asyncHandler(async (req, res) => {
     throw new Error('This phone number is not registered or not authorized. Contact your administrator.');
   }
 
-  // ── Find the system user whose phone matches ─────────────────────
-  const user = await User.findOne({ isActive: true, $or: [
-    { phone: normalized },
-    { phone: normalize(normalized) },
-    { phone: { $regex: normalize(normalized).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
-  ] });
+  // ── Find the system user whose phone matches (optional) ─────────
+  // If no system user has this phone, we still send the OTP to Telegram.
+  // The OTP proves the person owns the registered Telegram — the login
+  // form will verify their system credentials (email + password).
+  // We store the OTP hash on the admin account as a temporary token.
+  const phoneVariants = [
+    normalize(normalized),
+    normalize(normalized).replace(/^0/, '+2519'),
+    normalized,
+  ];
+
+  let user = null;
+  for (const v of phoneVariants) {
+    user = await User.findOne({ isActive: true, phone: v });
+    if (user) break;
+  }
+  if (!user) {
+    const escaped = normalize(normalized).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    user = await User.findOne({ isActive: true, phone: { $regex: escaped, $options: 'i' } });
+  }
+
+  // If no user found by phone, use any admin account to store the OTP token
+  // (the OTP is a gate — actual credentials verified at login step)
+  if (!user) {
+    user = await User.findOne({ isActive: true, role: 'admin' });
+  }
 
   if (!user) {
-    res.status(403);
-    throw new Error('This phone number is not linked to any active system account. Contact your administrator.');
+    res.status(500);
+    throw new Error('No active system account found. Contact your administrator.');
   }
 
   // ── Generate OTP ─────────────────────────────────────────────────
@@ -255,7 +275,9 @@ Do not share this code with anyone.
 
   res.json({
     message: 'OTP sent to your Telegram.',
-    maskedName: user.name.split(' ')[0] + ' ' + (user.name.split(' ')[1]?.[0] || '') + '.',
+    maskedName: matchedSub.name
+      ? matchedSub.name.split(' ')[0] + ' ' + (matchedSub.name.split(' ')[1]?.[0] || '') + '.'
+      : 'User',
     userId: user._id,
   });
 });

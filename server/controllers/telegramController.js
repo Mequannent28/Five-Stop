@@ -135,8 +135,44 @@ Available commands:
   );
 });
 
-// ── GET /api/telegram/subscribers (admin only) ───────────────────
-const getSubscribers = asyncHandler(async (req, res) => {
+// ── POST /api/telegram/subscribers (admin only) ──────────────────
+// Manually add a subscriber with name + phone (no bot interaction needed).
+// chatId is optional — if provided, they also get bot notifications.
+const addSubscriber = asyncHandler(async (req, res) => {
+  const { name, phone, username, chatId } = req.body;
+  if (!name || !phone) { res.status(400); throw new Error('Name and phone are required'); }
+
+  let settings = await Setting.findOne();
+  if (!settings) settings = new Setting();
+
+  const subscribers = settings.telegramSubscribers || [];
+
+  // Check duplicate phone
+  const dupPhone = subscribers.find(s => s.phone && s.phone.trim() === phone.trim());
+  if (dupPhone) { res.status(400); throw new Error(`Phone ${phone} is already registered to ${dupPhone.name}`); }
+
+  // Check duplicate chatId (if provided)
+  if (chatId) {
+    const dupChat = subscribers.find(s => String(s.chatId) === String(chatId));
+    if (dupChat) { res.status(400); throw new Error(`Chat ID already registered to ${dupChat.name}`); }
+  }
+
+  const newSub = {
+    chatId:       chatId ? String(chatId) : null,
+    name:         name.trim(),
+    username:     username ? username.trim().replace(/^@/, '') : '',
+    phone:        phone.trim(),
+    subscribedAt: new Date(),
+    manuallyAdded: true,
+  };
+
+  subscribers.push(newSub);
+  settings.telegramSubscribers = subscribers;
+  settings.markModified('telegramSubscribers');
+  await settings.save();
+
+  res.status(201).json({ message: 'Subscriber added.', subscriber: newSub });
+});
   const settings = await Setting.findOne();
   res.json(settings?.telegramSubscribers || []);
 });
@@ -186,4 +222,4 @@ const removeSubscriber = asyncHandler(async (req, res) => {
   res.json({ message: 'Subscriber removed.' });
 });
 
-module.exports = { handleWebhook, getSubscribers, updateSubscriberPhone, removeSubscriber };
+module.exports = { handleWebhook, getSubscribers, addSubscriber, updateSubscriberPhone, removeSubscriber };

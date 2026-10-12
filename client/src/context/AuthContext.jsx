@@ -146,7 +146,6 @@ export const AuthProvider = ({ children }) => {
     }
     return await fetchPermissions();
   };
-
   return (
     <AuthContext.Provider
       value={{

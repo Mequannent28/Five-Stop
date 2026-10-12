@@ -130,6 +130,10 @@ export default function Settings() {
   const [tgEditPhone,     setTgEditPhone]     = useState(null);  // chatId being edited
   const [tgPhoneVal,      setTgPhoneVal]      = useState('');
   const [tgPhoneSaving,   setTgPhoneSaving]   = useState(false);
+  // Manual add subscriber modal
+  const [tgAddOpen,       setTgAddOpen]       = useState(false);
+  const [tgAddForm,       setTgAddForm]       = useState({ name: '', phone: '', username: '', chatId: '' });
+  const [tgAddSaving,     setTgAddSaving]     = useState(false);
 
   // Sync profile when user updates
   useEffect(() => {
@@ -208,6 +212,25 @@ export default function Settings() {
       setTgError(err.response?.data?.message || 'Failed to register phone.');
     } finally {
       setTgPhoneSaving(false); }
+  };
+
+  // Handle manually adding a new subscriber
+  const handleAddSubscriber = async (e) => {
+    e.preventDefault();
+    setTgAddSaving(true);
+    setTgError('');
+    try {
+      await api.post('/telegram/subscribers', tgAddForm);
+      setTgSuccess(`"${tgAddForm.name}" added successfully.`);
+      setTimeout(() => setTgSuccess(''), 4000);
+      setTgAddOpen(false);
+      setTgAddForm({ name: '', phone: '', username: '', chatId: '' });
+      loadTgSubscribers();
+    } catch (err) {
+      setTgError(err.response?.data?.message || 'Failed to add subscriber.');
+    } finally {
+      setTgAddSaving(false);
+    }
   };
 
   // Handle Profile Update
@@ -1139,6 +1162,12 @@ export default function Settings() {
             >
               {tgLoading ? 'Loading…' : '↻ Refresh'}
             </button>
+            <button
+              onClick={() => { setTgAddOpen(true); setTgError(''); }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white transition"
+            >
+              + Add Manually
+            </button>
           </div>
 
           {/* How to add people */}
@@ -1261,6 +1290,73 @@ export default function Settings() {
                 {tgSubscribers.length} subscriber{tgSubscribers.length !== 1 ? 's' : ''} total
                 {' · '}
                 {tgSubscribers.filter(s => s.phone).length} with registered phone
+              </div>
+            </div>
+          )}
+
+          {/* ── Add Subscriber Modal ── */}
+          {tgAddOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+              <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
+                  <h3 className="font-bold text-ink-900">Add Subscriber Manually</h3>
+                  <button onClick={() => setTgAddOpen(false)} className="text-ink-400 hover:text-ink-700 text-lg font-bold">✕</button>
+                </div>
+                <form onSubmit={handleAddSubscriber} className="p-5 space-y-3">
+                  <p className="text-xs text-ink-500 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                    Add a person who hasn't messaged the bot yet. They can still receive OTP codes if their phone is registered. To also receive system notifications, they need to message <strong>@FivestopBot</strong>.
+                  </p>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-ink-700 mb-1">Full Name *</label>
+                    <input required value={tgAddForm.name}
+                      onChange={e => setTgAddForm(f => ({...f, name: e.target.value}))}
+                      placeholder="e.g. Anteneh Bekele"
+                      className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-ink-700 mb-1">Phone Number * <span className="text-blue-600">(used for OTP login)</span></label>
+                    <input required type="tel" value={tgAddForm.phone}
+                      onChange={e => setTgAddForm(f => ({...f, phone: e.target.value}))}
+                      placeholder="e.g. 0911000000"
+                      className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-ink-700 mb-1">Telegram Username <span className="text-ink-400">(optional, without @)</span></label>
+                    <input value={tgAddForm.username}
+                      onChange={e => setTgAddForm(f => ({...f, username: e.target.value.replace(/^@/,'')}))}
+                      placeholder="e.g. anteneh21"
+                      className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-ink-700 mb-1">Telegram Chat ID <span className="text-ink-400">(optional — needed for notifications)</span></label>
+                    <input value={tgAddForm.chatId}
+                      onChange={e => setTgAddForm(f => ({...f, chatId: e.target.value}))}
+                      placeholder="e.g. 1234567890"
+                      className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                    <p className="mt-1 text-[10px] text-ink-400">To get their Chat ID: have them message @FivestopBot, then you'll see them appear in this list with their ID.</p>
+                  </div>
+
+                  {tgError && (
+                    <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-600">
+                      ⚠ {tgError}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button type="button" onClick={() => setTgAddOpen(false)}
+                      className="rounded-lg border border-ink-200 px-4 py-2 text-xs font-semibold text-ink-600 hover:bg-ink-50 transition">
+                      Cancel
+                    </button>
+                    <button type="submit" disabled={tgAddSaving}
+                      className="rounded-lg bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white transition disabled:opacity-50">
+                      {tgAddSaving ? 'Adding…' : 'Add Subscriber'}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
