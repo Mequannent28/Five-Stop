@@ -14,6 +14,7 @@ import Settings from './pages/Settings';
 import SalesImport from './pages/SalesImport';
 import Analytics from './pages/Analytics';
 import RecycleBin from './pages/RecycleBin';
+import Consumption from './pages/Consumption';
 import ErrorBoundary from './components/ErrorBoundary';
 import { SessionTimeoutProvider } from './context/SessionTimeoutContext';
 import SessionTimeoutModal from './components/common/SessionTimeoutModal';
@@ -83,6 +84,14 @@ function App() {
         />
         <Route path="/settings" element={<Settings />} />
         <Route path="/profile" element={<Settings />} />
+        <Route
+          path="/consumption"
+          element={
+            <ProtectedRoute>
+              <Consumption />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/recycle-bin"
           element={

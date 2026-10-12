@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight,
   ShoppingBag, CreditCard, Leaf, TrendingUp, Flame, TrendingDown,
   BarChart2, Calendar, PackageOpen, Settings as SettingsIcon, UploadCloud,
-  Scale, ClipboardList, Trash2,
+  Scale, ClipboardList, Trash2, Coffee,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -165,6 +165,13 @@ const Sidebar = ({ open, onClose }) => {
           {canSeeNav('suppliers') && (
             <NavLink to="/suppliers" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
               <Truck size={18} strokeWidth={2} /> Suppliers
+            </NavLink>
+          )}
+
+          {/* Consumption Management */}
+          {canSeeNav('consumption') && (
+            <NavLink to="/consumption" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
+              <Coffee size={18} strokeWidth={2} /> Consumption
             </NavLink>
           )}
 

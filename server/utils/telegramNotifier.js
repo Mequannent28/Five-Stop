@@ -579,6 +579,74 @@ ${varLines}
   );
 }
 
+// ── CONSUMPTION ───────────────────────────────────────────────────
+
+const CATEGORY_EMOJI = {
+  staff_meal:          '🍽️',
+  guest_entertainment: '🎉',
+  owner_management:    '👔',
+  training_event:      '📚',
+  complimentary:       '🎁',
+  other:               '📝',
+};
+
+const CATEGORY_LABELS_TG = {
+  staff_meal:          'Staff Meal',
+  guest_entertainment: 'Guest Entertainment',
+  owner_management:    'Owner / Management',
+  training_event:      'Training & Events',
+  complimentary:       'Complimentary',
+  other:               'Other',
+};
+
+function notifyConsumptionCreated(record, user) {
+  const emoji = CATEGORY_EMOJI[record.category] || '🍽️';
+  const label = CATEGORY_LABELS_TG[record.category] || record.category;
+  const items = (record.items || []).map(i =>
+    `  • ${i.product?.name || '—'} × <b>${i.quantity}</b>`
+  ).join('\n');
+
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+${emoji} <b>NEW CONSUMPTION RECORD</b>
+
+🔖 <b>Voucher:</b>     ${record.voucherNo || '—'}
+🗂 <b>Category:</b>    ${label}
+👥 <b>Beneficiary:</b> ${record.beneficiary || '—'} (${record.pax || 1} pax)
+🏢 <b>Department:</b>  ${record.department || '—'}
+💰 <b>Recipe Cost:</b> ${etb(record.totalRecipeCost)}
+📋 <b>Status:</b>      PENDING (awaiting approval)
+
+🛒 <b>Items:</b>
+${items || '  —'}
+
+👤 <b>Recorded by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>        ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyConsumptionApproved(record, user) {
+  const emoji = CATEGORY_EMOJI[record.category] || '🍽️';
+  const label = CATEGORY_LABELS_TG[record.category] || record.category;
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+✅ <b>CONSUMPTION APPROVED</b>
+
+${emoji} <b>Category:</b>    ${label}
+🔖 <b>Voucher:</b>     ${record.voucherNo || '—'}
+👥 <b>Beneficiary:</b> ${record.beneficiary || '—'} (${record.pax || 1} pax)
+💰 <b>Recipe Cost:</b> ${etb(record.totalRecipeCost)}
+📦 <b>Stock has been deducted.</b>
+
+👤 <b>Approved by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>        ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────
 module.exports = {
   notifyLogin,
@@ -605,4 +673,6 @@ module.exports = {
   notifyBinEmptied,
   notifyInventoryCountSubmitted,
   notifyInventoryCountApproved,
+  notifyConsumptionCreated,
+  notifyConsumptionApproved,
 };

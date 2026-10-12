@@ -76,6 +76,7 @@ app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/inventory-count', require('./routes/inventoryCountRoutes'));
 app.use('/api/recycle-bin',    require('./routes/recycleBinRoutes'));
 app.use('/api/telegram',      require('./routes/telegramRoutes'));
+app.use('/api/consumption',   require('./routes/consumptionRoutes'));
 
 // Serve Frontend in production (for Aletcloud, Render, etc.)
 if (process.env.NODE_ENV === 'production') {
