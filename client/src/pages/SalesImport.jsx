@@ -363,43 +363,65 @@ export default function SalesImport() {
   return (
     <div className="space-y-6 pb-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-ink-900 flex items-center gap-2.5">
-          <UploadCloud className="h-7 w-7 text-blue-600" />
-          Import POS Sales Report
-        </h1>
-        <p className="text-sm text-ink-500 mt-1">
-          Upload your POS Excel report. Matched items automatically deduct ingredients/stock and record revenue and Gross Profit.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink-900 flex items-center gap-2.5">
+            <UploadCloud className="h-7 w-7 text-blue-600" />
+            POS Sales Import
+          </h1>
+          <p className="text-sm text-ink-500 mt-1">
+            Matched items automatically deduct stock via recipes and record revenue &amp; Gross Profit.
+          </p>
+        </div>
       </div>
 
       <Card>
 
         {/* ── 1. Upload Zone (no file yet) ── */}
         {!fileData && !result?.success && (
-          <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-ink-200 rounded-2xl bg-ink-50/70">
-            <div className="h-16 w-16 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600 mb-4 shadow-xs">
-              <UploadCloud size={32} />
-            </div>
-            <p className="text-base font-bold text-ink-900">Upload Sales Report (Excel / CSV)</p>
-            <p className="text-xs text-ink-500 mt-1 mb-2 text-center max-w-md">
-              Supports <span className="font-semibold text-ink-700">.xlsx, .xls, .csv</span> files exported from your POS.
-              Includes product names, codes, quantities sold, and default prices/revenue.
-            </p>
-            <p className="text-[11px] text-blue-700 font-semibold mb-5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
-              ✦ NOBIR / CNET POS format auto-detected — no column mapping needed
-            </p>
-            <label className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 transition">
-              <UploadCloud size={16} /> Select POS File
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            {/* Card A — Upload Excel */}
+            <label className="group cursor-pointer relative overflow-hidden rounded-2xl border-2 border-dashed border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 hover:border-blue-400 hover:shadow-lg transition-all duration-200 p-8 flex flex-col items-center text-center">
               <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
+              <div className="h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white mb-4 shadow-md group-hover:scale-105 transition-transform">
+                <UploadCloud size={28} />
+              </div>
+              <p className="text-base font-extrabold text-ink-900 mb-1">Upload POS File</p>
+              <p className="text-xs text-ink-500 mb-3 leading-relaxed">
+                Drop your <span className="font-semibold text-ink-700">.xlsx / .xls / .csv</span> POS export here.<br />
+                NOBIR / CNET format auto-detected.
+              </p>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 text-white px-5 py-2 text-xs font-bold shadow group-hover:bg-blue-700 transition">
+                <UploadCloud size={13} /> Select POS File
+              </span>
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-blue-100 border border-blue-200 text-blue-700 text-[10px] font-semibold px-2.5 py-0.5">
+                <Zap size={10} /> No column mapping needed
+              </span>
             </label>
+
+            {/* Card B — Manual Entry */}
             <button
               type="button"
               onClick={openManual}
-              className="inline-flex items-center gap-2 rounded-xl border-2 border-blue-300 bg-white px-6 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-50 transition"
+              className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 hover:border-emerald-400 hover:shadow-lg transition-all duration-200 p-8 flex flex-col items-center text-center"
             >
-              <PenLine size={16} /> Enter Sales Manually
+              <div className="h-14 w-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white mb-4 shadow-md group-hover:scale-105 transition-transform">
+                <PenLine size={26} />
+              </div>
+              <p className="text-base font-extrabold text-ink-900 mb-1">Enter Sales Manually</p>
+              <p className="text-xs text-ink-500 mb-3 leading-relaxed">
+                Type in article codes, names, quantities<br />
+                and amounts — same POS format.
+              </p>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 text-white px-5 py-2 text-xs font-bold shadow group-hover:bg-emerald-700 transition">
+                <PenLine size={13} /> Open Entry Form
+              </span>
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-700 text-[10px] font-semibold px-2.5 py-0.5">
+                ✦ Great for testing or corrections
+              </span>
             </button>
+
           </div>
         )}
 
