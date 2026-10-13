@@ -32,9 +32,9 @@ productSchema.index({ name: 1 });
 productSchema.index({ category: 1 });
 
 productSchema.virtual('recipeCost').get(function () {
-  return this.ingredients.reduce((sum, ing) => {
+  return (this.ingredients || []).reduce((sum, ing) => {
     const unitCost = ing.material?.unitCost ?? 0;
-    return sum + unitCost * ing.quantity;
+    return sum + unitCost * (ing.quantity || 0);
   }, 0);
 });
 

@@ -140,7 +140,7 @@ const updateConsumption = asyncHandler(async (req, res) => {
       const product = await Product.findById(item.product)
         .populate('ingredients.material', 'name unit unitCost');
       if (!product) { res.status(404); throw new Error(`Product not found: ${item.product}`); }
-      const recipeCost = product.ingredients.reduce((s, ing) =>
+      const recipeCost = (product.ingredients || []).reduce((s, ing) =>
         s + (ing.material?.unitCost ?? 0) * ing.quantity, 0);
       const totalCost = recipeCost * Number(item.quantity);
       totalRecipeCost += totalCost;
