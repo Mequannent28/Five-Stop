@@ -22,7 +22,7 @@ const greeting = () => {
   return 'Good evening';
 };
 
-const Topbar = ({ onMenuClick, title }) => {
+const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
   const { user, logout, hasRole } = useAuth();
   const { timeoutMinutes, setTimeoutMinutes, remainingSeconds } = useSessionTimeout();
   const navigate = useNavigate();
@@ -58,9 +58,18 @@ const Topbar = ({ onMenuClick, title }) => {
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between border-b border-ink-100 bg-white/90 px-4 py-3.5 backdrop-blur sm:px-8">
       <div className="flex items-center gap-3">
+        {/* Mobile: opens overlay sidebar */}
         <button
           onClick={onMenuClick}
           className="rounded-md p-1.5 text-ink-500 hover:bg-ink-50 lg:hidden"
+        >
+          <Menu size={22} />
+        </button>
+        {/* Desktop: collapses/expands sidebar */}
+        <button
+          onClick={onToggleCollapse}
+          className="hidden lg:flex items-center justify-center rounded-md p-1.5 text-ink-500 hover:bg-ink-100 transition"
+          title="Toggle sidebar"
         >
           <Menu size={22} />
         </button>

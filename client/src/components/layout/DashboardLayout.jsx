@@ -32,20 +32,32 @@ const titles = {
   '/reports/stock-levels': 'Stock Levels Report',
   '/reports/purchases': 'Purchases Report',
   '/users': 'Staff Accounts',
+  '/employees': 'Employee Management',
+  '/consumption': 'Consumption Management',
   '/settings': 'System Settings',
   '/profile': 'User Profile',
+  '/recycle-bin': 'Recycle Bin',
 };
 
 const DashboardLayout = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen,      setSidebarOpen]      = useState(false);  // mobile overlay
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);  // desktop collapse
   const location = useLocation();
   const title = titles[location.pathname] || 'Nobir Trading Plc Stock';
 
   return (
     <div className="flex h-screen overflow-hidden bg-ink-50">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+      />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} title={title} />
+        <Topbar
+          onMenuClick={() => setSidebarOpen(true)}
+          onToggleCollapse={() => setSidebarCollapsed(c => !c)}
+          title={title}
+        />
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 flex flex-col justify-between">
           <div>
             <Outlet />
