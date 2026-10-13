@@ -20,8 +20,8 @@ const itemName = (item) =>
   item.name || item.voucherNo || `${item._typeLabel} #${item._id?.slice(-6)}`;
 
 export default function RecycleBin() {
-  const { hasRole } = useAuth();
-  const isAdmin = hasRole('admin');
+  const { hasRole, can } = useAuth();
+  const isAdmin = hasRole('admin') || hasRole('manager') || can('voidTransactions');
 
   const [items,     setItems]     = useState([]);
   const [loading,   setLoading]   = useState(true);
