@@ -78,18 +78,23 @@ export default function Consumption() {
       const params = {};
       if (filterCat) params.category = filterCat;
       const res = await api.get('/consumption', { params });
+      console.log('[Consumption] API response:', typeof res.data, JSON.stringify(res.data)?.slice(0, 200));
       const data = res.data;
       setRecords(Array.isArray(data) ? data : []);
       setPage(1);
     } catch (err) {
-      console.error('Consumption load error:', err);
+      console.error('[Consumption] Load error:', err);
       setLoadError(err.response?.data?.message || err.message || 'Failed to load records.');
     }
     finally { setLoading(false); }
   }, [filterCat]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { api.get('/products').then(r => setProducts(r.data)); }, []);
+  useEffect(() => {
+    api.get('/products')
+      .then(r => setProducts(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setProducts([]));
+  }, []);
 
   /* ── filtered + paginated ── */
   const filtered = useMemo(() => {

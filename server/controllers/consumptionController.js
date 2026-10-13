@@ -46,7 +46,8 @@ const getConsumptions = asyncHandler(async (req, res) => {
     .populate('items.product', 'name code uom')
     .populate('performedBy', 'name')
     .populate('approvedBy', 'name')
-    .sort({ date: -1 });
+    .sort({ date: -1 })
+    .lean();
 
   // Filter out soft-deleted records in JS (handles null, undefined, and missing field)
   const active = (records || []).filter(r => !r.deletedAt);
@@ -59,7 +60,8 @@ const getConsumptionById = asyncHandler(async (req, res) => {
     .populate({ path: 'items.product', populate: { path: 'ingredients.material', select: 'name unit unitCost' } })
     .populate('performedBy', 'name role')
     .populate('approvedBy', 'name role')
-    .populate('trail.by', 'name');
+    .populate('trail.by', 'name')
+    .lean();
   if (!record) { res.status(404); throw new Error('Consumption record not found'); }
   res.json(record);
 });
@@ -116,7 +118,8 @@ const createConsumption = asyncHandler(async (req, res) => {
 
   const populated = await Consumption.findById(record._id)
     .populate('items.product', 'name code uom')
-    .populate('performedBy', 'name');
+    .populate('performedBy', 'name')
+    .lean();
 
   invalidateDashboardCache();
   tg.notifyConsumptionCreated(populated, req.user);
@@ -160,7 +163,8 @@ const updateConsumption = asyncHandler(async (req, res) => {
   await record.save();
   const populated = await Consumption.findById(record._id)
     .populate('items.product', 'name code uom')
-    .populate('performedBy', 'name');
+    .populate('performedBy', 'name')
+    .lean();
 
   invalidateDashboardCache();
   res.json(populated);
@@ -186,7 +190,8 @@ const approveConsumption = asyncHandler(async (req, res) => {
 
   const populated = await Consumption.findById(record._id)
     .populate('items.product', 'name code uom')
-    .populate('performedBy approvedBy', 'name');
+    .populate('performedBy approvedBy', 'name')
+    .lean();
 
   invalidateDashboardCache();
   tg.notifyConsumptionApproved(populated, req.user);
