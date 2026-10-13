@@ -152,7 +152,6 @@ const createTransaction = asyncHandler(async (req, res) => {
   tg.notifyTransaction(populated, req.user);
   res.status(201).json(populated);
 });
-
 // ── PUT /api/transactions/:id ─────────────────────────────────────────
 const updateTransaction = asyncHandler(async (req, res) => {
   const transaction = await StockTransaction.findById(req.params.id);
@@ -165,7 +164,6 @@ const updateTransaction = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error(`Cannot edit transaction in "${transaction.status}" status. Only pending transactions can be edited.`);
   }
-
   const {
     voucherType = transaction.voucherType,
     voucherNo,
@@ -546,33 +544,47 @@ const importSales = asyncHandler(async (req, res) => {
     const price = Number(unitPrice) || 0;
     const lineIngredients = [];
 
-    // 1. Try to find in Product by code or name
+    // 1. Try to find in Product by code or name (isActive only)
     let product = null;
     if (codeStr) {
-      product = await Product.findOne({ code: new RegExp(`^${escapeRegex(codeStr)}$`, 'i') })
-        .populate('ingredients.material');
+      // Match exact code OR code with trailing dashes (e.g. stored as "P-0001-")
+      const escapedCode = escapeRegex(codeStr);
+      product = await Product.findOne({
+        isActive: true,
+        code: { $regex: `^${escapedCode}-*$`, $options: 'i' },
+      }).populate({ path: 'ingredients.material', model: 'RawMaterial' });
     }
     if (!product && nameStr) {
-      product = await Product.findOne({ name: new RegExp(`^${escapeRegex(nameStr)}$`, 'i') })
-        .populate('ingredients.material');
-    }
-    // Fallback: check if code matches name or vice-versa
-    if (!product && (codeStr || nameStr)) {
-      const term = (nameStr || codeStr);
       product = await Product.findOne({
+        isActive: true,
+        name: new RegExp(`^${escapeRegex(nameStr)}$`, 'i'),
+      }).populate({ path: 'ingredients.material', model: 'RawMaterial' });
+    }
+    // Fallback: partial match — code contains the term or name contains the term
+    if (!product && (codeStr || nameStr)) {
+      const term = escapeRegex(codeStr || nameStr);
+      product = await Product.findOne({
+        isActive: true,
         $or: [
-          { code: new RegExp(`^${escapeRegex(term)}$`, 'i') },
-          { name: new RegExp(`^${escapeRegex(term)}$`, 'i') },
-        ]
-      }).populate('ingredients.material');
+          { code: { $regex: `^${term}-*$`, $options: 'i' } },
+          { name: { $regex: `^${term}$`,   $options: 'i' } },
+        ],
+      }).populate({ path: 'ingredients.material', model: 'RawMaterial' });
     }
 
     if (product) {
       let cogs = 0;
-      const hasRecipe = product.ingredients && product.ingredients.length > 0;
+      // Re-fetch ingredients with explicit populate to ensure materials load
+      // even if the shorthand populate silently missed them
+      const ingList = product.ingredients || [];
+      const hasRecipe = ingList.length > 0;
       if (hasRecipe) {
-        for (const ing of product.ingredients) {
-          const mat = ing.material;
+        for (const ing of ingList) {
+          // ing.material is populated; if null, fetch manually by ID
+          let mat = ing.material;
+          if (!mat && ing._doc?.material) {
+            mat = await RawMaterial.findById(ing._doc.material).lean();
+          }
           if (!mat) continue;
           const matId     = mat._id.toString();
           const deductQty = ing.quantity * qty;
@@ -609,7 +621,7 @@ const importSales = asyncHandler(async (req, res) => {
         revenue:         lineRev,
         cogs,
         grossProfit:     lineRev - cogs,
-        matchStatus:     hasRecipe ? 'recipe_deducted' : 'no_recipe',
+        matchStatus:     (hasRecipe && lineIngredients.length > 0) ? 'recipe_deducted' : (hasRecipe ? 'no_recipe' : 'no_recipe'),
         ingredientsUsed: lineIngredients,
       };
 

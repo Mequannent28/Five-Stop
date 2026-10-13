@@ -145,25 +145,50 @@ export default function SalesImport() {
     setManualRows(rows => rows.map(r => {
       if (r._id !== id) return r;
       const updated = { ...r, [field]: value };
-      // If user picks a product from dropdown, auto-fill code + name + avgAmt
-      if (field === '_productId') {
-        const prod = products.find(p => p._id === value);
+
+      // When name is typed/selected from datalist, try to find matching product
+      if (field === 'name') {
+        const prod = products.find(p =>
+          p.name.toLowerCase() === value.toLowerCase() ||
+          (p.code && p.code.toLowerCase() === value.toLowerCase())
+        );
         if (prod) {
-          updated.code    = prod.code || '';
-          updated.name    = prod.name;
+          updated.code    = prod.code || updated.code;
           updated.avgAmt  = prod.sellingPrice || 0;
-          updated.totalAmt = (prod.sellingPrice || 0) * (updated.qty || 1);
+          updated.totalAmt = (prod.sellingPrice || 0) * (parseFloat(updated.qty) || 1);
         }
       }
+
       // Auto-calc totalAmt when qty or avgAmt changes
       if (field === 'qty' || field === 'avgAmt') {
         updated.totalAmt = parseFloat(updated.avgAmt || 0) * parseFloat(updated.qty || 0);
       }
-      if (field === 'totalAmt') {
-        // allow manual override
-      }
+      // totalAmt can be manually overridden — no side effects
       return updated;
     }));
+  };
+
+  // Lookup product by code on blur of the code field — fills name + price
+  const handleCodeBlur = (id, codeValue) => {
+    if (!codeValue) return;
+    const norm = codeValue.trim().replace(/-+$/, '').toLowerCase();
+    const prod = products.find(p => {
+      const pc = (p.code || '').replace(/-+$/, '').toLowerCase();
+      return pc === norm;
+    });
+    if (prod) {
+      setManualRows(rows => rows.map(r => {
+        if (r._id !== id) return r;
+        const qty = parseFloat(r.qty) || 1;
+        return {
+          ...r,
+          code:     prod.code || codeValue,
+          name:     r.name || prod.name,
+          avgAmt:   prod.sellingPrice || 0,
+          totalAmt: (prod.sellingPrice || 0) * qty,
+        };
+      }));
+    }
   };
 
   const addManualRow    = () => setManualRows(rows => [...rows, emptyRow()]);
@@ -886,6 +911,7 @@ export default function SalesImport() {
                       {/* Code */}
                       <input value={row.code}
                         onChange={e => updateManualRow(row._id, 'code', e.target.value)}
+                        onBlur={e => handleCodeBlur(row._id, e.target.value)}
                         placeholder="P-0022"
                         className="rounded-lg border border-ink-200 px-2 py-2 text-xs outline-none focus:border-blue-500 font-mono" />
 
