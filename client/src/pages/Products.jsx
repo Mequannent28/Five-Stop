@@ -30,6 +30,8 @@ const Products = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [importProgress, setImportProgress] = useState(null); // { percent, current, total, created, updated, skipped }
   const [recipeImportResult, setRecipeImportResult] = useState(null);
@@ -71,7 +73,7 @@ const Products = () => {
   
 
   // ── CRUD ──
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setModalOpen(true); };
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setFormError(''); setModalOpen(true); };
 
   // Auto-generate next sequential P-XXXX code
   const generateCode = () => {
@@ -109,6 +111,34 @@ const Products = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError(''); setSaving(true);
+
+    // Client-side duplicate code check
+    const trimCode = (form.code || '').trim().replace(/-+$/, '').toLowerCase();
+    if (trimCode) {
+      const conflict = products.find(p => {
+        if (editing && p._id === editing._id) return false;
+        return (p.code || '').replace(/-+$/, '').toLowerCase() === trimCode;
+      });
+      if (conflict) {
+        setFormError(`Code "${form.code}" is already used by "${conflict.name}". Choose a different code.`);
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Client-side duplicate name check
+    const trimName = (form.name || '').trim().toLowerCase();
+    const nameConflict = products.find(p => {
+      if (editing && p._id === editing._id) return false;
+      return p.name.trim().toLowerCase() === trimName;
+    });
+    if (nameConflict) {
+      setFormError(`A product named "${form.name.trim()}" already exists (Code: ${nameConflict.code || 'no code'}). Use a different name.`);
+      setSaving(false);
+      return;
+    }
+
     const payload = {
       code: form.code,
       name: form.name,
@@ -119,13 +149,17 @@ const Products = () => {
       sellingPrice: form.sellingPrice,
       ingredients: form.ingredients.map(({ material, quantity }) => ({ material, quantity })),
     };
-    if (editing) {
-      await api.put(`/products/${editing._id}`, payload);
-    } else {
-      await api.post('/products', payload);
-    }
-    setModalOpen(false);
-    load();
+    try {
+      if (editing) {
+        await api.put(`/products/${editing._id}`, payload);
+      } else {
+        await api.post('/products', payload);
+      }
+      setModalOpen(false);
+      load();
+    } catch (err) {
+      setFormError(err.response?.data?.message || 'Failed to save product.');
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async (id) => {
@@ -699,10 +733,15 @@ const Products = () => {
             )}
           </div>
 
+          {formError && (
+            <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2.5 text-xs text-red-700">
+              <span className="shrink-0">⚠</span> {formError}
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button type="submit" style={{ background: 'linear-gradient(135deg,#1a56db,#0d2d80)', color: 'white' }}>
-              {editing ? 'Save changes' : 'Add product'}
+            <Button type="submit" disabled={saving} style={{ background: 'linear-gradient(135deg,#1a56db,#0d2d80)', color: 'white', opacity: saving ? 0.6 : 1 }}>
+              {saving ? 'Saving…' : (editing ? 'Save changes' : 'Add product')}
             </Button>
           </div>
         </form>

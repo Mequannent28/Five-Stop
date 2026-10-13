@@ -27,7 +27,7 @@ const productSchema = new mongoose.Schema(
 );
 
 productSchema.index({ isActive: 1, createdAt: -1 });
-productSchema.index({ code: 1 });
+productSchema.index({ code: 1, isActive: 1 }, { sparse: true });
 productSchema.index({ name: 1 });
 productSchema.index({ category: 1 });
 

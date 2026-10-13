@@ -37,8 +37,34 @@ const getProductById = asyncHandler(async (req, res) => {
 
 // POST /api/products
 const createProduct = asyncHandler(async (req, res) => {
-  const { name, category, description, sellingPrice, ingredients, code } = req.body;
-  const product = await Product.create({ code, name, category, description, sellingPrice, ingredients });
+  const { name, category, description, sellingPrice, ingredients, code, uom, parentCategory } = req.body;
+
+  if (!name?.trim()) { res.status(400); throw new Error('Product name is required.'); }
+
+  // Duplicate code check (only if a non-empty code was provided)
+  const trimmedCode = (code || '').trim();
+  if (trimmedCode) {
+    const existing = await Product.findOne({
+      code: { $regex: `^${trimmedCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-*$`, $options: 'i' },
+      isActive: true,
+    });
+    if (existing) {
+      res.status(400);
+      throw new Error(`Product code "${trimmedCode}" is already used by "${existing.name}". Please use a different code.`);
+    }
+  }
+
+  // Duplicate name check
+  const existingName = await Product.findOne({
+    name: { $regex: `^${name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+    isActive: true,
+  });
+  if (existingName) {
+    res.status(400);
+    throw new Error(`A product named "${name.trim()}" already exists (Code: ${existingName.code || 'no code'}). Use a different name.`);
+  }
+
+  const product = await Product.create({ code: trimmedCode, name: name.trim(), category, parentCategory, uom, description, sellingPrice, ingredients });
   const populated = await product.populate('ingredients.material', 'name unit unitCost');
   tg.notifyProductCreated(populated, req.user);
   invalidateDashboardCache();
@@ -51,17 +77,48 @@ const updateProduct = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
   if (!product) { res.status(404); throw new Error('Product not found'); }
 
-  const { name, category, description, sellingPrice, ingredients } = req.body;
+  const { name, category, description, sellingPrice, ingredients, code, uom, parentCategory } = req.body;
+
+  // Duplicate code check — only if code is being changed to a non-empty value
+  const trimmedCode = code !== undefined ? (code || '').trim() : null;
+  if (trimmedCode && trimmedCode !== (product.code || '').trim()) {
+    const conflict = await Product.findOne({
+      _id: { $ne: product._id },
+      code: { $regex: `^${trimmedCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-*$`, $options: 'i' },
+      isActive: true,
+    });
+    if (conflict) {
+      res.status(400);
+      throw new Error(`Product code "${trimmedCode}" is already used by "${conflict.name}". Choose a different code.`);
+    }
+  }
+
+  // Duplicate name check — only if name is being changed
+  const trimmedName = name !== undefined ? (name || '').trim() : null;
+  if (trimmedName && trimmedName.toLowerCase() !== product.name.toLowerCase()) {
+    const nameConflict = await Product.findOne({
+      _id: { $ne: product._id },
+      name: { $regex: `^${trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
+      isActive: true,
+    });
+    if (nameConflict) {
+      res.status(400);
+      throw new Error(`A product named "${trimmedName}" already exists. Use a different name.`);
+    }
+  }
 
   // Track price change before overwriting
   const oldPrice = product.sellingPrice;
   const oldIngCount = product.ingredients?.length || 0;
 
-  product.name        = name        ?? product.name;
-  product.category    = category    ?? product.category;
-  product.description = description ?? product.description;
+  if (trimmedCode !== null)   product.code          = trimmedCode;
+  if (trimmedName)            product.name          = trimmedName;
+  product.category     = category     ?? product.category;
+  product.parentCategory = parentCategory ?? product.parentCategory;
+  product.uom          = uom          ?? product.uom;
+  product.description  = description  ?? product.description;
   product.sellingPrice = sellingPrice ?? product.sellingPrice;
-  product.ingredients = ingredients ?? product.ingredients;
+  product.ingredients  = ingredients  ?? product.ingredients;
 
   const updated   = await product.save();
   const populated = await updated.populate('ingredients.material', 'name unit unitCost');
