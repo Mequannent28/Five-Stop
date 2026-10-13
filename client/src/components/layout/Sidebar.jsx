@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight,
   ShoppingBag, CreditCard, Leaf, TrendingUp, Flame, TrendingDown,
   BarChart2, Calendar, PackageOpen, Settings as SettingsIcon, UploadCloud,
-  Scale, ClipboardList, Trash2, Coffee,
+  Scale, ClipboardList, Trash2, Coffee, UserCog,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -194,6 +194,13 @@ const Sidebar = ({ open, onClose }) => {
           {canSeeNav('staffAccounts') && (
             <NavLink to="/users" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
               <Users size={18} strokeWidth={2} /> Staff Accounts
+            </NavLink>
+          )}
+
+          {/* Employees */}
+          {canSeeNav('staffAccounts') && (
+            <NavLink to="/employees" onClick={onClose} className={({ isActive }) => linkCls(isActive)}>
+              <UserCog size={18} strokeWidth={2} /> Employees
             </NavLink>
           )}
 

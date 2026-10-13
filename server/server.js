@@ -6,7 +6,6 @@ console.log('[STARTUP] NODE_ENV:', process.env.NODE_ENV);
 console.log('[STARTUP] PORT:', process.env.PORT);
 console.log('[STARTUP] MONGO_URI set:', !!process.env.MONGO_URI);
 console.log('[STARTUP] JWT_SECRET set:', !!process.env.JWT_SECRET);
-
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -14,7 +13,6 @@ const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 connectDB();
-
 // ── Auto-seed default accounts on startup ─────────────────────────────
 const autoSeed = async () => {
   try {
@@ -43,12 +41,10 @@ const autoSeed = async () => {
 autoSeed();
 
 const app = express();
-
 app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
-
 // Ensure DB is connected for serverless requests
 app.use(async (req, res, next) => {
   try {
@@ -77,6 +73,7 @@ app.use('/api/inventory-count', require('./routes/inventoryCountRoutes'));
 app.use('/api/recycle-bin',    require('./routes/recycleBinRoutes'));
 app.use('/api/telegram',      require('./routes/telegramRoutes'));
 app.use('/api/consumption',   require('./routes/consumptionRoutes'));
+app.use('/api/employees',     require('./routes/employeeRoutes'));
 
 // Serve Frontend in production (for Aletcloud, Render, etc.)
 if (process.env.NODE_ENV === 'production') {

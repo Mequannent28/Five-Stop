@@ -43,6 +43,7 @@ export default function Consumption() {
 
   const [records,   setRecords]   = useState([]);
   const [products,  setProducts]  = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [search,    setSearch]    = useState('');
   const [filterCat, setFilterCat] = useState('');
   const [loading,   setLoading]   = useState(false);
@@ -94,6 +95,9 @@ export default function Consumption() {
     api.get('/products')
       .then(r => setProducts(Array.isArray(r.data) ? r.data : []))
       .catch(() => setProducts([]));
+    api.get('/employees', { params: { status: 'active' } })
+      .then(r => setEmployees(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setEmployees([]));
   }, []);
 
   /* ── filtered + paginated ── */
@@ -420,7 +424,7 @@ export default function Consumption() {
                 const isActive = form.category === cat.key;
                 return (
                   <button key={cat.key} type="button"
-                    onClick={() => setForm(f => ({ ...f, category: cat.key }))}
+                    onClick={() => setForm(f => ({ ...f, category: cat.key, beneficiary: '' }))}
                     className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold border transition ${
                       isActive ? `${cat.activeCls} text-white border-transparent` : 'bg-white border-ink-200 text-ink-600 hover:border-blue-400'
                     }`}>
@@ -446,10 +450,33 @@ export default function Consumption() {
                 className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-ink-700 mb-1">Beneficiary / Guest Name</label>
-              <input value={form.beneficiary} placeholder="e.g. Night shift staff / Mr. John VIP"
-                onChange={e => setForm(f => ({ ...f, beneficiary: e.target.value }))}
-                className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+              <label className="block text-xs font-semibold text-ink-700 mb-1">
+                {form.category === 'staff_meal' ? 'Employee *' : 'Beneficiary / Guest Name'}
+              </label>
+              {form.category === 'staff_meal' ? (
+                <select required value={form.beneficiary}
+                  onChange={e => setForm(f => ({ ...f, beneficiary: e.target.value }))}
+                  className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500 bg-white">
+                  <option value="">Select employee…</option>
+                  {/* Group by department */}
+                  {Array.from(new Set(employees.map(e => e.department))).sort().map(dept => (
+                    <optgroup key={dept} label={dept}>
+                      {employees.filter(e => e.department === dept).map(e => (
+                        <option key={e._id} value={`${e.firstName} ${e.lastName}`}>
+                          {e.firstName} {e.lastName}{e.position ? ` — ${e.position}` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                  {employees.length === 0 && (
+                    <option disabled>No active employees found — add them in Employees page</option>
+                  )}
+                </select>
+              ) : (
+                <input value={form.beneficiary} placeholder="e.g. Mr. John VIP Guest"
+                  onChange={e => setForm(f => ({ ...f, beneficiary: e.target.value }))}
+                  className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-ink-700 mb-1">Department</label>

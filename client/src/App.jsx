@@ -15,6 +15,7 @@ import SalesImport from './pages/SalesImport';
 import Analytics from './pages/Analytics';
 import RecycleBin from './pages/RecycleBin';
 import Consumption from './pages/Consumption';
+import Employees from './pages/Employees';
 import ErrorBoundary from './components/ErrorBoundary';
 import { SessionTimeoutProvider } from './context/SessionTimeoutContext';
 import SessionTimeoutModal from './components/common/SessionTimeoutModal';
@@ -97,6 +98,14 @@ function App() {
           element={
             <ProtectedRoute roles={['admin', 'manager']}>
               <RecycleBin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employees"
+          element={
+            <ProtectedRoute>
+              <Employees />
             </ProtectedRoute>
           }
         />
