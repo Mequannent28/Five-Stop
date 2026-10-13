@@ -787,7 +787,7 @@ export default function Login() {
             </span>
             <div className="login-status" aria-live="polite">
               <span className="login-status__dot" aria-hidden="true" />
-              System online · Port 5000
+              System online
             </div>
           </div>
 
