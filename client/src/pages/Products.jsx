@@ -117,11 +117,11 @@ const Products = () => {
     e.preventDefault();
     setFormError(''); setSaving(true);
 
-    // Client-side duplicate code check
+    // Client-side duplicate code check (skip self when editing)
     const trimCode = (form.code || '').trim().replace(/-+$/, '').toLowerCase();
     if (trimCode) {
       const conflict = products.find(p => {
-        if (editing && p._id === editing._id) return false;
+        if (editing && String(p._id) === String(editing._id)) return false;
         return (p.code || '').replace(/-+$/, '').toLowerCase() === trimCode;
       });
       if (conflict) {
@@ -131,16 +131,19 @@ const Products = () => {
       }
     }
 
-    // Client-side duplicate name check
+    // Client-side duplicate name check (only when name actually changed)
     const trimName = (form.name || '').trim().toLowerCase();
-    const nameConflict = products.find(p => {
-      if (editing && p._id === editing._id) return false;
-      return p.name.trim().toLowerCase() === trimName;
-    });
-    if (nameConflict) {
-      setFormError(`A product named "${form.name.trim()}" already exists (Code: ${nameConflict.code || 'no code'}). Use a different name.`);
-      setSaving(false);
-      return;
+    const originalName = (editing?.name || '').trim().toLowerCase();
+    if (trimName !== originalName) {
+      const nameConflict = products.find(p => {
+        if (editing && String(p._id) === String(editing._id)) return false;
+        return p.name.trim().toLowerCase() === trimName;
+      });
+      if (nameConflict) {
+        setFormError(`A product named "${form.name.trim()}" already exists (Code: ${nameConflict.code || 'no code'}). Use a different name.`);
+        setSaving(false);
+        return;
+      }
     }
 
     const payload = {

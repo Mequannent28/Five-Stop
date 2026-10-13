@@ -93,9 +93,9 @@ const updateProduct = asyncHandler(async (req, res) => {
     }
   }
 
-  // Duplicate name check — only if name is being changed
+  // Duplicate name check — only if name is being changed to something different
   const trimmedName = name !== undefined ? (name || '').trim() : null;
-  if (trimmedName && trimmedName.toLowerCase() !== product.name.toLowerCase()) {
+  if (trimmedName && trimmedName.toLowerCase() !== product.name.trim().toLowerCase()) {
     const nameConflict = await Product.findOne({
       _id: { $ne: product._id },
       name: { $regex: `^${trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
