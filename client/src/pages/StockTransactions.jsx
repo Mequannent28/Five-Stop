@@ -61,15 +61,15 @@ export default function StockTransactions({ defaultVoucher } = {}) {
   const load = useCallback(() => {
     const params = filterType ? { voucherType: filterType } : {};
     api.get('/transactions', { params }).then(r => {
-      setTransactions(r.data);
+      setTransactions(Array.isArray(r.data) ? r.data : []);
       setSelected(new Set());
-    });
+    }).catch(() => setTransactions([]));
   }, [filterType]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    api.get('/materials').then(r => setMaterials(r.data));
-    api.get('/suppliers').then(r => setSuppliers(r.data));
+    api.get('/materials').then(r => setMaterials(Array.isArray(r.data) ? r.data : [])).catch(() => setMaterials([]));
+    api.get('/suppliers').then(r => setSuppliers(Array.isArray(r.data) ? r.data : [])).catch(() => setSuppliers([]));
   }, []);
 
   const displayed = transactions.filter(t => {

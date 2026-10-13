@@ -43,12 +43,16 @@ const Products = () => {
 
   const load = () =>
     api.get('/products', { params: { search } }).then((r) => {
-      setProducts(r.data);
-      setSelected(new Set()); // clear selection on reload
-    });
+      setProducts(Array.isArray(r.data) ? r.data : []);
+      setSelected(new Set());
+    }).catch(() => setProducts([]));
 
   useEffect(() => { load(); }, [search]);
-  useEffect(() => { api.get('/materials').then((r) => setMaterials(r.data)); }, []);
+  useEffect(() => {
+    api.get('/materials')
+      .then((r) => setMaterials(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setMaterials([]));
+  }, []);
 
   // ── Selection helpers ──
   const allIds = products.map((p) => p._id);
@@ -97,7 +101,7 @@ const Products = () => {
       uom: p.uom || 'Pcs',
       description: p.description,
       sellingPrice: p.sellingPrice,
-      ingredients: p.ingredients.map((ing) => ({
+      ingredients: (p.ingredients || []).map((ing) => ({
         material: ing.material?._id ?? ing.material,
         materialName: ing.material?.name ?? '',
         unit: ing.material?.unit ?? '',

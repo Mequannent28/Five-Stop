@@ -16,7 +16,9 @@ const Users = () => {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
 
-  const load = () => api.get('/users').then((res) => setUsers(res.data));
+  const load = () => api.get('/users')
+    .then((res) => setUsers(Array.isArray(res.data) ? res.data : []))
+    .catch(() => setUsers([]));
   useEffect(() => { load(); }, []);
 
   const handleSubmit = async (e) => {

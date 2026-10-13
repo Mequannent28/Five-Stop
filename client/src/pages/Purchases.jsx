@@ -57,12 +57,14 @@ export default function Purchases() {
   const [approveError,   setApproveError]   = useState(null);
 
   const load = () =>
-    api.get('/purchases').then(r => setPurchases(r.data));
+    api.get('/purchases')
+      .then(r => setPurchases(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setPurchases([]));
 
   useEffect(() => {
     load();
-    api.get('/suppliers').then(r => setSuppliers(r.data));
-    api.get('/materials').then(r => setMaterials(r.data));
+    api.get('/suppliers').then(r => setSuppliers(Array.isArray(r.data) ? r.data : [])).catch(() => setSuppliers([]));
+    api.get('/materials').then(r => setMaterials(Array.isArray(r.data) ? r.data : [])).catch(() => setMaterials([]));
   }, []);
 
   // ── Export data ──

@@ -48,9 +48,9 @@ const RawMaterials = () => {
 
   const load = () => {
     api.get('/materials', { params: { search } }).then((res) => {
-      setMaterials(res.data);
+      setMaterials(Array.isArray(res.data) ? res.data : []);
       setSelected(new Set());
-    });
+    }).catch(() => setMaterials([]));
   };
 
   useEffect(() => { load(); }, [search]);

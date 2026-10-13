@@ -20,9 +20,9 @@ const Suppliers = () => {
   const canDelete = hasRole('admin') || can('manageAccounts');
 
   const load = () => api.get('/suppliers', { params: { search } }).then(res => {
-    setSuppliers(res.data);
+    setSuppliers(Array.isArray(res.data) ? res.data : []);
     setSelected(new Set());
-  });
+  }).catch(() => setSuppliers([]));
   useEffect(() => { load(); }, [search]);
 
   /* ── selection ── */
