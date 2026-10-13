@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import api from '../api/axios';
 import Card from '../components/ui/Card';
@@ -6,8 +6,11 @@ import Button from '../components/ui/Button';
 import {
   UploadCloud, CheckCircle, AlertTriangle, ArrowRight, XCircle,
   TrendingUp, Search, Download, FileSpreadsheet, Scale, X,
-  ChevronDown, ChevronUp, Zap,
+  ChevronDown, ChevronUp, Zap, PenLine, Plus, Trash2,
 } from 'lucide-react';
+
+/* ── empty manual sale row ── */
+const emptyRow = () => ({ code: '', name: '', qty: 1, avgAmt: 0, totalAmt: 0, _id: Date.now() + Math.random() });
 
 /* ─────────────────────────────────────────────────────────────────────
    CNET / NOBIR POS Excel format detector + parser
@@ -109,6 +112,15 @@ export default function SalesImport() {
   const [loading,  setLoading]  = useState(false);
   const [result,   setResult]   = useState(null);
 
+  // Manual entry modal
+  const [manualOpen,  setManualOpen]  = useState(false);
+  const [manualRows,  setManualRows]  = useState([emptyRow()]);
+  const [manualDate,  setManualDate]  = useState(new Date().toISOString().slice(0, 10));
+  const [manualRef,   setManualRef]   = useState('');
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualError,   setManualError]   = useState('');
+  const [products,      setProducts]      = useState([]);
+
   // Result filters
   const [soldSearch,    setSoldSearch]    = useState('');
   const [statusFilter,  setStatusFilter]  = useState('all');
@@ -116,6 +128,82 @@ export default function SalesImport() {
 
   const fmt = (n) =>
     Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Load products for manual entry dropdown
+  useEffect(() => {
+    api.get('/products')
+      .then(r => setProducts(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setProducts([]));
+  }, []);
+
+  /* ── manual row helpers ── */
+  const updateManualRow = (id, field, value) => {
+    setManualRows(rows => rows.map(r => {
+      if (r._id !== id) return r;
+      const updated = { ...r, [field]: value };
+      // If user picks a product from dropdown, auto-fill code + name + avgAmt
+      if (field === '_productId') {
+        const prod = products.find(p => p._id === value);
+        if (prod) {
+          updated.code    = prod.code || '';
+          updated.name    = prod.name;
+          updated.avgAmt  = prod.sellingPrice || 0;
+          updated.totalAmt = (prod.sellingPrice || 0) * (updated.qty || 1);
+        }
+      }
+      // Auto-calc totalAmt when qty or avgAmt changes
+      if (field === 'qty' || field === 'avgAmt') {
+        updated.totalAmt = parseFloat(updated.avgAmt || 0) * parseFloat(updated.qty || 0);
+      }
+      if (field === 'totalAmt') {
+        // allow manual override
+      }
+      return updated;
+    }));
+  };
+
+  const addManualRow    = () => setManualRows(rows => [...rows, emptyRow()]);
+  const removeManualRow = (id) => setManualRows(rows => rows.length > 1 ? rows.filter(r => r._id !== id) : rows);
+
+  const openManual = () => {
+    setManualRows([emptyRow()]);
+    setManualDate(new Date().toISOString().slice(0, 10));
+    setManualRef('');
+    setManualError('');
+    setManualOpen(true);
+  };
+
+  /* ── manual submit ── */
+  const handleManualEntrySubmit = async () => {
+    const salesData = manualRows
+      .filter(r => (r.code || r.name) && r.qty > 0)
+      .map(r => ({
+        productCode: r.code.trim(),
+        productName: r.name.trim(),
+        quantity:    parseFloat(r.qty)      || 1,
+        revenue:     parseFloat(r.totalAmt) || 0,
+        unitPrice:   parseFloat(r.avgAmt)   || 0,
+      }));
+
+    if (!salesData.length) {
+      setManualError('Please add at least one product with a valid quantity.');
+      return;
+    }
+
+    setManualLoading(true); setManualError('');
+    try {
+      const res = await api.post('/transactions/import-sales', {
+        sales:     salesData,
+        notes:     `Manual Sales Entry${manualRef ? ' — ' + manualRef : ''}`,
+        reference: manualRef || `Manual Entry — ${new Date().toLocaleDateString()}`,
+        saleDate:  manualDate,
+      });
+      setManualOpen(false);
+      setResult({ success: true, data: res.data });
+    } catch (err) {
+      setManualError(err.response?.data?.message || 'Failed to submit sales.');
+    } finally { setManualLoading(false); }
+  };
 
   /* ── File upload handler ── */
   const handleFileUpload = (e) => {
@@ -301,6 +389,13 @@ export default function SalesImport() {
               <UploadCloud size={16} /> Select POS File
               <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
             </label>
+            <button
+              type="button"
+              onClick={openManual}
+              className="inline-flex items-center gap-2 rounded-xl border-2 border-blue-300 bg-white px-6 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-50 transition"
+            >
+              <PenLine size={16} /> Enter Sales Manually
+            </button>
           </div>
         )}
 
@@ -692,6 +787,170 @@ export default function SalesImport() {
         )}
 
       </Card>
+
+      {/* ══ Manual Sales Entry Modal ══ */}
+      {manualOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-ink-100">
+              <div className="flex items-center gap-2.5">
+                <span className="h-9 w-9 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                  <PenLine size={18} />
+                </span>
+                <div>
+                  <h2 className="text-base font-bold text-ink-900">Manual Sales Entry</h2>
+                  <p className="text-xs text-ink-500">Add products sold — same as POS format. Stock deducted automatically.</p>
+                </div>
+              </div>
+              <button onClick={() => setManualOpen(false)} className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+
+              {/* Date + Reference */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-ink-700 mb-1">Sale Date *</label>
+                  <input type="date" value={manualDate}
+                    onChange={e => setManualDate(e.target.value)}
+                    className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink-700 mb-1">Reference / Shift (optional)</label>
+                  <input type="text" value={manualRef} placeholder="e.g. Morning Shift, Table 5…"
+                    onChange={e => setManualRef(e.target.value)}
+                    className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                </div>
+              </div>
+
+              {/* Products table */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-ink-700">
+                    Products Sold <span className="text-red-500">*</span>
+                    <span className="ml-2 text-ink-400 font-normal">({manualRows.filter(r => r.code || r.name).length} items)</span>
+                  </label>
+                  <button type="button" onClick={addManualRow}
+                    className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition">
+                    <Plus size={12} /> Add Row
+                  </button>
+                </div>
+
+                {/* Column headers */}
+                <div className="grid gap-2 mb-1 px-1 text-[10px] font-bold text-ink-400 uppercase tracking-wider"
+                  style={{ gridTemplateColumns: '2fr 3fr 80px 110px 110px 32px' }}>
+                  <span>Article Code</span>
+                  <span>Article Name / Product</span>
+                  <span className="text-right">Qty</span>
+                  <span className="text-right">Avg Amount</span>
+                  <span className="text-right">Total Amount</span>
+                  <span />
+                </div>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {manualRows.map((row) => (
+                    <div key={row._id} className="grid gap-2 items-center"
+                      style={{ gridTemplateColumns: '2fr 3fr 80px 110px 110px 32px' }}>
+
+                      {/* Code */}
+                      <input value={row.code}
+                        onChange={e => updateManualRow(row._id, 'code', e.target.value)}
+                        placeholder="P-0022"
+                        className="rounded-lg border border-ink-200 px-2 py-2 text-xs outline-none focus:border-blue-500 font-mono" />
+
+                      {/* Name — free text OR pick from product dropdown */}
+                      <div className="relative">
+                        <input value={row.name}
+                          onChange={e => updateManualRow(row._id, 'name', e.target.value)}
+                          list={`prod-list-${row._id}`}
+                          placeholder="Select or type product name…"
+                          className="w-full rounded-lg border border-ink-200 px-2 py-2 text-xs outline-none focus:border-blue-500" />
+                        <datalist id={`prod-list-${row._id}`}>
+                          {products.map(p => (
+                            <option key={p._id} value={p.name}>{p.code ? `[${p.code}] ` : ''}{p.name}</option>
+                          ))}
+                        </datalist>
+                      </div>
+
+                      {/* Qty */}
+                      <input type="number" step="0.5" min="0.5" value={row.qty}
+                        onChange={e => updateManualRow(row._id, 'qty', e.target.value)}
+                        className="rounded-lg border border-ink-200 px-2 py-2 text-xs text-right outline-none focus:border-blue-500 tabular" />
+
+                      {/* Avg Amount */}
+                      <input type="number" step="0.01" min="0" value={row.avgAmt}
+                        onChange={e => updateManualRow(row._id, 'avgAmt', e.target.value)}
+                        placeholder="0.00"
+                        className="rounded-lg border border-ink-200 px-2 py-2 text-xs text-right outline-none focus:border-blue-500 tabular" />
+
+                      {/* Total Amount */}
+                      <input type="number" step="0.01" min="0" value={row.totalAmt}
+                        onChange={e => updateManualRow(row._id, 'totalAmt', e.target.value)}
+                        placeholder="0.00"
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-2 text-xs text-right outline-none focus:border-blue-500 tabular font-semibold text-blue-700" />
+
+                      {/* Remove */}
+                      <button type="button" onClick={() => removeManualRow(row._id)}
+                        disabled={manualRows.length === 1}
+                        className="rounded-md p-1 text-ink-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-30 transition">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Totals row */}
+                <div className="mt-3 rounded-xl bg-ink-50 border border-ink-200 px-4 py-2.5 flex items-center justify-between text-sm">
+                  <span className="text-ink-500 text-xs font-semibold">
+                    {manualRows.filter(r => r.code || r.name).length} items ·{' '}
+                    Total Qty: <strong className="text-ink-800">{manualRows.reduce((s, r) => s + (parseFloat(r.qty) || 0), 0)}</strong>
+                  </span>
+                  <span className="font-bold text-blue-700 text-base tabular">
+                    Total: ETB {fmt(manualRows.reduce((s, r) => s + (parseFloat(r.totalAmt) || 0), 0))}
+                  </span>
+                </div>
+              </div>
+
+              {/* Info */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 flex items-start gap-2">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-600" />
+                <span>
+                  Products are matched by <strong>Article Code</strong> first, then by name.
+                  Matched products deduct their recipe ingredients from stock automatically.
+                  <strong> Avg Amount</strong> = unit selling price &nbsp;|&nbsp; <strong>Total Amount</strong> = line revenue.
+                </span>
+              </div>
+
+              {manualError && (
+                <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-xs text-red-700 flex items-center gap-2">
+                  <XCircle size={13} className="shrink-0" /> {manualError}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-ink-100 bg-ink-50/50 rounded-b-2xl">
+              <button onClick={() => setManualOpen(false)}
+                className="rounded-lg border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-600 hover:bg-ink-100 transition">
+                Cancel
+              </button>
+              <button onClick={handleManualEntrySubmit} disabled={manualLoading}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-5 py-2 text-sm font-bold text-white transition">
+                {manualLoading
+                  ? 'Submitting…'
+                  : `Submit ${manualRows.filter(r => r.code || r.name).length} Sale${manualRows.filter(r => r.code || r.name).length !== 1 ? 's' : ''}`}
+                <ArrowRight size={15} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
