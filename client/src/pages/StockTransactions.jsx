@@ -275,7 +275,7 @@ export default function StockTransactions({ defaultVoucher } = {}) {
     } finally { setApproveLoading(false); }
   };
 
-  const formTotal = form?.items.reduce((s, it) => s + (Number(it.quantity)||0) * (Number(it.unitCost)||0), 0) ?? 0;
+  const formTotal = (form?.items ?? []).reduce((s, it) => s + (Number(it.quantity)||0) * (Number(it.unitCost)||0), 0);
 
   // Page heading
   const headingV = filterType ? voucherByKey[filterType] : null;

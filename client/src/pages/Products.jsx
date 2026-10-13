@@ -686,11 +686,11 @@ const Products = () => {
                 </div>
               ))}
             </div>
-            {form.ingredients.length > 0 && (
+            {(form.ingredients?.length > 0) && (
               <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-sm">
                 <span className="text-ink-500">Estimated recipe cost: </span>
                 <span className="font-semibold text-blue-700">
-                  ETB {form.ingredients.reduce((sum, ing) => {
+                  ETB {(form.ingredients || []).reduce((sum, ing) => {
                     const mat = materials.find((m) => m._id === ing.material);
                     return sum + (mat?.unitCost ?? 0) * ing.quantity;
                   }, 0).toFixed(2)}
