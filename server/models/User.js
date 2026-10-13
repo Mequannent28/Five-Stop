@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema(
       default: 'storekeeper',
     },
     phone: { type: String, trim: true, default: '' },
+    telegramChatId: { type: String, trim: true, default: '' },
     avatar: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
     // OTP fields for 2-step login

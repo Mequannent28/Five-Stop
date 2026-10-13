@@ -6,7 +6,7 @@ const tg = require('../utils/telegramNotifier');
 
 // @desc  Register a new user (admin only, in practice)
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, phone, telegramChatId } = req.body;
 
   const userExists = await User.findOne({ email });
   if (userExists) {
@@ -14,7 +14,33 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error('A user with this email already exists');
   }
 
-  const user = await User.create({ name, email, password, role });
+  const user = await User.create({
+    name, email, password, role,
+    phone: phone || '',
+    telegramChatId: telegramChatId || '',
+  });
+
+  // Auto-subscribe to Telegram if chatId provided
+  if (telegramChatId && telegramChatId.trim()) {
+    try {
+      const Setting = require('../models/Setting');
+      const settings = await Setting.findOne() || new Setting();
+      const subs = settings.telegramSubscribers || [];
+      const alreadyExists = subs.some(s => String(s.chatId) === String(telegramChatId.trim()));
+      if (!alreadyExists) {
+        subs.push({
+          chatId:       telegramChatId.trim(),
+          name:         name,
+          username:     email,
+          subscribedAt: new Date(),
+        });
+        settings.telegramSubscribers = subs;
+        await settings.save();
+      }
+    } catch (e) {
+      console.warn('[Register] Could not auto-subscribe Telegram:', e.message);
+    }
+  }
 
   tg.notifyUserCreated(user, req.user);
 
@@ -24,6 +50,7 @@ const registerUser = asyncHandler(async (req, res) => {
     email: user.email,
     role: user.role,
     phone: user.phone || '',
+    telegramChatId: user.telegramChatId || '',
     avatar: user.avatar || '',
     token: generateToken(user._id),
   });

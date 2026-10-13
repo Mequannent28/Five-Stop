@@ -14,12 +14,32 @@ const updateUser = asyncHandler(async (req, res) => {
   const wasActive = user.isActive;
   const oldRole   = user.role;
 
-  user.name     = req.body.name     ?? user.name;
-  user.role     = req.body.role     ?? user.role;
-  user.isActive = req.body.isActive ?? user.isActive;
+  user.name          = req.body.name          ?? user.name;
+  user.role          = req.body.role          ?? user.role;
+  user.isActive      = req.body.isActive      ?? user.isActive;
+  user.phone         = req.body.phone         ?? user.phone;
+  user.telegramChatId = req.body.telegramChatId ?? user.telegramChatId;
   if (req.body.password) user.password = req.body.password;
 
   const updated = await user.save();
+
+  // Auto-subscribe new Telegram chatId if provided and not already subscribed
+  const newChatId = (req.body.telegramChatId || '').trim();
+  if (newChatId) {
+    try {
+      const Setting = require('../models/Setting');
+      const settings = await Setting.findOne() || new Setting();
+      const subs = settings.telegramSubscribers || [];
+      const alreadyExists = subs.some(s => String(s.chatId) === newChatId);
+      if (!alreadyExists) {
+        subs.push({ chatId: newChatId, name: updated.name, username: updated.email, subscribedAt: new Date() });
+        settings.telegramSubscribers = subs;
+        await settings.save();
+      }
+    } catch (e) {
+      console.warn('[UpdateUser] Could not auto-subscribe Telegram:', e.message);
+    }
+  }
 
   // Notify: account enabled / disabled
   if (req.body.isActive !== undefined && req.body.isActive !== wasActive) {
@@ -31,11 +51,13 @@ const updateUser = asyncHandler(async (req, res) => {
   }
 
   res.json({
-    _id:      updated._id,
-    name:     updated.name,
-    email:    updated.email,
-    role:     updated.role,
-    isActive: updated.isActive,
+    _id:            updated._id,
+    name:           updated.name,
+    email:          updated.email,
+    role:           updated.role,
+    isActive:       updated.isActive,
+    phone:          updated.phone || '',
+    telegramChatId: updated.telegramChatId || '',
   });
 });
 
