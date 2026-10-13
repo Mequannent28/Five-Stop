@@ -11,14 +11,14 @@ const tg = require('../utils/telegramNotifier');
 // Returns all soft-deleted items across all collections
 const getRecycleBin = asyncHandler(async (req, res) => {
   const [materials, suppliers, products, transactions] = await Promise.all([
-    RawMaterial.find({ isActive: false, deletedAt: { $ne: null } }).lean(),
-    Supplier.find({ isActive: false, deletedAt: { $ne: null } }).lean(),
-    Product.find({ isActive: false, deletedAt: { $ne: null } }).populate('ingredients.material','name unit').lean(),
+    RawMaterial.find({ isActive: false, deletedAt: { $ne: null } }).lean().catch(() => []),
+    Supplier.find({ isActive: false, deletedAt: { $ne: null } }).lean().catch(() => []),
+    Product.find({ isActive: false, deletedAt: { $ne: null } }).populate('ingredients.material','name unit').lean().catch(() => []),
     StockTransaction.find({ deletedAt: { $ne: null } })
       .populate('supplier', 'name')
       .populate('performedBy', 'name')
       .populate('items.material', 'name unit')
-      .lean(),
+      .lean().catch(() => []),
   ]);
 
   const items = [
@@ -30,11 +30,9 @@ const getRecycleBin = asyncHandler(async (req, res) => {
 
   res.json(items);
 });
-
 // POST /api/recycle-bin/:type/:id/restore
 const restoreItem = asyncHandler(async (req, res) => {
   const { type, id } = req.params;
-
   if (type === 'material') {
     const doc = await RawMaterial.findById(id);
     if (!doc) { res.status(404); throw new Error('Item not found'); }
@@ -44,7 +42,6 @@ const restoreItem = asyncHandler(async (req, res) => {
     invalidateDashboardCache();
     return res.json({ message: 'Raw material restored.' });
   }
-
   if (type === 'supplier') {
     const doc = await Supplier.findById(id);
     if (!doc) { res.status(404); throw new Error('Item not found'); }
@@ -53,7 +50,6 @@ const restoreItem = asyncHandler(async (req, res) => {
     tg.notifyRestored('Supplier', doc.name, req.user);
     return res.json({ message: 'Supplier restored.' });
   }
-
   if (type === 'product') {
     const doc = await Product.findById(id);
     if (!doc) { res.status(404); throw new Error('Item not found'); }
@@ -63,7 +59,6 @@ const restoreItem = asyncHandler(async (req, res) => {
     invalidateDashboardCache();
     return res.json({ message: 'Product restored.' });
   }
-
   if (type === 'transaction') {
     const doc = await StockTransaction.findById(id);
     if (!doc) { res.status(404); throw new Error('Item not found'); }
@@ -86,10 +81,8 @@ const restoreItem = asyncHandler(async (req, res) => {
     invalidateDashboardCache();
     return res.json({ message: 'Transaction restored and stock re-applied.' });
   }
-
   res.status(400); throw new Error(`Unknown type: ${type}`);
 });
-
 // DELETE /api/recycle-bin/:type/:id  (permanent delete)
 const permanentDelete = asyncHandler(async (req, res) => {
   const { type, id } = req.params;

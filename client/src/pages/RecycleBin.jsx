@@ -34,9 +34,12 @@ export default function RecycleBin() {
     setLoading(true);
     try {
       const res = await api.get('/recycle-bin');
-      setItems(res.data);
+      setItems(Array.isArray(res.data) ? res.data : []);
       setSelected(new Set());
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('[RecycleBin] load error:', err);
+      setItems([]);
+    }
     finally { setLoading(false); }
   }, []);
 
@@ -46,7 +49,6 @@ export default function RecycleBin() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
-
   /* ── filtering ── */
   const displayed = filter === 'all' ? items : items.filter(i => i._type === filter);
 
@@ -63,7 +65,6 @@ export default function RecycleBin() {
   const toggleOne = (id) => setSelected(prev => {
     const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
   });
-
   /* ── single restore ── */
   const handleRestore = async (item) => {
     setWorking(true);
@@ -73,9 +74,9 @@ export default function RecycleBin() {
       load();
     } catch (err) {
       showToast(err.response?.data?.message || 'Restore failed.', 'error');
+      load();
     } finally { setWorking(false); }
   };
-
   /* ── single permanent delete ── */
   const handlePermanent = async (item) => {
     if (!window.confirm(`Permanently delete "${itemName(item)}"? This cannot be undone.`)) return;
@@ -85,7 +86,12 @@ export default function RecycleBin() {
       showToast(`"${itemName(item)}" permanently deleted.`);
       load();
     } catch (err) {
-      showToast(err.response?.data?.message || 'Delete failed.', 'error');
+      if (err.response?.status === 404) {
+        showToast('Item was already removed. Refreshing…', 'error');
+        load();
+      } else {
+        showToast(err.response?.data?.message || 'Delete failed.', 'error');
+      }
     } finally { setWorking(false); }
   };
 
@@ -103,7 +109,6 @@ export default function RecycleBin() {
     load();
     setWorking(false);
   };
-
   /* ── bulk permanent delete ── */
   const handleBulkPermanent = async () => {
     const toDelete = items.filter(i => selected.has(i._id));
@@ -119,7 +124,6 @@ export default function RecycleBin() {
     load();
     setWorking(false);
   };
-
   /* ── empty bin ── */
   const handleEmptyBin = async () => {
     if (!window.confirm('Empty the entire recycle bin? All items will be permanently deleted and cannot be recovered.')) return;
@@ -184,7 +188,6 @@ export default function RecycleBin() {
           )}
         </div>
       </div>
-
       {/* ── Filter tabs ── */}
       <div className="flex flex-wrap items-center gap-1.5">
         {[{ key: 'all', label: `All (${items.length})` },
@@ -231,7 +234,6 @@ export default function RecycleBin() {
           </button>
         </div>
       )}
-
       {/* ── Table ── */}
       <div className="overflow-hidden rounded-xl border border-red-200/60 bg-white shadow-soft">
         <table className="min-w-full text-sm" style={{ borderCollapse: 'collapse' }}>
@@ -286,7 +288,6 @@ export default function RecycleBin() {
                       className="h-4 w-4 rounded accent-red-600 cursor-pointer"
                     />
                   </td>
-
                   {/* Type badge */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${meta.color}`}>
@@ -317,7 +318,6 @@ export default function RecycleBin() {
 
                   {/* Deleted by */}
                   <td className="px-4 py-3 whitespace-nowrap text-xs text-ink-500">{item.deletedBy || '—'}</td>
-
                   {/* Actions */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
@@ -346,7 +346,6 @@ export default function RecycleBin() {
             })}
           </tbody>
         </table>
-
         {/* Footer count */}
         {!loading && (
           <div className="border-t border-ink-100 px-4 py-2 text-xs text-ink-400">
