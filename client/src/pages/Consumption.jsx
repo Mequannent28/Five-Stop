@@ -288,7 +288,7 @@ export default function Consumption() {
           <table className="min-w-full text-sm" style={{ borderCollapse: 'collapse' }}>
             <thead style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}>
               <tr>
-                {['Date', 'Voucher', 'Category', 'Beneficiary', 'Pax', 'Recipe Cost', 'Status', 'By', 'Actions'].map(h => (
+                {['Date', 'Voucher', 'Category', 'Beneficiary', 'Pax', 'Recipe Cost', 'Status', 'Items Consumed', 'By', 'Actions'].map(h => (
                   <th key={h} className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-blue-100"
                     style={{ borderBottom: '1px solid rgba(147,197,253,0.3)' }}>
                     {h}
@@ -298,12 +298,12 @@ export default function Consumption() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-ink-400">
+                <tr><td colSpan={10} className="px-4 py-10 text-center text-ink-400">
                   <RefreshCw size={16} className="inline animate-spin mr-2" />Loading…
                 </td></tr>
               )}
               {!loading && filtered.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-ink-400">
+                <tr><td colSpan={10} className="px-4 py-12 text-center text-ink-400">
                   No consumption records found. {canCreate && <span className="text-blue-600 cursor-pointer hover:underline" onClick={openCreate}>Add the first one →</span>}
                 </td></tr>
               )}
@@ -333,6 +333,26 @@ export default function Consumption() {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <WorkflowBadge status={r.status} size="sm" />
                     </td>
+                    {/* Items Consumed */}
+                    <td className="px-4 py-3 max-w-[220px]">
+                      <div className="flex flex-wrap gap-1">
+                        {(r.items || []).slice(0, 3).map((item, i) => (
+                          <span key={i}
+                            className="inline-flex items-center rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 whitespace-nowrap"
+                            title={item.product?.name}>
+                            {item.product?.name || '—'}
+                            <span className="ml-1 text-blue-400">×{item.quantity}</span>
+                          </span>
+                        ))}
+                        {(r.items || []).length > 3 && (
+                          <span className="inline-flex items-center rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-semibold text-ink-500">
+                            +{r.items.length - 3} more
+                          </span>
+                        )}
+                        {(r.items || []).length === 0 && <span className="text-ink-300 text-[10px]">—</span>}
+                      </div>
+                    </td>
+                    {/* By */}
                     <td className="px-4 py-3 whitespace-nowrap text-xs text-ink-400">
                       {r.performedBy?.name || '—'}
                     </td>
