@@ -73,22 +73,26 @@ function parseCnetPosSheet(rawRows) {
 
   const parsed = [];
   for (const row of dataRows) {
-    const code     = String(row[colMap.code]     || '').trim().replace(/-+$/, ''); // strip trailing dashes
-    const name     = String(row[colMap.name]     || '').trim();
-    const qty      = parseFloat(row[colMap.qty]  || 0) || 0;
+    const rawCode  = String(row[colMap.code]  || '').trim();
+    const name     = String(row[colMap.name]  || '').trim();
+    const qty      = parseFloat(row[colMap.qty]      || 0) || 0;
     const avgAmt   = parseFloat(row[colMap.avgAmt]   || 0) || 0;
     const totalAmt = parseFloat(row[colMap.totalAmt] || 0) || 0;
 
-    // Skip rows without a product code AND without a meaningful name
-    if (!code && !name) continue;
-    // Skip category / sub-category header rows: no code, name looks like a label
-    if (!code && (!qty || qty === 0)) continue;
-    // Skip summary / total rows (name contains "total", "sub total", "grand total", etc.)
-    if (/^(sub[\s-]?total|grand[\s-]?total|total[\s-]?tax|add[\s-]?charge|discount|erp\s|page\s|count:)/i.test(name)) continue;
-    // Skip rows where name is a category header (all caps, no code, no qty)
-    if (!code && /^[A-Z\s&\/]+$/.test(name) && !qty) continue;
+    // ── STRICT PRODUCT CODE REQUIRED ───────────────────────────────
+    // Category subtotal rows (BEVERAGES, SOFT DRINKS, LUNCH & DINNER, etc.)
+    // always have an empty or dash Article Code.  Real product lines always
+    // have a code like P-0080.  Reject anything without a proper code.
+    const isRealCode = rawCode && !/^[-–—]+$/.test(rawCode); // not empty, not just dashes
+    if (!isRealCode) continue;
 
-    if (qty <= 0 && !code && !name) continue;
+    const code = rawCode.replace(/-+$/, ''); // strip trailing dashes (e.g. "p-00107-" → "p-00107")
+
+    // Skip summary / footer rows regardless
+    if (/^(sub[\s-]?total|grand[\s-]?total|total[\s-]?tax|add[\s-]?charge|discount|erp\s|page\s|count:)/i.test(name)) continue;
+
+    // Must have qty > 0 to be a real sold line
+    if (qty <= 0) continue;
 
     parsed.push({ code, name, qty, avgAmt, totalAmt });
   }

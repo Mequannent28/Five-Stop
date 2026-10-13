@@ -511,6 +511,24 @@ const importSales = asyncHandler(async (req, res) => {
 
   const escapeRegex = (s) => (s ? String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '');
 
+  // ── Duplicate-per-day check ───────────────────────────────────────
+  // Prevent importing the same day's sales twice.
+  const targetDate = saleDate ? new Date(saleDate) : new Date();
+  const dayStart   = new Date(targetDate); dayStart.setHours(0, 0, 0, 0);
+  const dayEnd     = new Date(targetDate); dayEnd.setHours(23, 59, 59, 999);
+  const existing   = await SalesRecord.findOne({
+    saleDate: { $gte: dayStart, $lte: dayEnd },
+    source:   'excel_import',
+  });
+  if (existing) {
+    res.status(409);
+    throw new Error(
+      `Sales for ${targetDate.toLocaleDateString('en-US', { dateStyle: 'medium' })} have already been imported ` +
+      `(Record: ${existing.reference || existing._id}). ` +
+      `Void the existing record first if you need to re-import.`
+    );
+  }
+
   const materialDeductions = {};
   const saleLines = [];
   const allSoldProducts = [];
