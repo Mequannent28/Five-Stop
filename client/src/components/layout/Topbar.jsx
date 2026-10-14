@@ -11,11 +11,292 @@ import {
   Layers,
   Clock,
   Timer,
+  HelpCircle,
+  X,
+  BookOpen,
+  Package,
+  ArrowLeftRight,
+  ShoppingCart,
+  BarChart2,
+  Users,
+  ChevronRight,
+  Search,
+  Lightbulb,
+  AlertTriangle,
+  CheckCircle2,
+  PlayCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSessionTimeout, TIMEOUT_OPTIONS } from '../../context/SessionTimeoutContext';
 
-const greeting = () => {
+// ─────────────────────────────────────────
+// HELP & DOCUMENTATION MODAL
+// ─────────────────────────────────────────
+const HELP_SECTIONS = [
+  {
+    id: 'getting-started',
+    icon: PlayCircle,
+    color: 'bg-blue-600',
+    title: 'Getting Started',
+    steps: [
+      { title: 'Log In', desc: 'Enter your username and password on the login page. Contact your Admin if you don\'t have credentials.' },
+      { title: 'Dashboard Overview', desc: 'After login, the Dashboard shows total stock value, reorder alerts, today\'s movements, and recent activity.' },
+      { title: 'Navigation', desc: 'Use the left sidebar to navigate between modules. Click the ☰ menu icon to collapse or expand it.' },
+      { title: 'Quick Actions', desc: 'Use the buttons at the top of the Dashboard to quickly create a Cash GRV, Credit GRV, or view Inventory Count.' },
+    ],
+  },
+  {
+    id: 'raw-materials',
+    icon: Package,
+    color: 'bg-emerald-600',
+    title: 'Raw Materials',
+    steps: [
+      { title: 'View Materials', desc: 'Go to Raw Materials in the sidebar. All active materials are listed with their current stock, unit, and category.' },
+      { title: 'Add a Material', desc: 'Click "+ Add Material". Fill in the name, unit (kg, L, pcs), category, and reorder level, then save.' },
+      { title: 'Edit / Archive', desc: 'Click the ⋯ action menu on any material row to edit its details or archive it (archived items won\'t appear in stock movements).' },
+      { title: 'Reorder Alerts', desc: 'Materials below their reorder level are highlighted in amber/red on the Dashboard and Reports. Set reorder levels carefully.' },
+    ],
+  },
+  {
+    id: 'stock-movements',
+    icon: ArrowLeftRight,
+    color: 'bg-indigo-600',
+    title: 'Stock Movements',
+    steps: [
+      { title: 'Cash GRV', desc: 'Use for goods purchased with cash from a supplier. Go to Stock Movements → Cash Goods Receiving → Fill in supplier, items, quantities, and unit cost.' },
+      { title: 'Credit GRV', desc: 'Use for goods received on credit. Same as Cash GRV but payment is deferred. Linked to a supplier account.' },
+      { title: 'Positive Adjustment', desc: 'Use to correct stock upward (e.g., after a physical count finds extra items). Requires a reason.' },
+      { title: 'Negative Adjustment', desc: 'Use to correct stock downward. Requires reason and manager/admin approval.' },
+      { title: 'Goods Disposal', desc: 'Record expired or damaged goods removed from stock. These reduce stock balance and appear in disposal reports.' },
+      { title: 'Fresh Bazaar', desc: 'For direct market purchases without a formal supplier invoice.' },
+    ],
+  },
+  {
+    id: 'purchases',
+    icon: ShoppingCart,
+    color: 'bg-violet-600',
+    title: 'Purchases & Approvals',
+    steps: [
+      { title: 'Create a Purchase Order', desc: 'Go to Purchases → New Purchase. Select a supplier, add items and quantities, then submit as Draft.' },
+      { title: 'Approval Workflow', desc: 'Draft → Manager checks → Admin approves → Storekeeper receives. Each step requires the appropriate role.' },
+      { title: 'Receive Goods', desc: 'Once approved, the storekeeper marks the PO as Received. Stock is automatically added to inventory.' },
+      { title: 'Cancel a PO', desc: 'Any step before Received can be cancelled. Cancelled POs are archived and visible in history.' },
+    ],
+  },
+  {
+    id: 'reports',
+    icon: BarChart2,
+    color: 'bg-amber-600',
+    title: 'Reports & Analytics',
+    steps: [
+      { title: 'Stock Balance Sheet', desc: 'Shows current stock quantity and value for all materials. Export to PDF or Excel using the Export button.' },
+      { title: 'Daily Report', desc: 'Summary of all stock movements for a selected day — inflow, outflow, adjustments, and disposals.' },
+      { title: 'GRV Reports', desc: 'View all Cash, Credit, or Fresh Bazaar receiving records filtered by date range or supplier.' },
+      { title: 'Inventory Count', desc: 'Physical count reconciliation report. Compare system stock vs physical count and record variances.' },
+      { title: 'Analytics & P&L', desc: 'View stock value trends, category breakdown, top assets, and profit/loss overview from the Analytics page.' },
+    ],
+  },
+  {
+    id: 'users',
+    icon: Users,
+    color: 'bg-rose-600',
+    title: 'Users & Access',
+    steps: [
+      { title: 'User Roles', desc: 'Admin: full access. Manager: approve, report, manage materials. Storekeeper: record movements. Viewer: read-only.' },
+      { title: 'Add a Staff Member', desc: 'Go to Staff Accounts → Add User. Set name, email, password, and role. The user can change their password after first login.' },
+      { title: 'Change Password', desc: 'Click your name at the top right → Security & Password → enter current password and new password.' },
+      { title: 'Session Timeout', desc: 'For security, the system auto-logs you out after a period of inactivity. You can change this in the top-right menu.' },
+    ],
+  },
+];
+
+const QUICK_TIPS = [
+  { icon: '💡', tip: 'Always set a reorder level for critical materials so the system can alert you before stock runs out.' },
+  { icon: '🔒', tip: 'Never share your login credentials. Each user should have their own account for a proper audit trail.' },
+  { icon: '📊', tip: 'Export your Stock Balance Sheet at the end of each week and save it for management review.' },
+  { icon: '🔄', tip: 'Use the Refresh button on the Dashboard to get the latest stock data if you\'ve been idle for a while.' },
+  { icon: '🗑️', tip: 'Accidentally deleted something? Check the Recycle Bin (Admin/Manager only) to restore it.' },
+];
+
+const HelpModal = ({ onClose }) => {
+  const [activeSection, setActiveSection] = useState('getting-started');
+  const [search, setSearch] = useState('');
+
+  const current = HELP_SECTIONS.find(s => s.id === activeSection);
+
+  const filtered = search.trim()
+    ? HELP_SECTIONS.flatMap(s =>
+        s.steps
+          .filter(st => st.title.toLowerCase().includes(search.toLowerCase()) || st.desc.toLowerCase().includes(search.toLowerCase()))
+          .map(st => ({ ...st, section: s.title, color: s.color }))
+      )
+    : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[999] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-3xl rounded-3xl bg-white shadow-2xl overflow-hidden flex flex-col"
+        style={{ maxHeight: '90vh' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-ink-100"
+          style={{ background: 'linear-gradient(135deg, #1a3cdb 0%, #4f46e5 100%)' }}>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20">
+              <BookOpen size={20} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-base font-black text-white">Help &amp; Documentation</h2>
+              <p className="text-xs text-blue-200">Step-by-step guides for every feature</p>
+            </div>
+          </div>
+          <button onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition">
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-6 py-3 border-b border-ink-100 bg-ink-50/40">
+          <div className="flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-3 py-2">
+            <Search size={14} className="text-ink-400 flex-shrink-0" />
+            <input
+              type="text"
+              placeholder="Search help topics..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="flex-1 text-xs outline-none text-ink-800 placeholder-ink-400 bg-transparent"
+            />
+            {search && <button onClick={() => setSearch('')} className="text-ink-400 hover:text-ink-700"><X size={13} /></button>}
+          </div>
+        </div>
+
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar nav */}
+          {!search && (
+            <div className="w-52 flex-shrink-0 border-r border-ink-100 overflow-y-auto bg-ink-50/40 py-3 px-2">
+              {HELP_SECTIONS.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setActiveSection(s.id)}
+                  className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-medium transition mb-0.5 ${
+                    activeSection === s.id
+                      ? 'bg-white shadow-sm text-blue-700 font-bold border border-ink-100'
+                      : 'text-ink-600 hover:bg-white/70 hover:text-ink-900'
+                  }`}
+                >
+                  <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg ${s.color}`}>
+                    <s.icon size={12} className="text-white" />
+                  </span>
+                  {s.title}
+                  {activeSection === s.id && <ChevronRight size={12} className="ml-auto text-blue-400" />}
+                </button>
+              ))}
+
+              {/* Quick Tips */}
+              <div className="mt-4 px-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400 px-2 mb-2">Quick Tips</p>
+                {QUICK_TIPS.map((t, i) => (
+                  <div key={i} className="flex items-start gap-2 rounded-lg p-2 text-[11px] text-ink-600 hover:bg-white/70 transition">
+                    <span className="flex-shrink-0 text-sm">{t.icon}</span>
+                    <span className="leading-relaxed">{t.tip}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            {/* Search results */}
+            {filtered !== null ? (
+              <div>
+                <p className="text-xs font-bold text-ink-500 mb-4">
+                  {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "<span className="text-blue-600">{search}</span>"
+                </p>
+                {filtered.length === 0 ? (
+                  <div className="text-center py-12 text-ink-400">
+                    <Search size={32} className="mx-auto mb-3 opacity-30" />
+                    <p className="text-sm font-medium">No results found</p>
+                    <p className="text-xs mt-1">Try a different keyword</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filtered.map((r, i) => (
+                      <div key={i} className="rounded-xl border border-ink-100 bg-ink-50/50 p-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 text-white ${r.color}`}>{r.section}</span>
+                          <p className="text-sm font-bold text-ink-900">{r.title}</p>
+                        </div>
+                        <p className="text-xs text-ink-600 leading-relaxed">{r.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Normal section view */
+              current && (
+                <div>
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${current.color} shadow-sm`}>
+                      <current.icon size={18} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-ink-900">{current.title}</h3>
+                      <p className="text-xs text-ink-400">{current.steps.length} steps</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {current.steps.map((step, idx) => (
+                      <div key={idx} className="flex gap-4 rounded-2xl border border-ink-100 bg-white p-4 hover:border-blue-200 hover:bg-blue-50/20 transition">
+                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-black mt-0.5">
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-ink-900 mb-0.5">{step.title}</p>
+                          <p className="text-xs text-ink-500 leading-relaxed">{step.desc}</p>
+                        </div>
+                        <CheckCircle2 size={16} className="flex-shrink-0 text-ink-200 mt-1" />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 flex items-start gap-3">
+                    <Lightbulb size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-bold text-amber-900 mb-1">Need more help?</p>
+                      <p className="text-xs text-amber-700 leading-relaxed">
+                        Contact your system administrator or reach MEGA Technology support for assistance beyond this guide.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-ink-100 bg-ink-50/40 px-6 py-3">
+          <p className="text-[10px] text-ink-400">Five Stop Hotel Management System · Powered by MEGA Technology</p>
+          <button onClick={onClose}
+            className="rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
   if (h < 17) return 'Good afternoon';
@@ -27,6 +308,7 @@ const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
   const { timeoutMinutes, setTimeoutMinutes, remainingSeconds } = useSessionTimeout();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const menuRef = useRef(null);
 
   // Close dropdown on click outside
@@ -56,7 +338,9 @@ const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
   }[user?.role || 'storekeeper'];
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/60 bg-white/80 px-4 py-3 backdrop-blur-md shadow-sm sm:px-8"
+    <>
+      {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/60 bg-white/80 px-4 py-3 backdrop-blur-md shadow-sm sm:px-8"
       style={{ background: 'rgba(255,255,255,0.85)' }}>
       <div className="flex items-center gap-3">
         {/* Mobile: opens overlay sidebar */}
@@ -183,6 +467,15 @@ const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
                 <Layers size={15} className="text-ink-400" />
                 <span>Role Privileges</span>
               </button>
+
+              {/* Help & Documentation */}
+              <button
+                onClick={() => { setMenuOpen(false); setHelpOpen(true); }}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 transition"
+              >
+                <HelpCircle size={15} className="text-blue-500" />
+                <span>Help &amp; Documentation</span>
+              </button>
             </div>
 
             {/* Session Inactivity Timeout Selector */}
@@ -229,8 +522,8 @@ const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
           </div>
         )}
       </div>
-      </div>
     </header>
+    </>
   );
 };
 
