@@ -13,7 +13,6 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Legend,
 } from 'recharts';
 import {
   Boxes,
@@ -24,16 +23,12 @@ import {
   ArrowUpCircle,
   ShoppingBag,
   CreditCard,
-  Leaf,
-  Flame,
   PlusCircle,
   RefreshCw,
   ChevronRight,
   TrendingUp,
-  TrendingDown,
   PieChart as PieIcon,
   BarChart3,
-  Layers,
   ArrowRight,
   ShieldCheck,
   AlertOctagon,
@@ -42,9 +37,7 @@ import {
   Scale,
 } from 'lucide-react';
 import api from '../api/axios';
-import { useAuth } from '../context/AuthContext';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
 
 const formatETB = (n) =>
   `ETB ${Number(n || 0).toLocaleString('en-US', {
@@ -151,7 +144,6 @@ const getStoredDashboardData = () => {
 let cachedDashboardData = getStoredDashboardData();
 
 export default function Dashboard() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [data, setData] = useState(cachedDashboardData);
   const [loading, setLoading] = useState(!cachedDashboardData);
@@ -178,7 +170,6 @@ export default function Dashboard() {
   useEffect(() => {
     fetchSummary();
   }, []);
-
 
   const trendData = useMemo(() => {
     if (!data?.trend) return [];
@@ -434,9 +425,7 @@ export default function Dashboard() {
       {/* ── Main Charts Row: Stock Movement & Category Pie Chart ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* 7-Day Stock Movement Curve / Bar Chart (8 Columns) */}
-        <Card className="lg:col-span-8 flex flex-col justify-between overflow-hidden">
-          {/* Subtle gradient header band */}
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-blue-400 to-indigo-500 rounded-t-2xl" style={{position:'relative', height:4, marginBottom: -4, borderRadius: '12px 12px 0 0', background:'linear-gradient(90deg,#1a56db,#6366f1)'}} />
+        <Card className="lg:col-span-8 flex flex-col justify-between">
           <div>
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
