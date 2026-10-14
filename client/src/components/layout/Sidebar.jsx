@@ -7,6 +7,7 @@ import {
   ShoppingBag, CreditCard, Leaf, TrendingUp, Flame, TrendingDown,
   BarChart2, Calendar, PackageOpen, Settings as SettingsIcon, UploadCloud,
   Scale, ClipboardList, Trash2, Coffee, UserCog, Sparkles,
+  SendToBack, X, Rocket, ClipboardCheck, ArrowRightLeft, History,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -96,6 +97,110 @@ const CollapsibleNav = ({ label, icon: Icon, isActive, open, onToggle, children,
 );
 
 /* ══════════════════════════════════════════
+   COMING SOON MODAL — Stock Issue & Request
+══════════════════════════════════════════ */
+const COMING_SOON_FEATURES = [
+  {
+    icon: ClipboardCheck,
+    color: 'from-blue-500 to-indigo-600',
+    bg: 'bg-blue-50',
+    text: 'text-blue-700',
+    title: 'Stock Request',
+    desc: 'Kitchen, Bar & Housekeeping request items from the main store with quantity and urgency level.',
+  },
+  {
+    icon: SendToBack,
+    color: 'from-emerald-500 to-teal-600',
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-700',
+    title: 'Stock Issue / Dispatch',
+    desc: 'Main store approves and issues requested stock to branches. Auto-deducts from main inventory.',
+  },
+  {
+    icon: ArrowRightLeft,
+    color: 'from-violet-500 to-purple-600',
+    bg: 'bg-violet-50',
+    text: 'text-violet-700',
+    title: 'Branch-to-Branch Transfer',
+    desc: 'Transfer excess stock between departments (e.g. Bar → Kitchen) with full audit trail.',
+  },
+  {
+    icon: History,
+    color: 'from-amber-500 to-orange-600',
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
+    title: 'Issue & Request History',
+    desc: 'Full log of all inter-department stock movements with status tracking (Pending → Approved → Issued).',
+  },
+];
+
+const StockIssueComingSoonModal = ({ onClose }) => (
+  <div className="fixed inset-0 z-[999] flex items-center justify-center p-4"
+    style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+    onClick={onClose}>
+    <div
+      className="relative w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden"
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Header gradient */}
+      <div className="relative px-7 pt-8 pb-6 text-center"
+        style={{ background: 'linear-gradient(135deg, #1a56db 0%, #4f46e5 60%, #7c3aed 100%)' }}>
+        {/* Close */}
+        <button onClick={onClose}
+          className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition">
+          <X size={15} />
+        </button>
+
+        {/* Icon */}
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm shadow-lg">
+          <SendToBack size={30} className="text-white" />
+        </div>
+
+        <h2 className="text-xl font-black text-white leading-tight">
+          Stock Issue & Request
+        </h2>
+        <p className="mt-1.5 text-sm text-blue-200 font-medium">
+          Inter-department stock workflow — coming soon
+        </p>
+
+        {/* Coming soon badge */}
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/20 px-4 py-1.5 text-xs font-bold text-white border border-white/30">
+          <Rocket size={11} />
+          Under Development
+        </div>
+      </div>
+
+      {/* Feature list */}
+      <div className="px-6 py-5 space-y-3">
+        <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-1">
+          What's being built
+        </p>
+        {COMING_SOON_FEATURES.map((f) => (
+          <div key={f.title}
+            className="flex items-start gap-3.5 rounded-2xl border border-ink-100 bg-ink-50/40 p-3.5 hover:bg-ink-50 transition">
+            <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${f.color} shadow-sm`}>
+              <f.icon size={16} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-ink-900 leading-tight">{f.title}</p>
+              <p className="text-xs text-ink-500 mt-0.5 leading-relaxed">{f.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="px-6 pb-6">
+        <button onClick={onClose}
+          className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-sm font-bold text-white hover:from-blue-700 hover:to-indigo-700 transition shadow-sm">
+          Got it, notify me when ready
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+/* ══════════════════════════════════════════
    SIDEBAR
 ══════════════════════════════════════════ */
 const Sidebar = ({ open, onClose, collapsed = false }) => {
@@ -105,8 +210,9 @@ const Sidebar = ({ open, onClose, collapsed = false }) => {
   const onTransactions = location.pathname.startsWith('/transactions');
   const onReports      = location.pathname.startsWith('/reports');
 
-  const [stockOpen,  setStockOpen]  = useState(onTransactions);
-  const [reportOpen, setReportOpen] = useState(onReports);
+  const [stockOpen,        setStockOpen]        = useState(onTransactions);
+  const [reportOpen,       setReportOpen]        = useState(onReports);
+  const [issueModalOpen,   setIssueModalOpen]    = useState(false);
 
   const linkCls = (isActive) =>
     `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
@@ -158,6 +264,7 @@ const Sidebar = ({ open, onClose, collapsed = false }) => {
   return (
     <>
       {open && <div className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden" onClick={onClose} />}
+      {issueModalOpen && <StockIssueComingSoonModal onClose={() => setIssueModalOpen(false)} />}
 
       <aside
         className={`
@@ -236,6 +343,27 @@ const Sidebar = ({ open, onClose, collapsed = false }) => {
 
           {canSeeNav('suppliers') && navLink('/suppliers', Truck, 'Suppliers')}
           {canSeeNav('consumption') && navLink('/consumption', Coffee, 'Consumption')}
+
+          {/* Stock Issue & Request — Coming Soon */}
+          <button
+            onClick={() => setIssueModalOpen(true)}
+            title={collapsed ? 'Stock Issue & Request' : undefined}
+            className={`group w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
+              text-blue-100/80 hover:bg-white/8 hover:text-white
+              ${collapsed ? 'justify-center' : ''}`}
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/5 group-hover:bg-white/10 transition-all">
+              <SendToBack size={15} strokeWidth={2} />
+            </span>
+            {!collapsed && (
+              <span className="flex flex-1 items-center justify-between text-[13px]">
+                Stock Issue & Request
+                <span className="rounded-full bg-indigo-500/30 border border-indigo-400/40 px-2 py-0.5 text-[9px] font-bold text-indigo-300 tracking-wide">
+                  SOON
+                </span>
+              </span>
+            )}
+          </button>
 
           {/* Reports */}
           {canSeeNav('reports') && (
