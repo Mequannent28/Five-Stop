@@ -56,7 +56,8 @@ const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
   }[user?.role || 'storekeeper'];
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-ink-100 bg-white/90 px-4 py-3.5 backdrop-blur sm:px-8">
+    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/60 bg-white/80 px-4 py-3 backdrop-blur-md shadow-sm sm:px-8"
+      style={{ background: 'rgba(255,255,255,0.85)' }}>
       <div className="flex items-center gap-3">
         {/* Mobile: opens overlay sidebar */}
         <button

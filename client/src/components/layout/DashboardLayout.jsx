@@ -38,7 +38,6 @@ const titles = {
   '/profile': 'User Profile',
   '/recycle-bin': 'Recycle Bin',
 };
-
 const DashboardLayout = () => {
   const [sidebarOpen,      setSidebarOpen]      = useState(false);  // mobile overlay
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);  // desktop collapse
@@ -58,7 +57,8 @@ const DashboardLayout = () => {
           onToggleCollapse={() => setSidebarCollapsed(c => !c)}
           title={title}
         />
-        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 flex flex-col justify-between">
+        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 flex flex-col justify-between"
+          style={{ background: 'linear-gradient(135deg, #f0f4ff 0%, #f8faff 50%, #ffffff 100%)' }}>
           <div>
             <Outlet />
           </div>
@@ -100,5 +100,4 @@ const DashboardLayout = () => {
     </div>
   );
 };
-
 export default DashboardLayout;
