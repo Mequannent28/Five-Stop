@@ -182,7 +182,8 @@ const Sidebar = ({ open, onClose, collapsed = false }) => {
         </div>
 
         {/* ── Logo ── */}
-        <div className={`relative flex items-center gap-3 py-5 ${collapsed ? 'justify-center px-2' : 'px-5'}`}>
+        <NavLink to="/" onClick={onClose}
+          className={`relative flex items-center gap-3 py-5 hover:opacity-90 transition-opacity ${collapsed ? 'justify-center px-2' : 'px-5'}`}>
           <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl overflow-hidden shadow-lg"
             style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%)' }}>
             <div className="absolute inset-0 opacity-20"
@@ -199,7 +200,7 @@ const Sidebar = ({ open, onClose, collapsed = false }) => {
               <p className="text-[10px] text-blue-300/70 mt-0.5 tracking-wide font-medium">Hotel Management</p>
             </div>
           )}
-        </div>
+        </NavLink>
 
         {/* ── Nav ── */}
         <nav className="relative flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden px-2 pb-4
