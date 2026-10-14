@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import api from '../api/axios';
 import Card from '../components/ui/Card';
@@ -6,7 +6,7 @@ import Button from '../components/ui/Button';
 import {
   UploadCloud, CheckCircle, AlertTriangle, ArrowRight, XCircle,
   TrendingUp, Search, Download, FileSpreadsheet, Scale, X,
-  ChevronDown, ChevronUp, Zap, PenLine, Plus, Trash2,
+  ChevronDown, ChevronUp, Zap, PenLine, Plus, Trash2, Camera, ScanLine,
 } from 'lucide-react';
 
 /* ── empty manual sale row ── */
@@ -26,7 +26,6 @@ function parseCnetPosSheet(rawRows) {
     const row  = rawRows[i];
     const keys = Object.keys(row).map(k => String(k).trim());
     const vals = Object.values(row).map(v => String(v || '').trim().toLowerCase());
-
     // Look for the header in values (sheet_to_json with header:1 style) or keys
     const allText = [...keys, ...vals];
     if (
@@ -46,7 +45,6 @@ function parseCnetPosSheet(rawRows) {
       break;
     }
   }
-
   // If we didn't find the header row inside the data rows, it might BE the column keys
   // (sheet_to_json uses first row as keys by default)
   if (headerIdx === -1 && rawRows.length > 0) {
@@ -115,6 +113,16 @@ export default function SalesImport() {
 
   const [loading,  setLoading]  = useState(false);
   const [result,   setResult]   = useState(null);
+
+  // Image OCR state
+  const [imageOcrOpen,    setImageOcrOpen]    = useState(false);
+  const [ocrLoading,      setOcrLoading]      = useState(false);
+  const [ocrError,        setOcrError]        = useState('');
+  const [ocrRows,         setOcrRows]         = useState([]);
+  const [ocrRawText,      setOcrRawText]      = useState('');
+  const [ocrImagePreview, setOcrImagePreview] = useState(null);
+  const imageInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   // Manual entry modal
   const [manualOpen,  setManualOpen]  = useState(false);
@@ -380,6 +388,89 @@ export default function SalesImport() {
   const resetAll = () => {
     setFileData(null); setParsed(null); setResult(null);
     setIsCnetFmt(false); setColumns([]);
+    setImageOcrOpen(false); setOcrRows([]); setOcrRawText('');
+    setOcrImagePreview(null); setOcrError('');
+  };
+
+  /* ── Image OCR handler ── */
+  const handleImageOcr = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setOcrError(''); setOcrRows([]); setOcrRawText('');
+
+    // Preview
+    const previewReader = new FileReader();
+    previewReader.onload = (ev) => setOcrImagePreview(ev.target.result);
+    previewReader.readAsDataURL(file);
+
+    // Read as base64 for API
+    const b64Reader = new FileReader();
+    b64Reader.onload = async (ev) => {
+      const dataUrl = ev.target.result; // data:image/jpeg;base64,....
+      const base64  = dataUrl.split(',')[1];
+      const mime    = file.type || 'image/jpeg';
+
+      setOcrLoading(true); setImageOcrOpen(true);
+      try {
+        const res = await api.post('/transactions/parse-image-sales', {
+          imageBase64: base64,
+          mimeType:    mime,
+        });
+        setOcrRows(res.data.rows || []);
+        setOcrRawText(res.data.rawText || '');
+        if (!res.data.rows?.length) {
+          setOcrError(res.data.message || 'No product lines detected.');
+        }
+      } catch (err) {
+        setOcrError(err.response?.data?.message || 'OCR failed. Please try a clearer image.');
+      } finally {
+        setOcrLoading(false);
+        if (imageInputRef.current)  imageInputRef.current.value  = '';
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+      }
+    };
+    b64Reader.readAsDataURL(file);
+  };
+
+  /* ── Update OCR row ── */
+  const updateOcrRow = (idx, field, value) => {
+    setOcrRows(rows => rows.map((r, i) => {
+      if (i !== idx) return r;
+      const updated = { ...r, [field]: value };
+      if (field === 'qty' || field === 'avgAmt') {
+        updated.totalAmt = parseFloat(updated.avgAmt || 0) * parseFloat(updated.qty || 0);
+      }
+      return updated;
+    }));
+  };
+  const removeOcrRow = (idx) => setOcrRows(rows => rows.filter((_, i) => i !== idx));
+
+  /* ── Submit OCR rows (same pipeline as CNET) ── */
+  const handleOcrSubmit = async () => {
+    const salesData = ocrRows
+      .filter(r => (r.code || r.name) && r.qty > 0)
+      .map(r => ({
+        productCode: r.code,
+        productName: r.name,
+        quantity:    parseFloat(r.qty)      || 1,
+        revenue:     parseFloat(r.totalAmt) || 0,
+        unitPrice:   parseFloat(r.avgAmt)   || 0,
+      }));
+
+    if (!salesData.length) { setOcrError('No valid rows to import.'); return; }
+
+    setLoading(true); setResult(null); setOcrError('');
+    try {
+      const res = await api.post('/transactions/import-sales', {
+        sales:     salesData,
+        notes:     'Imported via POS Photo / Image OCR',
+        reference: `POS Image Import — ${new Date().toLocaleDateString()}`,
+      });
+      setResult({ success: true, data: res.data });
+      setImageOcrOpen(false);
+    } catch (err) {
+      setOcrError(err.response?.data?.message || 'Import failed.');
+    } finally { setLoading(false); }
   };
 
   /* ════════════════════════════════════════════════════════════════
@@ -405,8 +496,6 @@ export default function SalesImport() {
         {/* ── 1. Upload Zone (no file yet) ── */}
         {!fileData && !result?.success && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-            {/* Card A — Upload Excel */}
             <label className="group cursor-pointer relative overflow-hidden rounded-2xl border-2 border-dashed border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 hover:border-blue-400 hover:shadow-lg transition-all duration-200 p-8 flex flex-col items-center text-center">
               <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
               <div className="h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white mb-4 shadow-md group-hover:scale-105 transition-transform">
@@ -446,6 +535,33 @@ export default function SalesImport() {
                 ✦ Great for testing or corrections
               </span>
             </button>
+
+            {/* Card C — Scan / Photo Image */}
+            <div className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50 hover:border-violet-400 hover:shadow-lg transition-all duration-200 p-8 flex flex-col items-center text-center col-span-1 sm:col-span-2">
+              <div className="h-14 w-14 rounded-2xl bg-violet-600 flex items-center justify-center text-white mb-4 shadow-md group-hover:scale-105 transition-transform">
+                <ScanLine size={26} />
+              </div>
+              <p className="text-base font-extrabold text-ink-900 mb-1">Scan POS Report (Photo / Image)</p>
+              <p className="text-xs text-ink-500 mb-3 leading-relaxed">
+                Take a photo or upload an image of your POS report.<br />
+                AI reads article codes, quantities and amounts automatically.
+              </p>
+              <div className="flex items-center gap-2">
+                {/* Upload image file */}
+                <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-full bg-violet-600 text-white px-4 py-2 text-xs font-bold shadow hover:bg-violet-700 transition">
+                  <UploadCloud size={13} /> Upload Image
+                  <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageOcr} />
+                </label>
+                {/* Camera capture */}
+                <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-full bg-violet-700 text-white px-4 py-2 text-xs font-bold shadow hover:bg-violet-800 transition">
+                  <Camera size={13} /> Take Photo
+                  <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageOcr} />
+                </label>
+              </div>
+              <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-violet-100 border border-violet-200 text-violet-700 text-[10px] font-semibold px-2.5 py-0.5">
+                ✦ Powered by OCR — auto-detects product lines
+              </span>
+            </div>
 
           </div>
         )}
@@ -838,6 +954,123 @@ export default function SalesImport() {
         )}
 
       </Card>
+
+      {/* ══ OCR Image Review Modal ══ */}
+      {imageOcrOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-ink-100">
+              <div className="flex items-center gap-2.5">
+                <span className="h-9 w-9 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600">
+                  <ScanLine size={18} />
+                </span>
+                <div>
+                  <h2 className="text-base font-bold text-ink-900">OCR Image Scan Results</h2>
+                  <p className="text-xs text-ink-500">Review and correct detected rows before importing</p>
+                </div>
+              </div>
+              <button onClick={() => setImageOcrOpen(false)} className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+
+              {/* Loading state */}
+              {ocrLoading && (
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="h-12 w-12 rounded-full border-4 border-violet-200 border-t-violet-600 animate-spin" />
+                  <p className="text-sm font-semibold text-ink-700">Scanning image with OCR…</p>
+                  <p className="text-xs text-ink-400">This may take 5–10 seconds</p>
+                </div>
+              )}
+
+              {/* Error */}
+              {!ocrLoading && ocrError && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+                  <XCircle size={16} className="shrink-0 mt-0.5 text-red-500" />
+                  <div>
+                    <p className="font-semibold">OCR Error</p>
+                    <p className="text-xs mt-0.5">{ocrError}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Image preview + results side by side */}
+              {!ocrLoading && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Image preview */}
+                  {ocrImagePreview && (
+                    <div className="rounded-xl border border-ink-200 overflow-hidden">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400 px-3 py-1.5 bg-ink-50 border-b border-ink-100">Uploaded Image</p>
+                      <img src={ocrImagePreview} alt="POS scan" className="w-full object-contain max-h-64" />
+                    </div>
+                  )}
+
+                  {/* Detected rows */}
+                  {ocrRows.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-ink-700">
+                          Detected {ocrRows.length} product line{ocrRows.length !== 1 ? 's' : ''}
+                          <span className="ml-1 text-violet-600">(editable)</span>
+                        </p>
+                        <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 font-semibold">
+                          ✓ Ready to import
+                        </span>
+                      </div>
+                      <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+                        {ocrRows.map((row, idx) => (
+                          <div key={idx} className="grid gap-1 items-center text-xs"
+                            style={{ gridTemplateColumns: '80px 1fr 50px 80px 24px' }}>
+                            <input value={row.code} onChange={e => updateOcrRow(idx, 'code', e.target.value)}
+                              className="rounded border border-ink-200 px-1.5 py-1 font-mono outline-none focus:border-violet-400 text-[11px]" placeholder="Code" />
+                            <input value={row.name} onChange={e => updateOcrRow(idx, 'name', e.target.value)}
+                              className="rounded border border-ink-200 px-1.5 py-1 outline-none focus:border-violet-400 text-[11px]" placeholder="Name" />
+                            <input type="number" value={row.qty} onChange={e => updateOcrRow(idx, 'qty', e.target.value)}
+                              className="rounded border border-ink-200 px-1.5 py-1 text-right outline-none focus:border-violet-400 text-[11px]" />
+                            <input type="number" value={row.totalAmt} onChange={e => updateOcrRow(idx, 'totalAmt', e.target.value)}
+                              className="rounded border border-violet-200 bg-violet-50 px-1.5 py-1 text-right outline-none focus:border-violet-500 text-[11px] font-semibold text-violet-700" />
+                            <button type="button" onClick={() => removeOcrRow(idx)}
+                              className="rounded p-0.5 text-ink-300 hover:text-red-500 hover:bg-red-50">
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-ink-400">Columns: Code · Name · Qty · Total Amount</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Info */}
+              {!ocrLoading && ocrRows.length > 0 && (
+                <div className="rounded-lg bg-violet-50 border border-violet-200 px-4 py-2.5 text-xs text-violet-800 flex items-start gap-2">
+                  <AlertTriangle size={13} className="shrink-0 mt-0.5 text-violet-500" />
+                  <span>Review the detected rows carefully. OCR may misread unclear text. Correct any errors before importing.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-ink-100 bg-ink-50/50 rounded-b-2xl">
+              <button onClick={() => setImageOcrOpen(false)}
+                className="rounded-lg border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-600 hover:bg-ink-100 transition">
+                Cancel
+              </button>
+              <button onClick={handleOcrSubmit}
+                disabled={loading || ocrLoading || ocrRows.length === 0}
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-50 px-5 py-2 text-sm font-bold text-white transition">
+                {loading ? 'Importing…' : `Import ${ocrRows.filter(r => r.code || r.name).length} Items`}
+                <ArrowRight size={15} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══ Manual Sales Entry Modal ══ */}
       {manualOpen && (

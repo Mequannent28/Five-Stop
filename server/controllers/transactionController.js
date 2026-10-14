@@ -792,4 +792,110 @@ const importSales = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { getTransactions, createTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, restoreTransaction, permanentDeleteTransaction, getVoucherSummary, advanceTransaction, importSales };
+// ── POST /api/transactions/parse-image-sales ─────────────────────────
+// Accepts a base64-encoded image of a POS report, runs OCR via ocr.space,
+// parses the resulting text for article codes / names / quantities / amounts.
+const parseImageSales = asyncHandler(async (req, res) => {
+  const { imageBase64, mimeType = 'image/jpeg' } = req.body;
+  if (!imageBase64) { res.status(400); throw new Error('No image data provided'); }
+
+  const https    = require('https');
+  const querystring = require('querystring');
+
+  const OCR_API_KEY = process.env.OCR_API_KEY || 'helloworld'; // helloworld = free demo key
+
+  // Call ocr.space API
+  const ocrText = await new Promise((resolve, reject) => {
+    const postData = querystring.stringify({
+      base64Image: `data:${mimeType};base64,${imageBase64}`,
+      language:    'eng',
+      isTable:     'true',
+      OCREngine:   '2',
+      apikey:      OCR_API_KEY,
+    });
+
+    const options = {
+      hostname: 'api.ocr.space',
+      path:     '/parse/image',
+      method:   'POST',
+      headers:  {
+        'Content-Type':   'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+    };
+
+    const request = https.request(options, (response) => {
+      let data = '';
+      response.on('data', chunk => { data += chunk; });
+      response.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.IsErroredOnProcessing) {
+            reject(new Error(json.ErrorMessage?.[0] || 'OCR processing failed'));
+            return;
+          }
+          const text = json.ParsedResults?.[0]?.ParsedText || '';
+          resolve(text);
+        } catch (e) {
+          reject(new Error('Invalid OCR response'));
+        }
+      });
+    });
+    request.on('error', reject);
+    request.write(postData);
+    request.end();
+  });
+
+  if (!ocrText.trim()) {
+    res.status(422); throw new Error('No text detected in the image. Please use a clearer photo.');
+  }
+
+  // ── Parse OCR text for POS data ──────────────────────────────────
+  // Lines that look like: CODE  NAME  QTY  AVG_AMOUNT  TOTAL_AMOUNT
+  // We try to extract rows with at least a code pattern (P-XXXX) and numbers.
+  const rows = [];
+  const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    // Skip header/summary lines
+    if (/^(category|sub.?category|article|catagory|total|grand|sub\s|add\.|discount|erp|page|count:)/i.test(line)) continue;
+    if (/^\s*$/.test(line)) continue;
+
+    // Try to detect a product code pattern (P-XXXX or p-XXXXX-)
+    const codeMatch = line.match(/\b([Pp]-?\d{3,6}-?)\b/);
+    if (!codeMatch) continue; // skip lines without a product code
+
+    const code = codeMatch[1].replace(/-+$/, '').trim();
+
+    // Extract all numbers from the line
+    const nums = [...line.matchAll(/[\d,]+\.?\d*/g)]
+      .map(m => parseFloat(m[0].replace(/,/g, '')))
+      .filter(n => !isNaN(n) && n > 0);
+
+    if (nums.length < 2) continue; // need at least qty + one amount
+
+    // Heuristic: first small number = qty, last large number = total amount, middle = avg
+    const qty      = nums[0] <= 1000 ? nums[0] : 1;
+    const totalAmt = nums[nums.length - 1];
+    const avgAmt   = nums.length >= 3 ? nums[nums.length - 2] : (qty > 0 ? totalAmt / qty : totalAmt);
+
+    // Extract product name — text between code and first number
+    const afterCode = line.slice(line.indexOf(codeMatch[0]) + codeMatch[0].length);
+    const nameMatch = afterCode.match(/^[^0-9\t]*/);
+    const name = (nameMatch ? nameMatch[0] : '').replace(/[^\w\s\-\/\(\)]/g, '').trim();
+
+    if (qty <= 0 || totalAmt <= 0) continue;
+
+    rows.push({ code, name, qty, avgAmt, totalAmt });
+  }
+
+  res.json({
+    rows,
+    rawText: ocrText,
+    message: rows.length > 0
+      ? `Detected ${rows.length} product line(s) from the image.`
+      : 'No product lines detected. The image may be unclear or not in CNET format.',
+  });
+});
+
+module.exports = { getTransactions, createTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, restoreTransaction, permanentDeleteTransaction, getVoucherSummary, advanceTransaction, importSales, parseImageSales };

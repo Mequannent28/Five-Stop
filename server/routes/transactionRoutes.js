@@ -20,6 +20,7 @@ router.get('/summary', getVoucherSummary);
 router.get('/', getTransactions);
 router.post('/', authorizePermission('recordGoods'), createTransaction);
 router.post('/import-sales', authorizePermission('recordGoods'), importSales);
+router.post('/parse-image-sales', authorizePermission('recordGoods'), require('../controllers/transactionController').parseImageSales);
 router.delete('/bulk', authorizePermission('voidTransactions'), bulkDeleteTransactions);
 router.put('/:id', authorizePermission('recordGoods'), updateTransaction);
 router.post('/:id/advance', advanceTransaction);
