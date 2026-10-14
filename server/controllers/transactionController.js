@@ -457,11 +457,28 @@ const advanceTransaction = asyncHandler(async (req, res) => {
     : [{ material: txn.material, quantity: txn.quantity }];
 
   if (action === 'check') {
-    // Apply stock for the first time
+    // Apply stock for the first time + WAC update for stock-IN
     for (const item of stockItems) {
       const mat = await RawMaterial.findById(item.material);
       if (mat) {
-        mat.currentStock += direction === 'in' ? item.quantity : -item.quantity;
+        if (direction === 'in') {
+          // ── Weighted Average Cost (WAC) ──────────────────────────
+          // newUnitCost = (oldStock × oldCost + inQty × inCost) / (oldStock + inQty)
+          // Only update when oldStock > 0; if stock was 0, just use the new price.
+          const oldStock = mat.currentStock >= 0 ? mat.currentStock : 0;
+          const oldCost  = mat.unitCost  || 0;
+          const inQty    = item.quantity || 0;
+          const inCost   = item.unitCost || oldCost;
+          const totalQty = oldStock + inQty;
+          if (totalQty > 0) {
+            mat.unitCost = ((oldStock * oldCost) + (inQty * inCost)) / totalQty;
+            // Round to 4 decimal places to avoid floating-point noise
+            mat.unitCost = Math.round(mat.unitCost * 10000) / 10000;
+          }
+          mat.currentStock += inQty;
+        } else {
+          mat.currentStock -= item.quantity;
+        }
         await mat.save();
       }
     }

@@ -1,14 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Paperclip, UploadCloud, X, FileText, Image, Loader2, Eye, Trash2 } from 'lucide-react';
+import { Paperclip, UploadCloud, X, FileText, Image, Loader2, Eye, Trash2, Camera } from 'lucide-react';
 import api from '../../api/axios';
-
-// ── AttachmentUploader ─────────────────────────────────────────────────
-// Renders a drag-and-drop / click-to-upload area for receipts / invoices.
-// Calls onAttachmentsChange(attachments[]) with the current list.
-// ──────────────────────────────────────────────────────────────────────
 
 export default function AttachmentUploader({ attachments = [], onAttachmentsChange, disabled = false }) {
   const inputRef   = useRef(null);
+  const cameraRef  = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver]  = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -30,11 +26,13 @@ export default function AttachmentUploader({ attachments = [], onAttachmentsChan
       alert(err.response?.data?.message || 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
+      if (inputRef.current)  inputRef.current.value  = '';
+      if (cameraRef.current) cameraRef.current.value = '';
     }
   };
 
-  const handleFileChange = (e) => uploadFiles(e.target.files);
+  const handleFileChange  = (e) => uploadFiles(e.target.files);
+  const handleCameraChange = (e) => uploadFiles(e.target.files);
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -43,21 +41,19 @@ export default function AttachmentUploader({ attachments = [], onAttachmentsChan
   };
 
   const removeAttachment = (idx) => {
-    const updated = attachments.filter((_, i) => i !== idx);
-    onAttachmentsChange(updated);
+    onAttachmentsChange(attachments.filter((_, i) => i !== idx));
   };
 
   return (
     <div className="space-y-3">
       {/* Drop Zone */}
       <div
-        onClick={() => !disabled && !uploading && inputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={`
           relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed
-          px-4 py-5 text-center transition cursor-pointer select-none
+          px-4 py-5 text-center transition select-none
           ${dragOver ? 'border-blue-500 bg-blue-50' : 'border-ink-200 bg-ink-50/60 hover:border-blue-400 hover:bg-blue-50/30'}
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
@@ -71,18 +67,39 @@ export default function AttachmentUploader({ attachments = [], onAttachmentsChan
           <>
             <UploadCloud size={22} className="text-ink-400" />
             <div>
-              <p className="text-xs font-semibold text-ink-700">
-                {dragOver ? 'Drop files here' : 'Upload Receipt / Invoice'}
-              </p>
+              <p className="text-xs font-semibold text-ink-700">Upload Receipt / Invoice</p>
               <p className="text-[11px] text-ink-400 mt-0.5">
                 JPG, PNG, PDF up to 10 MB · Drag &amp; drop or click
               </p>
             </div>
-            <label className="inline-flex items-center gap-1.5 mt-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition pointer-events-none">
-              <Paperclip size={12} /> Attach File
-            </label>
+
+            {/* Two buttons side by side */}
+            <div className="flex items-center gap-2 mt-1">
+              {/* Attach File */}
+              <button
+                type="button"
+                disabled={disabled || uploading}
+                onClick={() => !disabled && !uploading && inputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition"
+              >
+                <Paperclip size={12} /> Attach File
+              </button>
+
+              {/* Take Photo — uses device camera */}
+              <button
+                type="button"
+                disabled={disabled || uploading}
+                onClick={() => !disabled && !uploading && cameraRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
+                title="Take a photo with your camera"
+              >
+                <Camera size={12} /> Take Photo
+              </button>
+            </div>
           </>
         )}
+
+        {/* Hidden file input — any file */}
         <input
           ref={inputRef}
           type="file"
@@ -90,6 +107,17 @@ export default function AttachmentUploader({ attachments = [], onAttachmentsChan
           accept="image/*,.pdf"
           className="hidden"
           onChange={handleFileChange}
+          disabled={disabled || uploading}
+        />
+
+        {/* Hidden camera input — opens device camera directly */}
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handleCameraChange}
           disabled={disabled || uploading}
         />
       </div>
