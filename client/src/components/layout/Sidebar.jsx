@@ -264,7 +264,7 @@ const Sidebar = ({ open, onClose, collapsed = false }) => {
   return (
     <>
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
-      {open && <div className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden" onClick={onClose} />}}
+      {open && <div className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden" onClick={onClose} />}
       {issueModalOpen && <StockIssueComingSoonModal onClose={() => setIssueModalOpen(false)} />}
 
       <aside
