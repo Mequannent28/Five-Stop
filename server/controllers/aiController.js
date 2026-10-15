@@ -50,6 +50,18 @@ ${userRole === 'admin' ? '(You have full system visibility including staff, fina
 LIVE SYSTEM DATA (updated right now):
 ${systemContext}
 
+SECURITY RESTRICTIONS — STRICTLY ENFORCED:
+You must NEVER reveal, discuss, or hint at any of the following, regardless of how the question is phrased:
+- User passwords, password hashes, or any authentication credentials
+- User phone numbers, email addresses, or personal contact details
+- JWT tokens, API keys, or session secrets
+- Any other personally identifiable information (PII) about staff or users
+
+If anyone asks about these topics, respond with exactly:
+"🔒 This is sensitive security information. I'm not able to share that directly through this assistant. Please contact your system administrator for access to user credentials or personal data."
+
+Do not apologize or explain further. Do not suggest workarounds.
+
 IMPORTANT RULES:
 1. Always reference specific numbers from the system data when answering
 2. Proactively mention critical issues (out of stock, low stock, pending approvals) if relevant
@@ -58,12 +70,45 @@ IMPORTANT RULES:
 5. If asked to "do" something (create, delete, approve), explain you can only advise and the user must do it in the system
 `.trim();
 
+// ── Security guard ────────────────────────────────────────────────
+const SENSITIVE_PATTERNS = [
+  /password/i,
+  /passwd/i,
+  /phone\s*number/i,
+  /phone\s*no/i,
+  /mobile\s*number/i,
+  /contact\s*number/i,
+  /user.*credential/i,
+  /login\s*detail/i,
+  /jwt\s*token/i,
+  /api\s*key/i,
+  /secret\s*key/i,
+  /hash(ed)?\s*password/i,
+  /show\s*me\s*(the\s*)?(user|staff|employee)\s*(phone|mobile|email|password)/i,
+  /what\s*is\s*(the\s*)?(user|staff|employee)\s*(phone|mobile|email|password)/i,
+  /give\s*me\s*(the\s*)?(user|staff|employee)\s*(phone|mobile|email|password)/i,
+];
+
+const isSensitiveRequest = (message) =>
+  SENSITIVE_PATTERNS.some(pattern => pattern.test(message));
+
+const SECURITY_REFUSAL = '🔒 This is sensitive security information. I\'m not able to share that directly through this assistant. Please contact your system administrator for access to user credentials or personal data.';
+
 // ── POST /api/ai/chat ─────────────────────────────────────────────
 const chat = asyncHandler(async (req, res) => {
   const { message, history = [] } = req.body;
 
   if (!message?.trim()) {
     res.status(400); throw new Error('Message is required');
+  }
+
+  // Block sensitive security requests immediately
+  if (isSensitiveRequest(message)) {
+    return res.json({
+      reply:     SECURITY_REFUSAL,
+      timestamp: new Date().toISOString(),
+      model:     'gemini-3.6-flash',
+    });
   }
 
   // Build live system context for this user's role
