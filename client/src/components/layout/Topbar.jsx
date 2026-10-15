@@ -1,11 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Menu, LogOut, ChevronDown, User, Shield, Building,
   Layers, Clock, HelpCircle, X, BookOpen, Package,
   ArrowLeftRight, ShoppingCart, BarChart2, Users,
   ChevronRight, Search, Lightbulb, CheckCircle2, PlayCircle,
+  Bell, BellRing, Check, Trash2,
 } from 'lucide-react';
+import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { useSessionTimeout } from '../../context/SessionTimeoutContext';
 
@@ -295,6 +297,182 @@ const HelpModal = ({ onClose }) => {
 };
 
 // ─────────────────────────────────────────
+// NOTIFICATION BELL COMPONENT
+// ─────────────────────────────────────────
+const SEVERITY_STYLES = {
+  info:    { dot: 'bg-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-700'    },
+  success: { dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  warning: { dot: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700'   },
+  error:   { dot: 'bg-rose-500',    bg: 'bg-rose-50',    text: 'text-rose-700'    },
+};
+
+const TYPE_ICONS = {
+  purchase:      '🛒',
+  stock_request: '📦',
+  transaction:   '↔️',
+  consumption:   '🍽️',
+  material:      '🧱',
+  employee:      '👷',
+  user:          '👤',
+  system:        '⚙️',
+  low_stock:     '⚠️',
+};
+
+const NotificationBell = () => {
+  const [open, setOpen]               = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unread, setUnread]           = useState(0);
+  const [loading, setLoading]         = useState(false);
+  const bellRef                       = useRef(null);
+  const navigate                      = useNavigate();
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await api.get('/notifications');
+      setNotifications(res.data.notifications || []);
+      setUnread(res.data.unread || 0);
+    } catch { /* silent */ }
+  }, []);
+
+  // Poll every 30 seconds
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (bellRef.current && !bellRef.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const markAllRead = async () => {
+    try {
+      await api.post('/notifications/read-all');
+      setUnread(0);
+      setNotifications(prev => prev.map(n => ({ ...n, _read: true })));
+    } catch { /* silent */ }
+  };
+
+  const handleClick = (n) => {
+    api.post(`/notifications/${n._id}/read`).catch(() => {});
+    setOpen(false);
+    if (n.link) navigate(n.link);
+  };
+
+  const timeAgo = (dateStr) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1)  return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+
+  return (
+    <div className="relative" ref={bellRef}>
+      <button
+        onClick={() => { setOpen(v => !v); if (!open) fetchNotifications(); }}
+        className={`relative flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+          unread > 0
+            ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100'
+            : 'border-ink-200 bg-white text-ink-500 hover:bg-ink-50'
+        }`}
+        title="Notifications"
+      >
+        {unread > 0 ? <BellRing size={16} className="animate-[wiggle_1s_ease-in-out_infinite]" /> : <Bell size={16} />}
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white shadow-sm">
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-ink-100 bg-white shadow-2xl ring-1 ring-black/5 z-50 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-ink-100 bg-ink-50/60">
+            <div className="flex items-center gap-2">
+              <Bell size={14} className="text-blue-600" />
+              <span className="text-xs font-bold text-ink-900">Notifications</span>
+              {unread > 0 && (
+                <span className="rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold px-1.5 py-0.5">
+                  {unread} new
+                </span>
+              )}
+            </div>
+            {unread > 0 && (
+              <button
+                onClick={markAllRead}
+                className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
+              >
+                <Check size={11} /> Mark all read
+              </button>
+            )}
+          </div>
+
+          {/* List */}
+          <div className="max-h-80 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="py-10 text-center">
+                <Bell size={24} className="mx-auto mb-2 text-ink-200" />
+                <p className="text-xs font-medium text-ink-500">No notifications yet</p>
+                <p className="text-[10px] text-ink-400 mt-0.5">Actions you take will appear here</p>
+              </div>
+            ) : (
+              notifications.map((n) => {
+                const sev = SEVERITY_STYLES[n.severity] || SEVERITY_STYLES.info;
+                const isRead = n._read || n.readBy?.length > 0;
+                return (
+                  <button
+                    key={n._id}
+                    onClick={() => handleClick(n)}
+                    className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-ink-50/80 transition border-b border-ink-50 last:border-0 ${
+                      !isRead ? 'bg-blue-50/30' : ''
+                    }`}
+                  >
+                    <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl text-sm ${sev.bg}`}>
+                      {TYPE_ICONS[n.type] || '📋'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-xs font-bold truncate ${!isRead ? 'text-ink-900' : 'text-ink-700'}`}>
+                          {n.title}
+                        </p>
+                        {!isRead && <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${sev.dot}`} />}
+                      </div>
+                      <p className="text-[11px] text-ink-500 leading-relaxed mt-0.5 line-clamp-2">
+                        {n.message}
+                      </p>
+                      <p className="text-[10px] text-ink-400 mt-1">{timeAgo(n.createdAt)}</p>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-ink-100 px-4 py-2.5 bg-ink-50/40 text-center">
+            <button
+              onClick={() => { setOpen(false); fetchNotifications(); }}
+              className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
+            >
+              Refresh notifications
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────
 // TOPBAR COMPONENT
 // ─────────────────────────────────────────
 const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
@@ -359,7 +537,7 @@ const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
           </div>
         </div>
 
-        {/* Right: session indicator + user menu */}
+        {/* Right: session indicator + notifications + user menu */}
         <div className="flex items-center gap-2.5">
           {/* Session timeout indicator */}
           <div
@@ -373,6 +551,9 @@ const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
               {timeoutMinutes === 0 ? 'Timeout: Off' : `Auto-Logout: ${timeoutMinutes}m`}
             </span>
           </div>
+
+          {/* Notification Bell */}
+          <NotificationBell />
 
           {/* User menu */}
           <div className="relative" ref={menuRef}>

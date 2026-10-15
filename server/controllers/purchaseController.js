@@ -6,6 +6,8 @@ const StockTransaction = require('../models/StockTransaction');
 const User = require('../models/User');
 const { invalidateDashboardCache } = require('./dashboardController');
 const { hasPermission } = require('../middleware/authMiddleware');
+const tg = require('../utils/telegramNotifier');
+const notify = require('../utils/notificationHelper');
 
 // ── helpers ──────────────────────────────────────────────────────────
 const applyStock = async (purchase, performedBy) => {
@@ -85,6 +87,8 @@ const createPurchase = asyncHandler(async (req, res) => {
     { path: 'items.material', select: 'name unit' },
     { path: 'recordedBy', select: 'name role' },
   ]);
+  tg.notifyPurchaseCreated(populated.toObject ? populated.toObject() : populated, req.user);
+  notify.push({ type: 'purchase', title: 'New Purchase Order', message: `${req.user.name} created a draft PO for ${populated.supplier?.name || 'supplier'} — ${populated.totalAmount ? 'ETB ' + Number(populated.totalAmount).toLocaleString() : ''}`, icon: '📝', link: '/purchases', severity: 'info', userId: req.user._id });
   res.status(201).json(populated);
 });
 
@@ -162,6 +166,10 @@ const advancePurchase = asyncHandler(async (req, res) => {
     .populate('recordedBy checkedBy approvedBy receivedBy', 'name role');
 
   res.json({ message: `Purchase moved from "${prev}" → "${rule.to}"`, purchase: populated });
+  tg.notifyPurchaseAdvanced(populated, action, actor);
+  const actionLabels = { check: 'checked', approve: 'approved', receive: 'received — stock added', cancel: 'cancelled' };
+  const sev = action === 'receive' ? 'success' : action === 'cancel' ? 'warning' : 'info';
+  notify.push({ type: 'purchase', title: `Purchase ${actionLabels[action] || action}`, message: `${actor.name} ${actionLabels[action] || action} PO for ${populated.supplier?.name || 'supplier'}`, icon: action === 'receive' ? '📦' : action === 'cancel' ? '🔴' : '✅', link: '/purchases', severity: sev, userId: actor._id });
 });
 
 // ── DELETE /api/purchases/:id ─────────────────────────────────────────
@@ -174,6 +182,8 @@ const deletePurchase = asyncHandler(async (req, res) => {
   }
   await purchase.deleteOne();
   invalidateDashboardCache();
+  tg.notifyPurchaseDeleted(purchase, req.user);
+  notify.push({ type: 'purchase', title: 'Purchase Order Deleted', message: `${req.user.name} deleted PO for ${purchase.supplier?.name || 'supplier'}`, icon: '🗑️', link: '/purchases', severity: 'warning', userId: req.user._id });
   res.json({ message: 'Purchase deleted' });
 });
 

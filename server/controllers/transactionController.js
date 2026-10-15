@@ -7,6 +7,7 @@ const User = require('../models/User');
 const { invalidateDashboardCache } = require('./dashboardController');
 const { hasPermission } = require('../middleware/authMiddleware');
 const tg = require('../utils/telegramNotifier');
+const notify = require('../utils/notificationHelper');
 
 // ── helpers ───────────────────────────────────────────────────────────
 const verifyUserPassword = async (userId, password) => {
@@ -150,6 +151,7 @@ const createTransaction = asyncHandler(async (req, res) => {
 
   invalidateDashboardCache();
   tg.notifyTransaction(populated, req.user);
+  notify.push({ type: 'transaction', title: 'New Stock Transaction', message: `${req.user.name} recorded a ${populated.voucherType?.replace('_',' ')} — ${populated.items?.length || 1} item(s)`, icon: populated.type === 'in' ? '📥' : '📤', link: '/transactions', severity: 'info', userId: req.user._id });
   res.status(201).json(populated);
 });
 // ── PUT /api/transactions/:id ─────────────────────────────────────────
@@ -296,6 +298,7 @@ const deleteTransaction = asyncHandler(async (req, res) => {
   await transaction.save();
 
   tg.notifyTransactionDeleted(transaction, req.user);
+  notify.push({ type: 'transaction', title: 'Transaction Deleted', message: `${req.user.name} deleted voucher ${transaction.voucherNo || transaction._id?.toString().slice(-6)}`, icon: '🗑️', link: '/transactions', severity: 'warning', userId: req.user._id });
   invalidateDashboardCache();
   res.json({ message: 'Transaction moved to recycle bin and stock reversed.' });
 });
@@ -508,6 +511,9 @@ const advanceTransaction = asyncHandler(async (req, res) => {
     .populate('performedBy checkedBy approvedBy postedBy', 'name role');
 
   tg.notifyTransactionAdvanced(populated, action, actor);
+  if (['void','approve'].includes(action)) {
+    notify.push({ type: 'transaction', title: `Voucher ${action}d`, message: `${actor.name} ${action}d ${populated.voucherNo || 'voucher'}`, icon: action === 'void' ? '🔴' : '🟣', link: '/transactions', severity: action === 'void' ? 'error' : 'success', userId: actor._id });
+  }
   res.json({ message: `Voucher moved from "${prev}" → "${rule.to}"`, transaction: populated });
 });
 

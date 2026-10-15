@@ -579,6 +579,246 @@ ${varLines}
   );
 }
 
+// ── PURCHASES ─────────────────────────────────────────────────────
+
+const PURCHASE_ACTION_EMOJI = {
+  draft:     '📝',
+  checked:   '✅',
+  approved:  '🟣',
+  received:  '📦',
+  cancelled: '🔴',
+};
+
+function notifyPurchaseCreated(purchase, user) {
+  const items = (purchase.items || []).map(i =>
+    `  • ${i.material?.name || '—'} × <b>${i.quantity}</b> ${i.material?.unit || ''} @ ${etb(i.unitCost)}`
+  ).join('\n');
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+📝 <b>NEW PURCHASE ORDER (DRAFT)</b>
+
+🔖 <b>Invoice No:</b>  ${purchase.invoiceNumber || 'Pending'}
+🏪 <b>Supplier:</b>   ${purchase.supplier?.name || '—'}
+💰 <b>Total:</b>      ${etb(purchase.totalAmount)}
+📋 <b>Status:</b>     DRAFT
+
+📦 <b>Items:</b>
+${items || '  —'}
+
+👤 <b>Created by:</b> ${user?.name || '—'} (${user?.role || ''})
+🕐 <b>Time:</b>       ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyPurchaseAdvanced(purchase, action, actor) {
+  const emoji = PURCHASE_ACTION_EMOJI[purchase.status] || '🔄';
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+${emoji} <b>PURCHASE ${action.toUpperCase()}ED</b>
+
+🔖 <b>Invoice:</b>  ${purchase.invoiceNumber || purchase._id?.toString().slice(-6)}
+🏪 <b>Supplier:</b> ${purchase.supplier?.name || '—'}
+💰 <b>Total:</b>    ${etb(purchase.totalAmount)}
+📋 <b>Status:</b>   ${(purchase.status || '').toUpperCase()}
+${action === 'receive' ? '\n📦 <b>Stock has been added to inventory.</b>' : ''}
+👤 <b>By:</b>   ${actor?.name || '—'} (${actor?.role || ''})
+🕐 <b>Time:</b> ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyPurchaseDeleted(purchase, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+🗑️ <b>PURCHASE ORDER DELETED</b>
+
+🔖 <b>Invoice:</b>  ${purchase.invoiceNumber || '—'}
+🏪 <b>Supplier:</b> ${purchase.supplier?.name || '—'}
+💰 <b>Total:</b>    ${etb(purchase.totalAmount)}
+📋 <b>Was:</b>      ${(purchase.status || '').toUpperCase()}
+
+👤 <b>Deleted by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>       ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+// ── EMPLOYEES ─────────────────────────────────────────────────────
+
+function notifyEmployeeCreated(emp, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+👷 <b>NEW EMPLOYEE ADDED</b>
+
+🆔 <b>ID:</b>         ${emp.employeeId || '—'}
+👤 <b>Name:</b>       ${emp.firstName} ${emp.lastName}
+🏢 <b>Department:</b> ${emp.department || '—'}
+💼 <b>Position:</b>   ${emp.position || '—'}
+📞 <b>Phone:</b>      ${emp.phone || '—'}
+
+🛠 <b>Added by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>     ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyEmployeeUpdated(emp, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+✏️ <b>EMPLOYEE UPDATED</b>
+
+🆔 <b>ID:</b>         ${emp.employeeId || '—'}
+👤 <b>Name:</b>       ${emp.firstName} ${emp.lastName}
+🏢 <b>Department:</b> ${emp.department || '—'}
+💼 <b>Position:</b>   ${emp.position || '—'}
+📋 <b>Status:</b>     ${(emp.status || '').toUpperCase()}
+
+🛠 <b>Updated by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>       ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyEmployeeDeleted(emp, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+🗑️ <b>EMPLOYEE REMOVED</b>
+
+🆔 <b>ID:</b>         ${emp.employeeId || '—'}
+👤 <b>Name:</b>       ${emp.firstName} ${emp.lastName}
+🏢 <b>Department:</b> ${emp.department || '—'}
+
+🛠 <b>Deleted by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>       ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+// ── STOCK REQUEST EXTRA EVENTS ────────────────────────────────────
+
+function notifyStockRequestRejected(req, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+❌ <b>STOCK REQUEST REJECTED</b>
+
+🔖 <b>Voucher:</b>    ${req.voucherNo || '—'}
+🏢 <b>Department:</b> ${req.department}
+📦 <b>Items:</b>      ${req.items?.length || 0} line(s)
+💬 <b>Reason:</b>     ${req.rejectReason || '—'}
+
+👤 <b>Rejected by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>        ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyStockRequestCancelled(req, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+🚫 <b>STOCK REQUEST CANCELLED</b>
+
+🔖 <b>Voucher:</b>    ${req.voucherNo || '—'}
+🏢 <b>Department:</b> ${req.department}
+
+👤 <b>Cancelled by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>         ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyStockRequestDeleted(req, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+🗑️ <b>STOCK REQUEST DELETED</b>
+
+🔖 <b>Voucher:</b>    ${req.voucherNo || '—'}
+🏢 <b>Department:</b> ${req.department}
+📋 <b>Was:</b>        ${(req.status || '').toUpperCase()}
+
+👤 <b>Deleted by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>       ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+// ── CONSUMPTION EXTRA EVENTS ──────────────────────────────────────
+
+function notifyConsumptionVoided(record, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+🔴 <b>CONSUMPTION VOIDED</b>
+
+🔖 <b>Voucher:</b>     ${record.voucherNo || '—'}
+🗂 <b>Category:</b>    ${record.category || '—'}
+💰 <b>Recipe Cost:</b> ${etb(record.totalRecipeCost)}
+${record.status === 'approved' ? '📦 <b>Stock has been reversed.</b>' : ''}
+👤 <b>Voided by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>      ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyConsumptionDeleted(record, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+🗑️ <b>CONSUMPTION DELETED</b>
+
+🔖 <b>Voucher:</b>  ${record.voucherNo || '—'}
+🗂 <b>Category:</b> ${record.category || '—'}
+
+👤 <b>Deleted by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>       ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+// ── PERMANENT DELETE ──────────────────────────────────────────────
+
+function notifyPermanentDeleted(type, name, user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+💥 <b>PERMANENTLY DELETED</b>
+
+📂 <b>Type:</b> ${type}
+📦 <b>Item:</b> ${name}
+⚠️  This action is <b>irreversible</b>.
+
+👤 <b>By:</b>   ${user?.name || '—'}
+🕐 <b>Time:</b> ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+// ── PASSWORD / PROFILE CHANGES ────────────────────────────────────
+
+function notifyPasswordChanged(user) {
+  sendTelegram(
+`🏨 <b>${HOTEL}</b>
+━━━━━━━━━━━━━━━━━━━━
+🔑 <b>PASSWORD CHANGED</b>
+
+👤 <b>User:</b>  ${user.name}
+📧 <b>Email:</b> ${user.email}
+🎭 <b>Role:</b>  ${user.role?.toUpperCase()}
+
+🕐 <b>Time:</b> ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
 // ── STOCK ISSUE & REQUEST ─────────────────────────────────────────
 
 function notifyStockRequestCreated(req, user) {
@@ -743,4 +983,18 @@ module.exports = {
   notifyStockRequestCreated,
   notifyStockRequestApproved,
   notifyStockIssued,
+  // New
+  notifyPurchaseCreated,
+  notifyPurchaseAdvanced,
+  notifyPurchaseDeleted,
+  notifyEmployeeCreated,
+  notifyEmployeeUpdated,
+  notifyEmployeeDeleted,
+  notifyStockRequestRejected,
+  notifyStockRequestCancelled,
+  notifyStockRequestDeleted,
+  notifyConsumptionVoided,
+  notifyConsumptionDeleted,
+  notifyPermanentDeleted,
+  notifyPasswordChanged,
 };

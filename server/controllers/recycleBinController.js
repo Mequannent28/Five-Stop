@@ -6,7 +6,7 @@ const StockTransaction  = require('../models/StockTransaction');
 const { invalidateDashboardCache } = require('./dashboardController');
 const { VOUCHER_DIRECTION } = require('../models/StockTransaction');
 const tg = require('../utils/telegramNotifier');
-
+const notify = require('../utils/notificationHelper');
 // GET /api/recycle-bin
 // Returns all soft-deleted items across all collections
 const getRecycleBin = asyncHandler(async (req, res) => {
@@ -20,14 +20,12 @@ const getRecycleBin = asyncHandler(async (req, res) => {
       .populate('items.material', 'name unit')
       .lean().catch(() => []),
   ]);
-
   const items = [
     ...materials.map(m => ({ ...m, _type: 'material', _typeLabel: 'Raw Material' })),
     ...suppliers.map(s => ({ ...s, _type: 'supplier', _typeLabel: 'Supplier' })),
     ...products.map(p => ({ ...p, _type: 'product', _typeLabel: 'Product' })),
     ...transactions.map(t => ({ ...t, _type: 'transaction', _typeLabel: 'Transaction' })),
   ].sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
-
   res.json(items);
 });
 // POST /api/recycle-bin/:type/:id/restore
@@ -95,11 +93,13 @@ const permanentDelete = asyncHandler(async (req, res) => {
   };
   const Model = modelMap[type];
   if (!Model) { res.status(400); throw new Error(`Unknown type: ${type}`); }
-
   const doc = await Model.findById(id);
   if (!doc) { res.status(404); throw new Error('Item not found'); }
   await doc.deleteOne();
   if (type === 'material' || type === 'product' || type === 'transaction') invalidateDashboardCache();
+  const name = doc.name || doc.voucherNo || doc.firstName || String(id);
+  tg.notifyPermanentDeleted(type, name, req.user);
+  notify.push({ type: 'system', title: 'Item Permanently Deleted', message: `${req.user?.name || 'Admin'} permanently deleted ${type}: ${name}`, icon: '💥', link: '/recycle-bin', severity: 'error', userId: req.user?._id });
   res.json({ message: 'Permanently deleted.' });
 });
 

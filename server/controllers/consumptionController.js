@@ -5,6 +5,7 @@ const Product = require('../models/Product');
 const RawMaterial = require('../models/RawMaterial');
 const { invalidateDashboardCache } = require('./dashboardController');
 const tg = require('../utils/telegramNotifier');
+const notify = require('../utils/notificationHelper');
 
 // ── Auto voucher number ───────────────────────────────────────────
 const generateVoucherNo = async () => {
@@ -123,6 +124,7 @@ const createConsumption = asyncHandler(async (req, res) => {
 
   invalidateDashboardCache();
   tg.notifyConsumptionCreated(populated, req.user);
+  notify.push({ type: 'consumption', title: 'New Consumption Record', message: `${req.user.name} created consumption voucher ${populated.voucherNo}`, icon: '🍽️', link: '/consumption', severity: 'info', userId: req.user._id });
   res.status(201).json(populated);
 });
 
@@ -195,6 +197,7 @@ const approveConsumption = asyncHandler(async (req, res) => {
 
   invalidateDashboardCache();
   tg.notifyConsumptionApproved(populated, req.user);
+  notify.push({ type: 'consumption', title: 'Consumption Approved', message: `${req.user.name} approved ${populated.voucherNo} — stock deducted`, icon: '✅', link: '/consumption', severity: 'success', userId: req.user._id });
   res.json({ message: 'Consumption approved and stock deducted.', record: populated });
 });
 
@@ -215,6 +218,8 @@ const voidConsumption = asyncHandler(async (req, res) => {
   await record.save();
 
   invalidateDashboardCache();
+  tg.notifyConsumptionVoided(record, req.user);
+  notify.push({ type: 'consumption', title: 'Consumption Voided', message: `${req.user.name} voided voucher ${record.voucherNo}`, icon: '🔴', link: '/consumption', severity: 'warning', userId: req.user._id });
   res.json({ message: 'Consumption voided.', record });
 });
 
@@ -228,6 +233,8 @@ const deleteConsumption = asyncHandler(async (req, res) => {
   record.deletedAt = new Date();
   record.deletedBy = req.user?.name || 'System';
   await record.save();
+  tg.notifyConsumptionDeleted(record, req.user);
+  notify.push({ type: 'consumption', title: 'Consumption Deleted', message: `${req.user.name} deleted voucher ${record.voucherNo}`, icon: '🗑️', link: '/consumption', severity: 'warning', userId: req.user._id });
   res.json({ message: 'Moved to recycle bin.' });
 });
 

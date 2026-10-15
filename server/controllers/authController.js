@@ -185,7 +185,7 @@ const updatePassword = asyncHandler(async (req, res) => {
 
   user.password = newPassword;
   await user.save();
-
+  tg.notifyPasswordChanged(req.user);
   res.json({ message: 'Password updated successfully' });
 });
 
