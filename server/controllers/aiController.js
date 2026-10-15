@@ -1,7 +1,7 @@
 /**
  * AI Controller — Five Stop Stock Management System
  * ──────────────────────────────────────────────────────────────────
- * Uses Google Gemini 3.6 Flash with live system context from MongoDB.
+ * Uses Google Gemini 2.5 Flash with live system context from MongoDB.
  * Each request gets a fresh snapshot so the AI always has current data.
  *
  * Endpoints:
@@ -14,9 +14,10 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { buildSystemContext } = require('../utils/systemContextService');
 
 // ── Gemini setup ─────────────────────────────────────────────────
-// Primary: gemini-2.0-flash — higher free-tier quota (1500 req/day)
-// Fallback: gemini-2.0-flash-lite — even more generous quota
-const MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+// Confirmed available models for this API key (via ListModels):
+//   gemini-2.5-flash      → primary stable model
+//   gemini-2.5-flash-lite → fallback on quota/errors
+const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
 
 const getGemini = (modelIndex = 0) => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -39,7 +40,7 @@ const getFriendlyError = (err) => {
     return '⏳ MEGA is temporarily unavailable due to high usage. Please try again in a few minutes. If this keeps happening, contact your system administrator to upgrade the AI plan.';
   }
   if (msg.includes('404') || msg.includes('not found')) {
-    return '⚙️ MEGA encountered a configuration issue. Please contact your system administrator.';
+    return '⏳ MEGA is temporarily unavailable. Please try again in a moment.';
   }
   if (msg.includes('401') || msg.includes('403') || msg.includes('API key')) {
     return '🔑 MEGA is not properly configured. Please contact your system administrator to check the API settings.';
@@ -200,7 +201,6 @@ Respond with a JSON object in this exact format:
 Focus on: out of stock items, low stock, pending purchase approvals, high-value stock issues.
 Return ONLY valid JSON, no markdown, no extra text.
 `.trim();
-
   for (let i = 0; i < MODELS.length; i++) {
     try {
       const model  = getGemini(i);
