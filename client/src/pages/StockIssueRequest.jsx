@@ -111,20 +111,17 @@ export default function StockIssueRequest() {
   // ── Issue qty overrides ──────────────────────────────────────
   const [issueQtys, setIssueQtys] = useState({});
 
-  // ── Load data ────────────────────────────────────────────────
+  // ── Load data — split into fast (page load) + lazy (modal only) ────
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const [reqRes, matRes, sumRes] = await Promise.all([
+      // Only load requests + summary on page load — fast
+      const [reqRes, sumRes] = await Promise.all([
         api.get('/stock-requests'),
-        api.get('/materials?isActive=true&limit=500'),
         api.get('/stock-requests/summary'),
       ]);
       setRequests(Array.isArray(reqRes.data) ? reqRes.data : []);
-      setMaterials(Array.isArray(matRes.data?.materials)
-        ? matRes.data.materials
-        : Array.isArray(matRes.data) ? matRes.data : []);
       setSummary(sumRes.data || {});
     } catch (err) {
       console.error('Failed to load stock requests', err);
@@ -133,6 +130,21 @@ export default function StockIssueRequest() {
       setRefreshing(false);
     }
   }, []);
+
+  // Lazy-load materials only when create modal is opened
+  const loadMaterials = useCallback(async () => {
+    if (materials.length > 0) return; // already loaded
+    try {
+      const matRes = await api.get('/materials?isActive=true&limit=500');
+      setMaterials(
+        Array.isArray(matRes.data?.materials)
+          ? matRes.data.materials
+          : Array.isArray(matRes.data) ? matRes.data : []
+      );
+    } catch (err) {
+      console.error('Failed to load materials', err);
+    }
+  }, [materials.length]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -163,6 +175,7 @@ export default function StockIssueRequest() {
     setFormItems([{ ...EMPTY_ITEM }]);
     setFormError('');
     setCreateOpen(true);
+    loadMaterials(); // lazy load
   };
 
   const openEdit = (req) => {
@@ -178,6 +191,7 @@ export default function StockIssueRequest() {
     })));
     setFormError('');
     setCreateOpen(true);
+    loadMaterials(); // lazy load
   };
 
   const addItem    = () => setFormItems(prev => [...prev, { ...EMPTY_ITEM }]);
@@ -357,7 +371,7 @@ export default function StockIssueRequest() {
           </button>
           {canIssue && (
             <button
-              onClick={() => { setFormType('direct_issue'); openCreate(); setTimeout(() => setFormType('direct_issue'), 50); }}
+              onClick={() => { openCreate(); setTimeout(() => setFormType('direct_issue'), 50); }}
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-sm"
             >
               <PackageCheck size={14} /> Direct Issue
@@ -695,7 +709,7 @@ export default function StockIssueRequest() {
                               onChange={e => updateItem(idx, 'material', e.target.value)}
                               className="w-full rounded-lg border border-ink-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-500"
                             >
-                              <option value="">Select material...</option>
+                              <option value="">{materials.length === 0 ? 'Loading materials...' : 'Select material...'}</option>
                               {materials.map(m => (
                                 <option key={m._id} value={m._id}>
                                   {m.name} ({m.currentStock} {m.unit} available)

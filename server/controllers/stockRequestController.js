@@ -69,6 +69,7 @@ const getStockRequests = asyncHandler(async (req, res) => {
     .populate('issuedBy',    'name role')
     .populate('rejectedBy',  'name role')
     .sort({ createdAt: -1 })
+    .limit(200)   // cap at 200 — prevents unbounded queries
     .lean();
 
   res.json(requests);

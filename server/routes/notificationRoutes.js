@@ -25,12 +25,16 @@ router.post('/read-all', asyncHandler(async (req, res) => {
   res.json({ message: 'All marked as read' });
 }));
 
-// POST /api/notifications/:id/read — mark one as read
-router.post('/:id/read', asyncHandler(async (req, res) => {
-  await Notification.findByIdAndUpdate(req.params.id, {
-    $addToSet: { readBy: req.user._id },
-  });
-  res.json({ message: 'Marked as read' });
+// DELETE /api/notifications/:id — permanently delete a single notification
+router.delete('/:id', asyncHandler(async (req, res) => {
+  await Notification.findByIdAndDelete(req.params.id);
+  res.json({ message: 'Deleted' });
+}));
+
+// DELETE /api/notifications — delete all (clear all)
+router.delete('/', asyncHandler(async (req, res) => {
+  await Notification.deleteMany({});
+  res.json({ message: 'All cleared' });
 }));
 
 module.exports = router;

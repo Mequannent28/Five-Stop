@@ -5,7 +5,7 @@ import {
   Layers, Clock, HelpCircle, X, BookOpen, Package,
   ArrowLeftRight, ShoppingCart, BarChart2, Users,
   ChevronRight, Search, Lightbulb, CheckCircle2, PlayCircle,
-  Bell, BellRing, Check, Trash2,
+  Bell, BellRing, Trash2,
 } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
@@ -322,7 +322,6 @@ const NotificationBell = () => {
   const [open, setOpen]               = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread]           = useState(0);
-  const [loading, setLoading]         = useState(false);
   const bellRef                       = useRef(null);
   const navigate                      = useNavigate();
 
@@ -350,18 +349,20 @@ const NotificationBell = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const markAllRead = async () => {
-    try {
-      await api.post('/notifications/read-all');
-      setUnread(0);
-      setNotifications(prev => prev.map(n => ({ ...n, _read: true })));
-    } catch { /* silent */ }
-  };
-
+  // Click = remove instantly from UI + delete from DB
   const handleClick = (n) => {
-    api.post(`/notifications/${n._id}/read`).catch(() => {});
+    setNotifications(prev => prev.filter(x => x._id !== n._id));
+    setUnread(prev => Math.max(0, prev - 1));
+    api.delete(`/notifications/${n._id}`).catch(() => {});
     setOpen(false);
     if (n.link) navigate(n.link);
+  };
+
+  // Clear all
+  const clearAll = async () => {
+    setNotifications([]);
+    setUnread(0);
+    api.delete('/notifications').catch(() => {});
   };
 
   const timeAgo = (dateStr) => {
@@ -385,7 +386,7 @@ const NotificationBell = () => {
         }`}
         title="Notifications"
       >
-        {unread > 0 ? <BellRing size={16} className="animate-[wiggle_1s_ease-in-out_infinite]" /> : <Bell size={16} />}
+        {unread > 0 ? <BellRing size={16} /> : <Bell size={16} />}
         {unread > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white shadow-sm">
             {unread > 9 ? '9+' : unread}
@@ -406,12 +407,12 @@ const NotificationBell = () => {
                 </span>
               )}
             </div>
-            {unread > 0 && (
+            {notifications.length > 0 && (
               <button
-                onClick={markAllRead}
-                className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
+                onClick={clearAll}
+                className="flex items-center gap-1 text-[11px] font-semibold text-rose-500 hover:text-rose-700 transition"
               >
-                <Check size={11} /> Mark all read
+                <Trash2 size={11} /> Clear all
               </button>
             )}
           </div>
@@ -421,49 +422,55 @@ const NotificationBell = () => {
             {notifications.length === 0 ? (
               <div className="py-10 text-center">
                 <Bell size={24} className="mx-auto mb-2 text-ink-200" />
-                <p className="text-xs font-medium text-ink-500">No notifications yet</p>
-                <p className="text-[10px] text-ink-400 mt-0.5">Actions you take will appear here</p>
+                <p className="text-xs font-medium text-ink-500">All caught up!</p>
+                <p className="text-[10px] text-ink-400 mt-0.5">New activity will appear here</p>
               </div>
             ) : (
               notifications.map((n) => {
                 const sev = SEVERITY_STYLES[n.severity] || SEVERITY_STYLES.info;
-                const isRead = n._read || n.readBy?.length > 0;
                 return (
-                  <button
-                    key={n._id}
-                    onClick={() => handleClick(n)}
-                    className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-ink-50/80 transition border-b border-ink-50 last:border-0 ${
-                      !isRead ? 'bg-blue-50/30' : ''
-                    }`}
-                  >
-                    <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl text-sm ${sev.bg}`}>
-                      {TYPE_ICONS[n.type] || '📋'}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <p className={`text-xs font-bold truncate ${!isRead ? 'text-ink-900' : 'text-ink-700'}`}>
-                          {n.title}
-                        </p>
-                        {!isRead && <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${sev.dot}`} />}
+                  <div key={n._id} className="flex items-start gap-0 border-b border-ink-50 last:border-0 group hover:bg-ink-50/60 transition">
+                    {/* Main clickable area */}
+                    <button
+                      onClick={() => handleClick(n)}
+                      className="flex flex-1 items-start gap-3 px-4 py-3 text-left"
+                    >
+                      <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl text-sm ${sev.bg}`}>
+                        {TYPE_ICONS[n.type] || '📋'}
                       </div>
-                      <p className="text-[11px] text-ink-500 leading-relaxed mt-0.5 line-clamp-2">
-                        {n.message}
-                      </p>
-                      <p className="text-[10px] text-ink-400 mt-1">{timeAgo(n.createdAt)}</p>
-                    </div>
-                  </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-bold text-ink-900 truncate">{n.title}</p>
+                          <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${sev.dot}`} />
+                        </div>
+                        <p className="text-[11px] text-ink-500 leading-relaxed mt-0.5 line-clamp-2">
+                          {n.message}
+                        </p>
+                        <p className="text-[10px] text-ink-400 mt-1">{timeAgo(n.createdAt)}</p>
+                      </div>
+                    </button>
+                    {/* Dismiss X button */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleClick({ ...n, link: null }); }}
+                      className="px-2 py-3 text-ink-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition flex-shrink-0"
+                      title="Dismiss"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 );
               })
             )}
           </div>
 
           {/* Footer */}
-          <div className="border-t border-ink-100 px-4 py-2.5 bg-ink-50/40 text-center">
+          <div className="border-t border-ink-100 px-4 py-2.5 bg-ink-50/40 flex items-center justify-between">
+            <span className="text-[10px] text-ink-400">Click to view · X to dismiss</span>
             <button
-              onClick={() => { setOpen(false); fetchNotifications(); }}
+              onClick={() => { fetchNotifications(); }}
               className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 transition"
             >
-              Refresh notifications
+              Refresh
             </button>
           </div>
         </div>
