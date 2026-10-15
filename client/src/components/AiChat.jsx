@@ -328,8 +328,8 @@ export default function AiChat() {
                 <div ref={bottomRef} />
               </div>
 
-              {/* Suggestions */}
-              {suggestions.length > 0 && messages.length <= 2 && (
+              {/* Suggestions — always visible */}
+              {suggestions.length > 0 && (
                 <div className="px-3 pb-2 flex-shrink-0">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400 mb-1.5 px-1">
                     Quick questions
