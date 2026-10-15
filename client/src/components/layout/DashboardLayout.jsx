@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import AiChat from '../AiChat';
 
 const titles = {
   '/': 'Dashboard',
@@ -37,6 +38,7 @@ const titles = {
   '/settings': 'System Settings',
   '/profile': 'User Profile',
   '/recycle-bin': 'Recycle Bin',
+  '/stock-requests': 'Stock Issue & Request',
 };
 const DashboardLayout = () => {
   const [sidebarOpen,      setSidebarOpen]      = useState(false);  // mobile overlay
@@ -97,6 +99,8 @@ const DashboardLayout = () => {
           </footer>
         </main>
       </div>
+      {/* AI Chat — floats over every page */}
+      <AiChat />
     </div>
   );
 };
