@@ -217,7 +217,7 @@ export default function AiChat() {
           0%, 60%, 100% { transform: translateY(0); }
           30% { transform: translateY(-6px); }
         }
-        @keyframes faraSlideUp {
+        @keyframes megaSlideUp {
           from { opacity: 0; transform: translateY(16px) scale(0.96); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
@@ -256,7 +256,7 @@ export default function AiChat() {
           }`}
           style={{
             height: minimized ? 56 : 560,
-            animation: 'faraSlideUp 0.25s ease-out',
+            animation: 'megaSlideUp 0.25s ease-out',
             background: 'linear-gradient(180deg, #fafbff 0%, #ffffff 100%)',
           }}
         >
