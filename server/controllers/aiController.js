@@ -14,10 +14,10 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { buildSystemContext } = require('../utils/systemContextService');
 
 // ── Gemini setup ─────────────────────────────────────────────────
-// Confirmed available models for this API key (via ListModels):
-//   gemini-2.5-flash      → primary stable model
-//   gemini-2.5-flash-lite → fallback on quota/errors
-const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+// Confirmed working models (tested live against API key):
+//   gemini-3.5-flash-lite  → primary (confirmed working)
+//   gemini-flash-lite-latest → fallback (confirmed working)
+const MODELS = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest'];
 
 const getGemini = (modelIndex = 0) => {
   const apiKey = process.env.GEMINI_API_KEY;
