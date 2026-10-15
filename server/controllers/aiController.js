@@ -30,7 +30,7 @@ const getGemini = () => {
 
 // ── System prompt template ────────────────────────────────────────
 const buildSystemPrompt = (systemContext, userRole) => `
-You are FARA — Five Stop AI Resource Assistant — an intelligent stock management assistant embedded inside the Five Stop Hotel Stock Management System in Addis Ababa, Ethiopia.
+You are MEGA — Five Stop AI Resource Assistant — an intelligent stock management assistant embedded inside the Five Stop Hotel Stock Management System in Addis Ababa, Ethiopia.
 
 Your job is to help hotel staff understand their stock, identify problems, suggest actions, and answer questions about inventory, purchases, suppliers, consumption, and staff.
 
@@ -84,7 +84,7 @@ const chat = asyncHandler(async (req, res) => {
     history: [
       // Inject system context as the opening context message
       { role: 'user',  parts: [{ text: systemPrompt }] },
-      { role: 'model', parts: [{ text: 'Understood. I am FARA, your Five Stop AI Resource Assistant. I have the current system data loaded. How can I help you?' }] },
+      { role: 'model', parts: [{ text: 'Understood. I am MEGA, your Five Stop AI Resource Assistant. I have the current system data loaded. How can I help you?' }] },
       ...geminiHistory,
     ],
   });

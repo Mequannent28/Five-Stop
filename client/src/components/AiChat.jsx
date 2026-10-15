@@ -93,7 +93,7 @@ const SuggestionChip = ({ text, onClick }) => (
 );
 
 // ── INITIAL GREETING ──────────────────────────────────────────────
-const GREETING = `Hi! I'm **FARA** — your Five Stop AI Resource Assistant 🌟
+const GREETING = `Hi! I'm **MEGA** — your Five Stop AI Resource Assistant 🌟
 
 I have live access to your entire stock system right now. Ask me anything like:
 • "What items are out of stock?"
@@ -229,7 +229,7 @@ export default function AiChat() {
           onClick={handleOpen}
           className="fixed bottom-6 right-6 z-[998] flex items-center gap-2.5 rounded-2xl shadow-2xl px-4 py-3 text-white font-bold text-sm transition-all hover:scale-105 active:scale-95"
           style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 60%, #1a56db 100%)' }}
-          title="Open FARA — AI Assistant"
+          title="Open MEGA — AI Assistant"
         >
           <div className="relative">
             <Sparkles size={18} />
@@ -239,7 +239,7 @@ export default function AiChat() {
               </span>
             )}
           </div>
-          <span>Ask FARA</span>
+          <span>Ask MEGA</span>
           {analyzed && (
             <span className={`text-xs font-normal opacity-80`}>
               · Score {analyzed.score}/100
@@ -271,7 +271,7 @@ export default function AiChat() {
                 <Sparkles size={16} className="text-white" />
               </div>
               <div>
-                <p className="text-sm font-black text-white leading-tight">FARA</p>
+                <p className="text-sm font-black text-white leading-tight">MEGA</p>
                 <p className="text-[10px] text-purple-200 leading-tight">Five Stop AI Assistant</p>
               </div>
               {analyzed && (
@@ -368,7 +368,7 @@ export default function AiChat() {
                   </button>
                 </div>
                 <p className="text-center text-[10px] text-ink-300 mt-1.5">
-                  FARA · Powered by Google Gemini · Live system data
+                  MEGA · Powered by Google Gemini · Live system data
                 </p>
               </div>
             </>
