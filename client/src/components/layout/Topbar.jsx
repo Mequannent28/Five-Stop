@@ -1,36 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  Menu,
-  LogOut,
-  ChevronDown,
-  User,
-  Shield,
-  Building,
-  Settings as SettingsIcon,
-  Layers,
-  Clock,
-  Timer,
-  HelpCircle,
-  X,
-  BookOpen,
-  Package,
-  ArrowLeftRight,
-  ShoppingCart,
-  BarChart2,
-  Users,
-  ChevronRight,
-  Search,
-  Lightbulb,
-  AlertTriangle,
-  CheckCircle2,
-  PlayCircle,
+  Menu, LogOut, ChevronDown, User, Shield, Building,
+  Layers, Clock, HelpCircle, X, BookOpen, Package,
+  ArrowLeftRight, ShoppingCart, BarChart2, Users,
+  ChevronRight, Search, Lightbulb, CheckCircle2, PlayCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useSessionTimeout, TIMEOUT_OPTIONS } from '../../context/SessionTimeoutContext';
+import { useSessionTimeout } from '../../context/SessionTimeoutContext';
 
 // ─────────────────────────────────────────
-// HELP & DOCUMENTATION MODAL
+// HELP MODAL DATA
 // ─────────────────────────────────────────
 const HELP_SECTIONS = [
   {
@@ -39,9 +19,9 @@ const HELP_SECTIONS = [
     color: 'bg-blue-600',
     title: 'Getting Started',
     steps: [
-      { title: 'Log In', desc: 'Enter your username and password on the login page. Contact your Admin if you don\'t have credentials.' },
+      { title: 'Log In', desc: "Enter your username and password on the login page. Contact your Admin if you don't have credentials." },
       { title: 'Dashboard Overview', desc: 'After login, the Dashboard shows total stock value, reorder alerts, today\'s movements, and recent activity.' },
-      { title: 'Navigation', desc: 'Use the left sidebar to navigate between modules. Click the ☰ menu icon to collapse or expand it.' },
+      { title: 'Navigation', desc: 'Use the left sidebar to navigate between modules. Click the menu icon to collapse or expand it.' },
       { title: 'Quick Actions', desc: 'Use the buttons at the top of the Dashboard to quickly create a Cash GRV, Credit GRV, or view Inventory Count.' },
     ],
   },
@@ -53,8 +33,8 @@ const HELP_SECTIONS = [
     steps: [
       { title: 'View Materials', desc: 'Go to Raw Materials in the sidebar. All active materials are listed with their current stock, unit, and category.' },
       { title: 'Add a Material', desc: 'Click "+ Add Material". Fill in the name, unit (kg, L, pcs), category, and reorder level, then save.' },
-      { title: 'Edit / Archive', desc: 'Click the ⋯ action menu on any material row to edit its details or archive it (archived items won\'t appear in stock movements).' },
-      { title: 'Reorder Alerts', desc: 'Materials below their reorder level are highlighted in amber/red on the Dashboard and Reports. Set reorder levels carefully.' },
+      { title: 'Edit / Archive', desc: "Click the action menu on any material row to edit its details or archive it." },
+      { title: 'Reorder Alerts', desc: 'Materials below their reorder level are highlighted in amber/red on the Dashboard and Reports.' },
     ],
   },
   {
@@ -63,7 +43,7 @@ const HELP_SECTIONS = [
     color: 'bg-indigo-600',
     title: 'Stock Movements',
     steps: [
-      { title: 'Cash GRV', desc: 'Use for goods purchased with cash from a supplier. Go to Stock Movements → Cash Goods Receiving → Fill in supplier, items, quantities, and unit cost.' },
+      { title: 'Cash GRV', desc: 'Use for goods purchased with cash. Go to Stock Movements → Cash Goods Receiving → fill in supplier, items, quantities, and unit cost.' },
       { title: 'Credit GRV', desc: 'Use for goods received on credit. Same as Cash GRV but payment is deferred. Linked to a supplier account.' },
       { title: 'Positive Adjustment', desc: 'Use to correct stock upward (e.g., after a physical count finds extra items). Requires a reason.' },
       { title: 'Negative Adjustment', desc: 'Use to correct stock downward. Requires reason and manager/admin approval.' },
@@ -92,7 +72,7 @@ const HELP_SECTIONS = [
       { title: 'Stock Balance Sheet', desc: 'Shows current stock quantity and value for all materials. Export to PDF or Excel using the Export button.' },
       { title: 'Daily Report', desc: 'Summary of all stock movements for a selected day — inflow, outflow, adjustments, and disposals.' },
       { title: 'GRV Reports', desc: 'View all Cash, Credit, or Fresh Bazaar receiving records filtered by date range or supplier.' },
-      { title: 'Inventory Count', desc: 'Physical count reconciliation report. Compare system stock vs physical count and record variances.' },
+      { title: 'Inventory Count', desc: 'Physical count reconciliation. Compare system stock vs physical count and record variances.' },
       { title: 'Analytics & P&L', desc: 'View stock value trends, category breakdown, top assets, and profit/loss overview from the Analytics page.' },
     ],
   },
@@ -103,9 +83,9 @@ const HELP_SECTIONS = [
     title: 'Users & Access',
     steps: [
       { title: 'User Roles', desc: 'Admin: full access. Manager: approve, report, manage materials. Storekeeper: record movements. Viewer: read-only.' },
-      { title: 'Add a Staff Member', desc: 'Go to Staff Accounts → Add User. Set name, email, password, and role. The user can change their password after first login.' },
-      { title: 'Change Password', desc: 'Click your name at the top right → Security & Password → enter current password and new password.' },
-      { title: 'Session Timeout', desc: 'For security, the system auto-logs you out after a period of inactivity. You can change this in the top-right menu.' },
+      { title: 'Add a Staff Member', desc: 'Go to Staff Accounts → Add User. Set name, email, password, and role.' },
+      { title: 'Change Password', desc: 'Click your name at the top right → Security & Password → enter current and new password.' },
+      { title: 'Session Timeout', desc: 'The system auto-logs you out after inactivity. You can change the timeout in the top-right menu.' },
     ],
   },
 ];
@@ -114,10 +94,13 @@ const QUICK_TIPS = [
   { icon: '💡', tip: 'Always set a reorder level for critical materials so the system can alert you before stock runs out.' },
   { icon: '🔒', tip: 'Never share your login credentials. Each user should have their own account for a proper audit trail.' },
   { icon: '📊', tip: 'Export your Stock Balance Sheet at the end of each week and save it for management review.' },
-  { icon: '🔄', tip: 'Use the Refresh button on the Dashboard to get the latest stock data if you\'ve been idle for a while.' },
+  { icon: '🔄', tip: "Use the Refresh button on the Dashboard to get the latest stock data if you've been idle for a while." },
   { icon: '🗑️', tip: 'Accidentally deleted something? Check the Recycle Bin (Admin/Manager only) to restore it.' },
 ];
 
+// ─────────────────────────────────────────
+// HELP MODAL COMPONENT
+// ─────────────────────────────────────────
 const HelpModal = ({ onClose }) => {
   const [activeSection, setActiveSection] = useState('getting-started');
   const [search, setSearch] = useState('');
@@ -127,7 +110,10 @@ const HelpModal = ({ onClose }) => {
   const filtered = search.trim()
     ? HELP_SECTIONS.flatMap(s =>
         s.steps
-          .filter(st => st.title.toLowerCase().includes(search.toLowerCase()) || st.desc.toLowerCase().includes(search.toLowerCase()))
+          .filter(st =>
+            st.title.toLowerCase().includes(search.toLowerCase()) ||
+            st.desc.toLowerCase().includes(search.toLowerCase())
+          )
           .map(st => ({ ...st, section: s.title, color: s.color }))
       )
     : null;
@@ -143,9 +129,11 @@ const HelpModal = ({ onClose }) => {
         style={{ maxHeight: '90vh' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-ink-100"
-          style={{ background: 'linear-gradient(135deg, #1a3cdb 0%, #4f46e5 100%)' }}>
+        {/* Modal Header */}
+        <div
+          className="flex items-center justify-between px-6 py-5 border-b border-ink-100"
+          style={{ background: 'linear-gradient(135deg, #1a3cdb 0%, #4f46e5 100%)' }}
+        >
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20">
               <BookOpen size={20} className="text-white" />
@@ -155,8 +143,10 @@ const HelpModal = ({ onClose }) => {
               <p className="text-xs text-blue-200">Step-by-step guides for every feature</p>
             </div>
           </div>
-          <button onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition">
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white hover:bg-white/30 transition"
+          >
             <X size={15} />
           </button>
         </div>
@@ -172,12 +162,16 @@ const HelpModal = ({ onClose }) => {
               onChange={e => setSearch(e.target.value)}
               className="flex-1 text-xs outline-none text-ink-800 placeholder-ink-400 bg-transparent"
             />
-            {search && <button onClick={() => setSearch('')} className="text-ink-400 hover:text-ink-700"><X size={13} /></button>}
+            {search && (
+              <button onClick={() => setSearch('')} className="text-ink-400 hover:text-ink-700">
+                <X size={13} />
+              </button>
+            )}
           </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar nav */}
+          {/* Section nav */}
           {!search && (
             <div className="w-52 flex-shrink-0 border-r border-ink-100 overflow-y-auto bg-ink-50/40 py-3 px-2">
               {HELP_SECTIONS.map(s => (
@@ -194,11 +188,11 @@ const HelpModal = ({ onClose }) => {
                     <s.icon size={12} className="text-white" />
                   </span>
                   {s.title}
-                  {activeSection === s.id && <ChevronRight size={12} className="ml-auto text-blue-400" />}
+                  {activeSection === s.id && (
+                    <ChevronRight size={12} className="ml-auto text-blue-400" />
+                  )}
                 </button>
               ))}
-
-              {/* Quick Tips */}
               <div className="mt-4 px-1">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400 px-2 mb-2">Quick Tips</p>
                 {QUICK_TIPS.map((t, i) => (
@@ -211,13 +205,13 @@ const HelpModal = ({ onClose }) => {
             </div>
           )}
 
-          {/* Content */}
+          {/* Content area */}
           <div className="flex-1 overflow-y-auto px-6 py-5">
-            {/* Search results */}
             {filtered !== null ? (
               <div>
                 <p className="text-xs font-bold text-ink-500 mb-4">
-                  {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "<span className="text-blue-600">{search}</span>"
+                  {filtered.length} result{filtered.length !== 1 ? 's' : ''} for{' '}
+                  <span className="text-blue-600">"{search}"</span>
                 </p>
                 {filtered.length === 0 ? (
                   <div className="text-center py-12 text-ink-400">
@@ -230,7 +224,9 @@ const HelpModal = ({ onClose }) => {
                     {filtered.map((r, i) => (
                       <div key={i} className="rounded-xl border border-ink-100 bg-ink-50/50 p-4">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 text-white ${r.color}`}>{r.section}</span>
+                          <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 text-white ${r.color}`}>
+                            {r.section}
+                          </span>
                           <p className="text-sm font-bold text-ink-900">{r.title}</p>
                         </div>
                         <p className="text-xs text-ink-600 leading-relaxed">{r.desc}</p>
@@ -240,7 +236,6 @@ const HelpModal = ({ onClose }) => {
                 )}
               </div>
             ) : (
-              /* Normal section view */
               current && (
                 <div>
                   <div className="flex items-center gap-3 mb-5">
@@ -252,10 +247,12 @@ const HelpModal = ({ onClose }) => {
                       <p className="text-xs text-ink-400">{current.steps.length} steps</p>
                     </div>
                   </div>
-
                   <div className="space-y-3">
                     {current.steps.map((step, idx) => (
-                      <div key={idx} className="flex gap-4 rounded-2xl border border-ink-100 bg-white p-4 hover:border-blue-200 hover:bg-blue-50/20 transition">
+                      <div
+                        key={idx}
+                        className="flex gap-4 rounded-2xl border border-ink-100 bg-white p-4 hover:border-blue-200 hover:bg-blue-50/20 transition"
+                      >
                         <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-black mt-0.5">
                           {idx + 1}
                         </div>
@@ -267,13 +264,12 @@ const HelpModal = ({ onClose }) => {
                       </div>
                     ))}
                   </div>
-
                   <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 flex items-start gap-3">
                     <Lightbulb size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-xs font-bold text-amber-900 mb-1">Need more help?</p>
                       <p className="text-xs text-amber-700 leading-relaxed">
-                        Contact your system administrator or reach MEGA Technology support for assistance beyond this guide.
+                        Contact your system administrator or reach MEGA Technology support for assistance.
                       </p>
                     </div>
                   </div>
@@ -283,11 +279,13 @@ const HelpModal = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* Modal Footer */}
         <div className="flex items-center justify-between border-t border-ink-100 bg-ink-50/40 px-6 py-3">
-          <p className="text-[10px] text-ink-400">Five Stop Hotel Management System · Powered by MEGA Technology</p>
-          <button onClick={onClose}
-            className="rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition">
+          <p className="text-[10px] text-ink-400">Five Stop Hotel Management · Powered by MEGA Technology</p>
+          <button
+            onClick={onClose}
+            className="rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition"
+          >
             Close
           </button>
         </div>
@@ -296,34 +294,25 @@ const HelpModal = ({ onClose }) => {
   );
 };
 
-const greeting = () => {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
-};
-
+// ─────────────────────────────────────────
+// TOPBAR COMPONENT
+// ─────────────────────────────────────────
 const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
   const { user, logout, hasRole } = useAuth();
-  const { timeoutMinutes, setTimeoutMinutes, remainingSeconds } = useSessionTimeout();
+  const { timeoutMinutes, setTimeoutMinutes } = useSessionTimeout();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const menuRef = useRef(null);
 
-  // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false);
       }
     };
-    if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    if (menuOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [menuOpen]);
 
   const handleNav = (path) => {
@@ -332,7 +321,7 @@ const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
   };
 
   const roleBadgeStyle = {
-    admin: 'bg-brass-100 text-brass-800 border-brass-200',
+    admin: 'bg-amber-50 text-amber-800 border-amber-200',
     manager: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     storekeeper: 'bg-blue-50 text-blue-700 border-blue-200',
   }[user?.role || 'storekeeper'];
@@ -340,189 +329,183 @@ const Topbar = ({ onMenuClick, onToggleCollapse, title }) => {
   return (
     <>
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/60 bg-white/80 px-4 py-3 backdrop-blur-md shadow-sm sm:px-8"
-      style={{ background: 'rgba(255,255,255,0.85)' }}>
-      <div className="flex items-center gap-3">
-        {/* Mobile: opens overlay sidebar */}
-        <button
-          onClick={onMenuClick}
-          className="rounded-md p-1.5 text-ink-500 hover:bg-ink-50 lg:hidden"
-        >
-          <Menu size={22} />
-        </button>
-        {/* Desktop: collapses/expands sidebar */}
-        <button
-          onClick={onToggleCollapse}
-          className="hidden lg:flex items-center justify-center rounded-md p-1.5 text-ink-500 hover:bg-ink-100 transition"
-          title="Toggle sidebar"
-        >
-          <Menu size={22} />
-        </button>
-        <div>
-          <p className="text-xl font-bold text-ink-900">{title}</p>
-          <p className="text-xs text-ink-500">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-          </p>
-        </div>
-      </div>
 
-      <div className="flex items-center gap-2.5">
-        {/* Session Inactivity Indicator */}
-        <div
-          onClick={() => setMenuOpen((v) => !v)}
-          title={`Session Timeout: ${timeoutMinutes === 0 ? 'Disabled' : `Signs out after ${timeoutMinutes} minutes of inactivity`}`}
-          className="hidden md:flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-slate-50/80 px-2.5 py-1 text-xs text-slate-600 cursor-pointer hover:bg-slate-100 transition shadow-2xs"
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${timeoutMinutes === 0 ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
-          <Clock size={12} className="text-slate-400" />
-          <span className="text-[11px] font-medium text-slate-600">
-            {timeoutMinutes === 0 ? 'Timeout: Off' : `Auto-Logout: ${timeoutMinutes}m`}
-          </span>
-        </div>
-
-        <div className="relative" ref={menuRef}>
-        <button
-          onClick={() => setMenuOpen((v) => !v)}
-          className="flex items-center gap-2.5 rounded-full border border-ink-200/80 bg-white py-1 pl-1 pr-3 shadow-xs hover:border-ink-300 hover:bg-ink-50/60 transition"
-        >
-          {user?.avatar ? (
-            <img
-              src={user.avatar}
-              alt={user?.name}
-              className="h-8 w-8 rounded-full object-cover ring-1 ring-ink-200"
-            />
-          ) : (
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-xs">
-              {user?.name?.[0]?.toUpperCase()}
-            </span>
-          )}
-          <div className="hidden text-left sm:block">
-            <p className="text-xs font-semibold leading-tight text-ink-800">{user?.name}</p>
-            <p className="text-[10px] capitalize leading-none text-ink-400">{user?.role}</p>
+      <header
+        className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/60 px-4 py-3 backdrop-blur-md shadow-sm sm:px-8"
+        style={{ background: 'rgba(255,255,255,0.85)' }}
+      >
+        {/* Left: menu toggle + title */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onMenuClick}
+            className="rounded-md p-1.5 text-ink-500 hover:bg-ink-50 lg:hidden"
+          >
+            <Menu size={22} />
+          </button>
+          <button
+            onClick={onToggleCollapse}
+            className="hidden lg:flex items-center justify-center rounded-md p-1.5 text-ink-500 hover:bg-ink-100 transition"
+            title="Toggle sidebar"
+          >
+            <Menu size={22} />
+          </button>
+          <div>
+            <p className="text-xl font-bold text-ink-900">{title}</p>
+            <p className="text-xs text-ink-500">
+              {new Date().toLocaleDateString('en-US', {
+                weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+              })}
+            </p>
           </div>
-          <ChevronDown size={14} className={`text-ink-400 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
-        </button>
+        </div>
 
-        {menuOpen && (
-          <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-ink-100 bg-white p-2 shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100 z-50">
-            {/* User Profile Card Header */}
-            <div className="rounded-xl bg-ink-50/70 p-3 mb-1">
-              <div className="flex items-center gap-2.5">
-                {user?.avatar ? (
-                  <img
-                    src={user.avatar}
-                    alt={user?.name}
-                    className="h-9 w-9 rounded-xl object-cover ring-1 ring-ink-200 shadow-xs"
-                  />
-                ) : (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 font-bold text-white text-sm shadow-xs">
-                    {user?.name?.[0]?.toUpperCase()}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-ink-900 truncate">{user?.name}</p>
-                  <p className="text-[11px] text-ink-400 truncate">{user?.email}</p>
+        {/* Right: session indicator + user menu */}
+        <div className="flex items-center gap-2.5">
+          {/* Session timeout indicator */}
+          <div
+            onClick={() => setMenuOpen(v => !v)}
+            title={`Session Timeout: ${timeoutMinutes === 0 ? 'Disabled' : `Signs out after ${timeoutMinutes} minutes of inactivity`}`}
+            className="hidden md:flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-slate-50/80 px-2.5 py-1 text-xs text-slate-600 cursor-pointer hover:bg-slate-100 transition"
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${timeoutMinutes === 0 ? 'bg-slate-400' : 'bg-emerald-500 animate-pulse'}`} />
+            <Clock size={12} className="text-slate-400" />
+            <span className="text-[11px] font-medium text-slate-600">
+              {timeoutMinutes === 0 ? 'Timeout: Off' : `Auto-Logout: ${timeoutMinutes}m`}
+            </span>
+          </div>
+
+          {/* User menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen(v => !v)}
+              className="flex items-center gap-2.5 rounded-full border border-ink-200/80 bg-white py-1 pl-1 pr-3 shadow-xs hover:border-ink-300 hover:bg-ink-50/60 transition"
+            >
+              {user?.avatar ? (
+                <img src={user.avatar} alt={user?.name} className="h-8 w-8 rounded-full object-cover ring-1 ring-ink-200" />
+              ) : (
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-xs">
+                  {user?.name?.[0]?.toUpperCase()}
+                </span>
+              )}
+              <div className="hidden text-left sm:block">
+                <p className="text-xs font-semibold leading-tight text-ink-800">{user?.name}</p>
+                <p className="text-[10px] capitalize leading-none text-ink-400">{user?.role}</p>
+              </div>
+              <ChevronDown size={14} className={`text-ink-400 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-ink-100 bg-white p-2 shadow-xl ring-1 ring-black/5 z-50">
+                {/* Profile card */}
+                <div className="rounded-xl bg-ink-50/70 p-3 mb-1">
+                  <div className="flex items-center gap-2.5">
+                    {user?.avatar ? (
+                      <img src={user.avatar} alt={user?.name} className="h-9 w-9 rounded-xl object-cover ring-1 ring-ink-200" />
+                    ) : (
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 font-bold text-white text-sm">
+                        {user?.name?.[0]?.toUpperCase()}
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-ink-900 truncate">{user?.name}</p>
+                      <p className="text-[11px] text-ink-400 truncate">{user?.email}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2.5 flex items-center justify-between border-t border-ink-100/80 pt-2">
+                    <span className="text-[10px] uppercase font-bold text-ink-400">Role</span>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold capitalize ${roleBadgeStyle}`}>
+                      {user?.role}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Nav items */}
+                <div className="space-y-0.5 pt-1">
+                  <button
+                    onClick={() => handleNav('/settings?tab=profile')}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50 transition"
+                  >
+                    <User size={15} className="text-ink-400" />
+                    My Profile
+                  </button>
+                  <button
+                    onClick={() => handleNav('/settings?tab=security')}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50 transition"
+                  >
+                    <Shield size={15} className="text-ink-400" />
+                    Security &amp; Password
+                  </button>
+                  {hasRole('admin') && (
+                    <button
+                      onClick={() => handleNav('/settings?tab=system')}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50 transition"
+                    >
+                      <Building size={15} className="text-ink-400" />
+                      Hotel Settings
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleNav('/settings?tab=permissions')}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50 transition"
+                  >
+                    <Layers size={15} className="text-ink-400" />
+                    Role Privileges
+                  </button>
+                  {/* Help & Documentation */}
+                  <button
+                    onClick={() => { setMenuOpen(false); setHelpOpen(true); }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 transition"
+                  >
+                    <HelpCircle size={15} className="text-blue-500" />
+                    Help &amp; Documentation
+                  </button>
+                </div>
+
+                {/* Session timeout selector */}
+                <div className="mt-2 rounded-xl bg-slate-50 border border-slate-200/80 p-2.5 text-xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5 text-[11px] text-slate-600">
+                      <Clock size={13} className="text-blue-600" />
+                      Session Timeout
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200">
+                      {timeoutMinutes === 0 ? 'Disabled' : `${timeoutMinutes} min`}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mb-2 leading-tight">
+                    Auto-signs out after idle time to secure workstation:
+                  </p>
+                  <select
+                    value={timeoutMinutes}
+                    onChange={(e) => setTimeoutMinutes(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-2 text-[11px] font-medium text-slate-800 outline-none focus:border-blue-500"
+                  >
+                    <option value={1}>1 Minute (High Security)</option>
+                    <option value={2}>2 Minutes (Default Policy)</option>
+                    <option value={5}>5 Minutes</option>
+                    <option value={10}>10 Minutes</option>
+                    <option value={15}>15 Minutes</option>
+                    <option value={30}>30 Minutes</option>
+                    <option value={60}>60 Minutes (1 Hour)</option>
+                    <option value={0}>Never (Off)</option>
+                  </select>
+                </div>
+
+                {/* Sign out */}
+                <div className="mt-1 border-t border-ink-100 pt-1">
+                  <button
+                    onClick={logout}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                  >
+                    <LogOut size={15} />
+                    Sign Out
+                  </button>
                 </div>
               </div>
-              <div className="mt-2.5 flex items-center justify-between border-t border-ink-100/80 pt-2">
-                <span className="text-[10px] uppercase font-bold text-ink-400">Role</span>
-                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold capitalize ${roleBadgeStyle}`}>
-                  {user?.role}
-                </span>
-              </div>
-            </div>
-
-            {/* Menu Links */}
-            <div className="space-y-0.5 pt-1">
-              <button
-                onClick={() => handleNav('/settings?tab=profile')}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50 transition"
-              >
-                <User size={15} className="text-ink-400" />
-                <span>My Profile</span>
-              </button>
-
-              <button
-                onClick={() => handleNav('/settings?tab=security')}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50 transition"
-              >
-                <Shield size={15} className="text-ink-400" />
-                <span>Security &amp; Password</span>
-              </button>
-
-              {hasRole('admin') && (
-                <button
-                  onClick={() => handleNav('/settings?tab=system')}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50 transition"
-                >
-                  <Building size={15} className="text-ink-400" />
-                  <span>Hotel Settings</span>
-                </button>
-              )}
-
-              <button
-                onClick={() => handleNav('/settings?tab=permissions')}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-ink-700 hover:bg-ink-50 transition"
-              >
-                <Layers size={15} className="text-ink-400" />
-                <span>Role Privileges</span>
-              </button>
-
-              {/* Help & Documentation */}
-              <button
-                onClick={() => { setMenuOpen(false); setHelpOpen(true); }}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 transition"
-              >
-                <HelpCircle size={15} className="text-blue-500" />
-                <span>Help &amp; Documentation</span>
-              </button>
-            </div>
-
-            {/* Session Inactivity Timeout Selector */}
-            <div className="mt-2 rounded-xl bg-slate-50 border border-slate-200/80 p-2.5 text-xs">
-              <div className="flex items-center justify-between text-slate-700 font-semibold mb-1.5">
-                <span className="flex items-center gap-1.5 text-[11px] text-slate-600">
-                  <Clock size={13} className="text-blue-600" />
-                  <span>Session Timeout</span>
-                </span>
-                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200">
-                  {timeoutMinutes === 0 ? 'Disabled' : `${timeoutMinutes} min`}
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 mb-2 leading-tight">
-                Auto-signs out after idle time to secure workstation:
-              </p>
-              <select
-                id="topbar-session-timeout-select"
-                value={timeoutMinutes}
-                onChange={(e) => setTimeoutMinutes(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 px-2 text-[11px] font-medium text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs"
-              >
-                <option value={1}>1 Minute (High Security)</option>
-                <option value={2}>2 Minutes (Default Policy)</option>
-                <option value={5}>5 Minutes</option>
-                <option value={10}>10 Minutes</option>
-                <option value={15}>15 Minutes</option>
-                <option value={30}>30 Minutes</option>
-                <option value={60}>60 Minutes (1 Hour)</option>
-                <option value={0}>Never (Off)</option>
-              </select>
-            </div>
-
-            {/* Logout Action */}
-            <div className="mt-1 border-t border-ink-100 pt-1">
-              <button
-                onClick={logout}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
-              >
-                <LogOut size={15} />
-                <span>Sign Out</span>
-              </button>
-            </div>
+            )}
           </div>
-        )}
-      </div>
-    </header>
+        </div>
+      </header>
     </>
   );
 };
