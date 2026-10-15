@@ -240,6 +240,10 @@ const quickSuggestions = asyncHandler(async (req, res) => {
     "Which suppliers should we contact for restocking?",
     "What's the total value of our current inventory?",
     "Are there any pending purchase approvals?",
+    "How many active materials do we have?",
+    "What was our stock movement this week?",
+    "Which department consumes the most stock?",
+    "List items that are below reorder level",
   ];
 
   const dynamic = [];
@@ -247,7 +251,7 @@ const quickSuggestions = asyncHandler(async (req, res) => {
   if (hasLowStock)   dynamic.unshift("Which items are running low and need reordering?");
   if (hasPending)    dynamic.unshift("What stock requests are waiting for approval?");
 
-  const suggestions = [...new Set([...dynamic, ...base])].slice(0, 5);
+  const suggestions = [...new Set([...dynamic, ...base])].slice(0, 12);
   res.json({ suggestions });
 });
 
