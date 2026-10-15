@@ -522,24 +522,22 @@ export default function StockIssueRequest() {
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={req.status} /></td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition">
-                        {/* View */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* View — always shown */}
                         <button
                           onClick={() => openDetail(req)}
-                          className="rounded-lg p-1.5 text-ink-400 hover:bg-blue-50 hover:text-blue-600 transition"
-                          title="View detail"
+                          className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-ink-600 hover:bg-ink-50 hover:border-ink-300 transition shadow-sm"
                         >
-                          <Eye size={13} />
+                          <Eye size={11} /> View
                         </button>
 
                         {/* Edit — pending only */}
                         {req.status === 'pending' && (
                           <button
                             onClick={() => openEdit(req)}
-                            className="rounded-lg p-1.5 text-ink-400 hover:bg-amber-50 hover:text-amber-600 transition"
-                            title="Edit"
+                            className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition shadow-sm"
                           >
-                            <ClipboardList size={13} />
+                            <ClipboardList size={11} /> Edit
                           </button>
                         )}
 
@@ -547,10 +545,9 @@ export default function StockIssueRequest() {
                         {req.status === 'pending' && canApprove && (
                           <button
                             onClick={() => openAction('approve', req)}
-                            className="rounded-lg p-1.5 text-ink-400 hover:bg-blue-50 hover:text-blue-600 transition"
-                            title="Approve"
+                            className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-blue-700 transition shadow-sm"
                           >
-                            <CheckCircle2 size={13} />
+                            <CheckCircle2 size={11} /> Approve
                           </button>
                         )}
 
@@ -558,10 +555,9 @@ export default function StockIssueRequest() {
                         {req.status === 'approved' && canIssue && (
                           <button
                             onClick={() => openAction('issue', req)}
-                            className="rounded-lg p-1.5 text-ink-400 hover:bg-emerald-50 hover:text-emerald-600 transition"
-                            title="Issue stock"
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 transition shadow-sm"
                           >
-                            <PackageCheck size={13} />
+                            <PackageCheck size={11} /> Issue
                           </button>
                         )}
 
@@ -569,10 +565,9 @@ export default function StockIssueRequest() {
                         {['pending', 'approved'].includes(req.status) && canApprove && (
                           <button
                             onClick={() => openAction('reject', req)}
-                            className="rounded-lg p-1.5 text-ink-400 hover:bg-rose-50 hover:text-rose-600 transition"
-                            title="Reject"
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100 transition shadow-sm"
                           >
-                            <XCircle size={13} />
+                            <XCircle size={11} /> Reject
                           </button>
                         )}
 
@@ -580,10 +575,9 @@ export default function StockIssueRequest() {
                         {req.status === 'pending' && req.requestedBy?._id === user?._id && (
                           <button
                             onClick={() => openAction('cancel', req)}
-                            className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700 transition"
-                            title="Cancel"
+                            className="inline-flex items-center gap-1 rounded-lg border border-ink-200 bg-ink-50 px-2.5 py-1 text-[11px] font-semibold text-ink-600 hover:bg-ink-100 transition shadow-sm"
                           >
-                            <X size={13} />
+                            <X size={11} /> Cancel
                           </button>
                         )}
 
@@ -591,10 +585,9 @@ export default function StockIssueRequest() {
                         {['rejected', 'cancelled'].includes(req.status) && canApprove && (
                           <button
                             onClick={() => handleDelete(req)}
-                            className="rounded-lg p-1.5 text-ink-400 hover:bg-rose-50 hover:text-rose-600 transition"
-                            title="Delete"
+                            className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-700 transition shadow-sm"
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={11} /> Delete
                           </button>
                         )}
                       </div>
