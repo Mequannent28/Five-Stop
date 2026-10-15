@@ -212,7 +212,6 @@ const Sidebar = ({ open, onClose, collapsed = false }) => {
 
   const [stockOpen,        setStockOpen]        = useState(onTransactions);
   const [reportOpen,       setReportOpen]        = useState(onReports);
-  const [issueModalOpen,   setIssueModalOpen]    = useState(false);
 
   const linkCls = (isActive) =>
     `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
@@ -264,7 +263,6 @@ const Sidebar = ({ open, onClose, collapsed = false }) => {
   return (
     <>
       {open && <div className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm lg:hidden" onClick={onClose} />}
-      {issueModalOpen && <StockIssueComingSoonModal onClose={() => setIssueModalOpen(false)} />}
 
       <aside
         className={`
@@ -344,26 +342,8 @@ const Sidebar = ({ open, onClose, collapsed = false }) => {
           {canSeeNav('suppliers') && navLink('/suppliers', Truck, 'Suppliers')}
           {canSeeNav('consumption') && navLink('/consumption', Coffee, 'Consumption')}
 
-          {/* Stock Issue & Request — Coming Soon */}
-          <button
-            onClick={() => setIssueModalOpen(true)}
-            title={collapsed ? 'Stock Issue & Request' : undefined}
-            className={`group w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
-              text-blue-100/80 hover:bg-white/8 hover:text-white
-              ${collapsed ? 'justify-center' : ''}`}
-          >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/5 group-hover:bg-white/10 transition-all">
-              <SendToBack size={15} strokeWidth={2} />
-            </span>
-            {!collapsed && (
-              <span className="flex flex-1 items-center justify-between text-[13px]">
-                Stock Issue & Request
-                <span className="rounded-full bg-indigo-500/30 border border-indigo-400/40 px-2 py-0.5 text-[9px] font-bold text-indigo-300 tracking-wide">
-                  SOON
-                </span>
-              </span>
-            )}
-          </button>
+          {/* Stock Issue & Request */}
+          {navLink('/stock-requests', SendToBack, 'Stock Issue & Request')}
 
           {/* Reports */}
           {canSeeNav('reports') && (

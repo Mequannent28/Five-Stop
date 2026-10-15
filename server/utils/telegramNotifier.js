@@ -579,6 +579,71 @@ ${varLines}
   );
 }
 
+// ── STOCK ISSUE & REQUEST ─────────────────────────────────────────
+
+function notifyStockRequestCreated(req, user) {
+  const items = (req.items || []).map(i =>
+    `  • ${i.material?.name || '—'} × <b>${i.requestedQty}</b> ${i.material?.unit || ''}`
+  ).join('\n');
+  const emoji = req.priority === 'urgent' ? '🚨' : '📋';
+  sendTelegram(
+`🏨 <b>Five Stop Hotel</b>
+━━━━━━━━━━━━━━━━━━━━
+${emoji} <b>NEW STOCK REQUEST</b>
+
+🔖 <b>Voucher:</b>    ${req.voucherNo || '—'}
+🏢 <b>Department:</b> ${req.department}
+⚡ <b>Priority:</b>   ${(req.priority || 'normal').toUpperCase()}
+📋 <b>Status:</b>     PENDING
+
+📦 <b>Items:</b>
+${items || '  —'}
+
+👤 <b>Requested by:</b> ${user?.name || '—'} (${user?.role || ''})
+🕐 <b>Time:</b>         ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyStockRequestApproved(req, user) {
+  sendTelegram(
+`🏨 <b>Five Stop Hotel</b>
+━━━━━━━━━━━━━━━━━━━━
+✅ <b>STOCK REQUEST APPROVED</b>
+
+🔖 <b>Voucher:</b>    ${req.voucherNo || '—'}
+🏢 <b>Department:</b> ${req.department}
+📦 <b>Items:</b>      ${req.items?.length || 0} line(s)
+💰 <b>Total Cost:</b> ${etb(req.totalCost)}
+
+👤 <b>Approved by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>        ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
+function notifyStockIssued(req, user) {
+  const items = (req.items || []).map(i =>
+    `  • ${i.material?.name || '—'} × <b>${i.issuedQty}</b> ${i.material?.unit || ''} — ${etb(i.totalCost)}`
+  ).join('\n');
+  sendTelegram(
+`🏨 <b>Five Stop Hotel</b>
+━━━━━━━━━━━━━━━━━━━━
+📤 <b>STOCK ISSUED</b>
+
+🔖 <b>Voucher:</b>    ${req.voucherNo || '—'}
+🏢 <b>Department:</b> ${req.department}
+💰 <b>Total Cost:</b> ${etb(req.totalCost)}
+
+📦 <b>Issued Items:</b>
+${items || '  —'}
+
+👤 <b>Issued by:</b> ${user?.name || '—'}
+🕐 <b>Time:</b>      ${now()}
+━━━━━━━━━━━━━━━━━━━━`
+  );
+}
+
 // ── CONSUMPTION ───────────────────────────────────────────────────
 
 const CATEGORY_EMOJI = {
@@ -675,4 +740,7 @@ module.exports = {
   notifyInventoryCountApproved,
   notifyConsumptionCreated,
   notifyConsumptionApproved,
+  notifyStockRequestCreated,
+  notifyStockRequestApproved,
+  notifyStockIssued,
 };
