@@ -14,18 +14,40 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { buildSystemContext } = require('../utils/systemContextService');
 
 // ── Gemini setup ─────────────────────────────────────────────────
-const getGemini = () => {
+// Primary: gemini-2.0-flash — higher free-tier quota (1500 req/day)
+// Fallback: gemini-2.0-flash-lite — even more generous quota
+const MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+
+const getGemini = (modelIndex = 0) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set in environment variables');
   const genAI = new GoogleGenerativeAI(apiKey);
   return genAI.getGenerativeModel({
-    model: 'gemini-3.6-flash',
+    model: MODELS[modelIndex] || MODELS[0],
     generationConfig: {
       temperature:     0.4,
       topP:            0.9,
       maxOutputTokens: 1024,
     },
   });
+};
+
+// ── Friendly error messages ───────────────────────────────────────
+const getFriendlyError = (err) => {
+  const msg = err?.message || '';
+  if (msg.includes('429') || msg.includes('quota') || msg.includes('Too Many Requests')) {
+    return '⏳ MEGA is temporarily unavailable due to high usage. Please try again in a few minutes. If this keeps happening, contact your system administrator to upgrade the AI plan.';
+  }
+  if (msg.includes('404') || msg.includes('not found')) {
+    return '⚙️ MEGA encountered a configuration issue. Please contact your system administrator.';
+  }
+  if (msg.includes('401') || msg.includes('403') || msg.includes('API key')) {
+    return '🔑 MEGA is not properly configured. Please contact your system administrator to check the API settings.';
+  }
+  if (msg.includes('503') || msg.includes('unavailable') || msg.includes('overloaded')) {
+    return '🔄 The AI service is temporarily overloaded. Please try again in a moment.';
+  }
+  return '❌ MEGA could not process your request right now. Please try again shortly.';
 };
 
 // ── System prompt template ────────────────────────────────────────
@@ -107,7 +129,7 @@ const chat = asyncHandler(async (req, res) => {
     return res.json({
       reply:     SECURITY_REFUSAL,
       timestamp: new Date().toISOString(),
-      model:     'gemini-3.6-flash',
+      model:     MODELS[0],
     });
   }
 
@@ -115,32 +137,44 @@ const chat = asyncHandler(async (req, res) => {
   const systemContext = await buildSystemContext(req.user?.role || 'storekeeper');
   const systemPrompt  = buildSystemPrompt(systemContext, req.user?.role || 'storekeeper');
 
-  const model = getGemini();
+  // Try primary model, fall back to lite on quota error
+  let result;
+  for (let i = 0; i < MODELS.length; i++) {
+    try {
+      const model = getGemini(i);
+      const recentHistory = history.slice(-10);
+      const geminiHistory = recentHistory.map(turn => ({
+        role:  turn.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: turn.content }],
+      }));
 
-  // Build chat history for Gemini (max last 10 turns to stay token-efficient)
-  const recentHistory = history.slice(-10);
-  const geminiHistory = recentHistory.map(turn => ({
-    role:  turn.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: turn.content }],
-  }));
+      const chatSession = model.startChat({
+        history: [
+          { role: 'user',  parts: [{ text: systemPrompt }] },
+          { role: 'model', parts: [{ text: 'Understood. I am MEGA, your Five Stop AI Resource Assistant. I have the current system data loaded. How can I help you?' }] },
+          ...geminiHistory,
+        ],
+      });
 
-  // Start chat session with system context injected as first user turn
-  const chatSession = model.startChat({
-    history: [
-      // Inject system context as the opening context message
-      { role: 'user',  parts: [{ text: systemPrompt }] },
-      { role: 'model', parts: [{ text: 'Understood. I am MEGA, your Five Stop AI Resource Assistant. I have the current system data loaded. How can I help you?' }] },
-      ...geminiHistory,
-    ],
-  });
-
-  const result   = await chatSession.sendMessage(message);
-  const response = result.response.text();
+      result = await chatSession.sendMessage(message);
+      break; // success — stop trying
+    } catch (err) {
+      const isQuota = err?.message?.includes('429') || err?.message?.includes('quota');
+      // If quota error and there's a fallback model, try next
+      if (isQuota && i < MODELS.length - 1) continue;
+      // Otherwise return a friendly error
+      return res.json({
+        reply:     getFriendlyError(err),
+        timestamp: new Date().toISOString(),
+        model:     MODELS[i],
+      });
+    }
+  }
 
   res.json({
-    reply:     response,
+    reply:     result.response.text(),
     timestamp: new Date().toISOString(),
-    model:     'gemini-3.6-flash',
+    model:     MODELS[0],
   });
 });
 
@@ -148,7 +182,6 @@ const chat = asyncHandler(async (req, res) => {
 // Proactive analysis — no user input needed, returns key insights
 const analyze = asyncHandler(async (req, res) => {
   const systemContext = await buildSystemContext(req.user?.role || 'admin');
-  const model = getGemini();
 
   const prompt = `
 ${buildSystemPrompt(systemContext, req.user?.role || 'admin')}
@@ -168,20 +201,23 @@ Focus on: out of stock items, low stock, pending purchase approvals, high-value 
 Return ONLY valid JSON, no markdown, no extra text.
 `.trim();
 
-  try {
-    const result   = await model.generateContent(prompt);
-    const raw      = result.response.text().trim();
-    // Strip markdown code blocks if present
-    const cleaned  = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
-    const parsed   = JSON.parse(cleaned);
-    res.json(parsed);
-  } catch (err) {
-    // Fallback if JSON parsing fails
-    res.json({
-      alerts:  [{ level: 'info', title: 'Analysis Ready', message: 'System is running. Check individual modules for details.', action: 'Review dashboard' }],
-      summary: 'System operational',
-      score:   75,
-    });
+  for (let i = 0; i < MODELS.length; i++) {
+    try {
+      const model  = getGemini(i);
+      const result = await model.generateContent(prompt);
+      const raw     = result.response.text().trim();
+      const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+      return res.json(JSON.parse(cleaned));
+    } catch (err) {
+      const isQuota = err?.message?.includes('429') || err?.message?.includes('quota');
+      if (isQuota && i < MODELS.length - 1) continue;
+      // Fallback silent response on any error
+      return res.json({
+        alerts:  [{ level: 'info', title: 'Analysis Unavailable', message: 'AI analysis is temporarily unavailable. Check individual modules for details.', action: 'Review dashboard' }],
+        summary: 'System operational',
+        score:   75,
+      });
+    }
   }
 });
 
