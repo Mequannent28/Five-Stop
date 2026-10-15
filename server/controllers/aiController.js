@@ -1,7 +1,7 @@
 /**
  * AI Controller — Five Stop Stock Management System
  * ──────────────────────────────────────────────────────────────────
- * Uses Google Gemini 1.5 Flash with live system context from MongoDB.
+ * Uses Google Gemini 3.6 Flash with live system context from MongoDB.
  * Each request gets a fresh snapshot so the AI always has current data.
  *
  * Endpoints:
@@ -19,7 +19,7 @@ const getGemini = () => {
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set in environment variables');
   const genAI = new GoogleGenerativeAI(apiKey);
   return genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-3.6-flash',
     generationConfig: {
       temperature:     0.4,
       topP:            0.9,
@@ -95,7 +95,7 @@ const chat = asyncHandler(async (req, res) => {
   res.json({
     reply:     response,
     timestamp: new Date().toISOString(),
-    model:     'gemini-1.5-flash',
+    model:     'gemini-3.6-flash',
   });
 });
 
