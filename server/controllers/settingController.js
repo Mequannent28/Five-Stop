@@ -68,6 +68,7 @@ const updateSettings = asyncHandler(async (req, res) => {
     // Pricing & Cost Parameters
     'contingencyPercent', 'overheadPercent', 'defaultFoodCostPercent',
     'rawMaterialPriceAdjustType', 'rawMaterialPriceAdjustValue',
+    'productSellingPriceAdjustPercent',
   ];
 
   allowedFields.forEach((field) => {
@@ -90,5 +91,42 @@ const updateSettings = asyncHandler(async (req, res) => {
   res.json(updated);
 });
 
-module.exports = { getSettings, updateSettings };
+// @desc   Apply bulk % increase to ALL product selling prices
+// @route  POST /api/settings/apply-product-price-adjustment
+// @access Private/Admin
+const applyProductPriceAdjustment = asyncHandler(async (req, res) => {
+  const { percent } = req.body;
+  const pct = Number(percent);
+  if (!pct || pct <= 0 || pct > 500) {
+    res.status(400); throw new Error('Percent must be between 0.01 and 500');
+  }
+
+  const Product = require('../models/Product');
+
+  // Fetch all active products
+  const products = await Product.find({ isActive: true });
+  let updatedCount = 0;
+
+  for (const product of products) {
+    const oldPrice = product.sellingPrice || 0;
+    if (oldPrice > 0) {
+      product.sellingPrice = Math.round(oldPrice * (1 + pct / 100) * 100) / 100;
+      await product.save();
+      updatedCount++;
+    }
+  }
+
+  tg.notifySettingsChanged && tg.notifySettingsChanged(
+    { action: `Bulk product price +${pct}%`, updatedCount },
+    req.user
+  );
+
+  res.json({
+    message: `Successfully applied +${pct}% to ${updatedCount} product selling prices.`,
+    updatedCount,
+    percent: pct,
+  });
+});
+
+module.exports = { getSettings, updateSettings, applyProductPriceAdjustment };
 

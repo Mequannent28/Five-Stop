@@ -101,6 +101,7 @@ export default function Settings() {
     defaultFoodCostPercent: 30,
     rawMaterialPriceAdjustType: 'percent',
     rawMaterialPriceAdjustValue: 0,
+    productSellingPriceAdjustPercent: 0,
     rolePermissions: {
       recordGoods: { storekeeper: true, manager: true, admin: true },
       checkReview: { storekeeper: false, manager: true, admin: true },
@@ -127,6 +128,12 @@ export default function Settings() {
   const [systemSaving, setSystemSaving] = useState(false);
   const [systemSuccess, setSystemSuccess] = useState('');
   const [systemError, setSystemError] = useState('');
+
+  // Bulk product price adjustment state
+  const [bulkPricePercent, setBulkPricePercent]   = useState('');
+  const [bulkPriceApplying, setBulkPriceApplying] = useState(false);
+  const [bulkPriceSuccess, setBulkPriceSuccess]   = useState('');
+  const [bulkPriceError, setBulkPriceError]       = useState('');
 
   // Telegram subscribers state (Admin)
   const [tgSubscribers,   setTgSubscribers]   = useState([]);
@@ -390,6 +397,26 @@ export default function Settings() {
       setSystemError(err.response?.data?.message || 'Failed to update system settings.');
     } finally {
       setSystemSaving(false);
+    }
+  };
+
+  // Handle Bulk Product Price Adjustment
+  const handleBulkPriceApply = async () => {
+    const pct = Number(bulkPricePercent);
+    if (!pct || pct <= 0) { setBulkPriceError('Enter a valid percentage greater than 0.'); return; }
+    if (!window.confirm(`This will permanently increase ALL product selling prices by +${pct}%. This cannot be undone automatically. Continue?`)) return;
+    setBulkPriceApplying(true);
+    setBulkPriceError('');
+    setBulkPriceSuccess('');
+    try {
+      const res = await api.post('/settings/apply-product-price-adjustment', { percent: pct });
+      setBulkPriceSuccess(`✓ ${res.data.message}`);
+      setBulkPricePercent('');
+      setTimeout(() => setBulkPriceSuccess(''), 6000);
+    } catch (err) {
+      setBulkPriceError(err.response?.data?.message || 'Failed to apply price adjustment.');
+    } finally {
+      setBulkPriceApplying(false);
     }
   };
 
@@ -1213,6 +1240,104 @@ export default function Settings() {
                 <AlertCircle size={14} className="flex-shrink-0" /> {systemError}
               </div>
             )}
+
+            {/* ── Bulk Product Selling Price Adjustment ── */}
+            <div className="rounded-2xl overflow-hidden border border-blue-100">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-600">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
+                    <Sparkles size={18} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-white">Bulk Product Price Increase</p>
+                    <p className="text-[11px] text-blue-200">Apply a % increase to all product selling prices at once</p>
+                  </div>
+                </div>
+                <span className="rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold text-white">Permanent Action</span>
+              </div>
+
+              <div className="p-5 space-y-4 bg-blue-50/30">
+                <p className="text-xs text-ink-600">
+                  Use this when your menu prices need to increase across the board — for example, a 10% price rise due to inflation.
+                  This <strong>permanently updates</strong> the selling price stored on every active product.
+                </p>
+
+                {/* Input row */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0.01"
+                      max="500"
+                      step="0.1"
+                      value={bulkPricePercent}
+                      onChange={e => { setBulkPricePercent(e.target.value); setBulkPriceError(''); setBulkPriceSuccess(''); }}
+                      placeholder="e.g. 10"
+                      className="w-36 rounded-xl border-2 border-blue-200 bg-white py-2.5 pl-4 pr-10 text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-black text-blue-500">%</span>
+                  </div>
+
+                  {/* Live example */}
+                  {Number(bulkPricePercent) > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {[100, 250, 500, 1000].map(ex => (
+                        <div key={ex} className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-center">
+                          <p className="text-[10px] text-ink-400">ETB {ex} →</p>
+                          <p className="text-xs font-black text-blue-700">
+                            ETB {(ex * (1 + Number(bulkPricePercent) / 100)).toFixed(2)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick % buttons */}
+                <div className="flex gap-2 flex-wrap">
+                  <p className="text-[11px] font-semibold text-ink-500 self-center">Quick:</p>
+                  {[5, 10, 15, 20, 25].map(pct => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => { setBulkPricePercent(pct); setBulkPriceError(''); }}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold border transition ${
+                        Number(bulkPricePercent) === pct
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-ink-600 border-ink-200 hover:border-blue-400 hover:text-blue-700'
+                      }`}
+                    >
+                      +{pct}%
+                    </button>
+                  ))}
+                </div>
+
+                {/* Feedback */}
+                {bulkPriceSuccess && (
+                  <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs font-semibold text-emerald-700">
+                    <CheckCircle2 size={14} className="flex-shrink-0" /> {bulkPriceSuccess}
+                  </div>
+                )}
+                {bulkPriceError && (
+                  <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700">
+                    <AlertCircle size={14} className="flex-shrink-0" /> {bulkPriceError}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleBulkPriceApply}
+                  disabled={bulkPriceApplying || !Number(bulkPricePercent)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                >
+                  {bulkPriceApplying
+                    ? <><Sparkles size={15} className="animate-spin" /> Applying…</>
+                    : <><Sparkles size={15} /> Apply +{bulkPricePercent || '0'}% to All Products</>
+                  }
+                </button>
+              </div>
+            </div>
 
             <div className="pt-2 flex justify-end">
               <Button type="submit" disabled={systemSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">

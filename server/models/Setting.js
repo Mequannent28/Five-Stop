@@ -59,6 +59,8 @@ const settingSchema = new mongoose.Schema(
     // 'percent' = add X% to every unit cost | 'fixed' = add fixed ETB amount
     rawMaterialPriceAdjustType:  { type: String, default: 'percent', enum: ['percent', 'fixed'] },
     rawMaterialPriceAdjustValue: { type: Number, default: 0,         min: 0 },
+    // Product Selling Price Bulk Adjustment — percentage to add to ALL product selling prices
+    productSellingPriceAdjustPercent: { type: Number, default: 0, min: 0, max: 500 },
   },
   { timestamps: true }
 );
