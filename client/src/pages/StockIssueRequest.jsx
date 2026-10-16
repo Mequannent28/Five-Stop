@@ -208,6 +208,22 @@ export default function StockIssueRequest() {
     const validItems = formItems.filter(i => i.material && Number(i.requestedQty) > 0);
     if (!validItems.length) { setFormError('Add at least one item with a material and quantity.'); return; }
 
+    // Client-side stock check before submitting
+    if (formType === 'direct_issue') {
+      const overItems = validItems.filter(i => {
+        const mat = materials.find(m => m._id === i.material);
+        return mat && Number(i.requestedQty) > mat.currentStock;
+      });
+      if (overItems.length > 0) {
+        const msgs = overItems.map(i => {
+          const mat = materials.find(m => m._id === i.material);
+          return `${mat?.name}: requested ${i.requestedQty} but only ${mat?.currentStock} ${mat?.unit} available`;
+        }).join('\n');
+        setFormError(`⚠ Insufficient stock for direct issue:\n${msgs}`);
+        return;
+      }
+    }
+
     setFormLoading(true);
     try {
       const payload = {
@@ -221,13 +237,22 @@ export default function StockIssueRequest() {
           note:         i.note,
         })),
       };
+      let response;
       if (editTarget) {
-        await api.put(`/stock-requests/${editTarget._id}`, payload);
+        response = await api.put(`/stock-requests/${editTarget._id}`, payload);
       } else {
-        await api.post('/stock-requests', payload);
+        response = await api.post('/stock-requests', payload);
       }
       setCreateOpen(false);
       await load(true);
+
+      // Show stock warnings after successful submission (for regular requests)
+      if (response?.data?.stockWarnings?.length > 0) {
+        const warnMsgs = response.data.stockWarnings.map(w =>
+          `• ${w.name}: requested ${w.requested} ${w.unit}, only ${w.available} available (shortfall: ${w.shortfall})`
+        ).join('\n');
+        alert(`⚠ Request submitted, but note:\n\n${warnMsgs}\n\nThe storekeeper will see this when issuing.`);
+      }
     } catch (err) {
       setFormError(err.response?.data?.message || 'Failed to save request');
     } finally {
@@ -811,34 +836,91 @@ export default function StockIssueRequest() {
 
             <div className="p-6 space-y-4">
               {/* Items summary */}
-              <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-3 space-y-1.5">
-                {actionTarget.items?.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-ink-800">{item.material?.name || '—'}</span>
-                    <div className="flex items-center gap-3">
-                      {actionType === 'issue' ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-ink-400">Issue qty:</span>
-                          <input
-                            type="number"
-                            min="0"
-                            max={item.requestedQty}
-                            value={issueQtys[item.material?._id || item.material] ?? item.requestedQty}
-                            onChange={e => setIssueQtys(prev => ({
-                              ...prev,
-                              [item.material?._id || item.material]: e.target.value,
-                            }))}
-                            className="w-20 rounded-lg border border-ink-200 bg-white px-2 py-1 text-xs text-center outline-none focus:border-blue-500"
-                          />
-                          <span className="text-ink-400">/ {item.requestedQty} {item.material?.unit}</span>
-                        </div>
-                      ) : (
-                        <span className="text-ink-600">{item.requestedQty} {item.material?.unit}</span>
+              <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-3 space-y-2.5">
+                {actionTarget.items?.map((item, i) => {
+                  const matId       = item.material?._id || item.material;
+                  const currentStock = item.material?.currentStock ?? 0;
+                  const issueQty    = Number(issueQtys[matId] ?? item.requestedQty);
+                  const isInsufficient = actionType === 'issue' && issueQty > currentStock;
+                  const isExact        = actionType === 'issue' && issueQty === currentStock && currentStock < item.requestedQty;
+
+                  return (
+                    <div key={i} className={`rounded-xl border p-3 ${
+                      isInsufficient ? 'border-rose-200 bg-rose-50' : 'border-ink-100 bg-white'
+                    }`}>
+                      <div className="flex items-center justify-between text-xs mb-1.5">
+                        <span className="font-bold text-ink-900">{item.material?.name || '—'}</span>
+                        {actionType === 'issue' && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isInsufficient
+                              ? 'bg-rose-100 text-rose-700'
+                              : currentStock >= item.requestedQty
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {isInsufficient
+                              ? `⚠ Only ${currentStock} ${item.material?.unit} available`
+                              : currentStock >= item.requestedQty
+                              ? `✓ ${currentStock} ${item.material?.unit} in stock`
+                              : `⚡ ${currentStock} ${item.material?.unit} available`
+                            }
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-ink-500">Requested: <strong>{item.requestedQty} {item.material?.unit}</strong></span>
+                        {actionType === 'issue' && (
+                          <div className="flex items-center gap-1.5 ml-auto">
+                            <span className="text-ink-500">Issue:</span>
+                            <input
+                              type="number"
+                              min="0"
+                              max={currentStock}
+                              step="any"
+                              value={issueQtys[matId] ?? item.requestedQty}
+                              onChange={e => setIssueQtys(prev => ({
+                                ...prev,
+                                [matId]: e.target.value,
+                              }))}
+                              className={`w-24 rounded-lg border px-2 py-1 text-xs text-center outline-none focus:ring-1 ${
+                                isInsufficient
+                                  ? 'border-rose-400 bg-rose-50 text-rose-700 focus:border-rose-500 focus:ring-rose-200'
+                                  : 'border-ink-200 bg-white focus:border-blue-500 focus:ring-blue-200'
+                              }`}
+                            />
+                            <span className="text-ink-400">/ {item.requestedQty} {item.material?.unit}</span>
+                          </div>
+                        )}
+                        {actionType !== 'issue' && (
+                          <span className="ml-auto text-ink-600">{item.requestedQty} {item.material?.unit}</span>
+                        )}
+                      </div>
+                      {isInsufficient && (
+                        <p className="text-[10px] text-rose-600 mt-1.5 font-semibold">
+                          ⚠ Not enough balance. Max you can issue: {currentStock} {item.material?.unit}. Reduce quantity or wait for restocking.
+                        </p>
+                      )}
+                      {isExact && !isInsufficient && (
+                        <p className="text-[10px] text-amber-600 mt-1.5 font-semibold">
+                          ⚡ This will completely empty {item.material?.name} from the store.
+                        </p>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {/* Insufficient stock summary warning */}
+              {actionType === 'issue' && actionTarget.items?.some(item => {
+                const matId = item.material?._id || item.material;
+                const currentStock = item.material?.currentStock ?? 0;
+                return Number(issueQtys[matId] ?? item.requestedQty) > currentStock;
+              }) && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
+                  <p className="font-bold mb-1">⚠ Insufficient Balance</p>
+                  <p>One or more items exceed available stock. Please reduce the issue quantity to available amount or the system will block this action.</p>
+                </div>
+              )}
 
               {/* Note/Reason input */}
               <div>

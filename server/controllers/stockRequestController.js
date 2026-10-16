@@ -26,26 +26,41 @@ async function applyStockDeduction(items, reverse = false) {
   }
 }
 
-// ── Helper: compute totals ────────────────────────────────────────
+// ── Helper: compute totals + availability ────────────────────────
 async function resolveItemCosts(items) {
   let total = 0;
   const resolved = [];
+  const stockWarnings = []; // items where requestedQty > currentStock
+
   for (const item of items) {
     const mat = await RawMaterial.findById(item.material).select('unitCost name unit currentStock');
     if (!mat) throw new Error(`Material not found: ${item.material}`);
-    const unitCost  = mat.unitCost || 0;
-    const totalCost = unitCost * Number(item.requestedQty);
+    const unitCost    = mat.unitCost || 0;
+    const requestedQty = Number(item.requestedQty);
+    const totalCost   = unitCost * requestedQty;
     total += totalCost;
+
+    // Flag if requested exceeds available stock
+    if (requestedQty > mat.currentStock) {
+      stockWarnings.push({
+        name:        mat.name,
+        unit:        mat.unit,
+        requested:   requestedQty,
+        available:   mat.currentStock,
+        shortfall:   requestedQty - mat.currentStock,
+      });
+    }
+
     resolved.push({
       material:     mat._id,
-      requestedQty: Number(item.requestedQty),
+      requestedQty,
       issuedQty:    0,
       unitCost,
       totalCost,
       note: item.note || '',
     });
   }
-  return { resolved, total };
+  return { resolved, total, stockWarnings };
 }
 
 // ── GET /api/stock-requests ───────────────────────────────────────
@@ -104,10 +119,19 @@ const createStockRequest = asyncHandler(async (req, res) => {
     res.status(400); throw new Error('At least one item is required');
   }
 
-  const { resolved, total } = await resolveItemCosts(items);
+  const { resolved, total, stockWarnings } = await resolveItemCosts(items);
 
   const isDirectIssue = requestType === 'direct_issue' &&
     ['admin', 'manager', 'storekeeper'].includes(req.user.role);
+
+  // Block direct issue if any item exceeds available stock — must use partial or request workflow
+  if (isDirectIssue && stockWarnings.length > 0) {
+    const msgs = stockWarnings.map(w =>
+      `${w.name}: requested ${w.requested} ${w.unit} but only ${w.available} available`
+    ).join('; ');
+    res.status(400);
+    throw new Error(`Insufficient stock for direct issue — ${msgs}`);
+  }
 
   const status = isDirectIssue ? 'issued' : 'pending';
   const voucherNo = await generateVoucherNo();
@@ -158,7 +182,7 @@ const createStockRequest = asyncHandler(async (req, res) => {
   tg.notifyStockRequestCreated && tg.notifyStockRequestCreated(populated, req.user);
   notify.push({ type: 'stock_request', title: isDirectIssue ? 'Direct Stock Issue' : 'New Stock Request', message: `${req.user.name} submitted a ${isDirectIssue ? 'direct issue' : 'request'} for ${department} — ${populated.items?.length} item(s)`, icon: isDirectIssue ? '📤' : '📋', link: '/stock-requests', severity: isDirectIssue ? 'success' : 'info', userId: req.user._id });
 
-  res.status(201).json(populated);
+  res.status(201).json({ ...populated, stockWarnings: stockWarnings || [] });
 });
 
 // ── PUT /api/stock-requests/:id ───────────────────────────────────
@@ -242,21 +266,58 @@ const issueStock = asyncHandler(async (req, res) => {
     res.status(400); throw new Error(`Cannot issue stock for a request in "${request.status}" status`);
   }
 
-  // Allow partial quantity override
+  // Apply partial quantity overrides
   if (issuedItems && issuedItems.length) {
     for (const issued of issuedItems) {
       const item = request.items.find(i => i.material.toString() === issued.material);
       if (item) {
-        item.issuedQty  = Number(issued.issuedQty) || item.requestedQty;
-        item.totalCost  = item.unitCost * item.issuedQty;
+        item.issuedQty = Number(issued.issuedQty) || 0;
+        item.totalCost = item.unitCost * item.issuedQty;
       }
     }
   } else {
-    // Issue full requested quantities
     request.items.forEach(item => {
       item.issuedQty = item.requestedQty;
       item.totalCost = item.unitCost * item.issuedQty;
     });
+  }
+
+  // ── Stock sufficiency check ───────────────────────────────────
+  // Fetch current stock for all items in parallel
+  const matIds = request.items.map(i => i.material);
+  const materials = await RawMaterial.find({ _id: { $in: matIds } }).select('name unit currentStock').lean();
+  const matMap = {};
+  materials.forEach(m => { matMap[m._id.toString()] = m; });
+
+  const insufficientItems = [];
+  const stockWarnings     = [];
+
+  for (const item of request.items) {
+    if (item.issuedQty <= 0) continue;
+    const mat = matMap[item.material.toString()];
+    if (!mat) continue;
+    if (item.issuedQty > mat.currentStock) {
+      insufficientItems.push({
+        name:      mat.name,
+        unit:      mat.unit,
+        requested: item.requestedQty,
+        issuing:   item.issuedQty,
+        available: mat.currentStock,
+        shortfall: item.issuedQty - mat.currentStock,
+      });
+    } else if (mat.currentStock - item.issuedQty <= 0) {
+      // Will empty the stock — note as warning but allow
+      stockWarnings.push(`${mat.name} will be completely emptied after this issue`);
+    }
+  }
+
+  // If any item has insufficient stock — block and inform
+  if (insufficientItems.length > 0) {
+    const msgs = insufficientItems.map(w =>
+      `${w.name}: issuing ${w.issuing} ${w.unit} but only ${w.available} ${w.unit} available (shortfall: ${w.shortfall})`
+    ).join('\n');
+    res.status(400);
+    throw new Error(`Insufficient stock:\n${msgs}\n\nPlease reduce the issue quantity or wait for restocking.`);
   }
 
   // Recalculate total
@@ -287,7 +348,11 @@ const issueStock = asyncHandler(async (req, res) => {
   invalidateDashboardCache();
   tg.notifyStockIssued && tg.notifyStockIssued(populated, req.user);
   notify.push({ type: 'stock_request', title: 'Stock Issued', message: `${req.user.name} issued stock for ${populated.department} — ETB ${Number(populated.totalCost || 0).toLocaleString()}`, icon: '📦', link: '/stock-requests', severity: 'success', userId: req.user._id });
-  res.json({ message: 'Stock issued and inventory deducted.', request: populated });
+  res.json({
+    message: 'Stock issued and inventory deducted.',
+    request: populated,
+    stockWarnings,
+  });
 });
 
 // ── POST /api/stock-requests/:id/reject ──────────────────────────
