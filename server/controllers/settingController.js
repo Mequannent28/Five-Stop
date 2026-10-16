@@ -65,6 +65,9 @@ const updateSettings = asyncHandler(async (req, res) => {
     'hotelName', 'systemEmail', 'phone', 'address',
     'currency', 'currencySymbol', 'lowStockThresholdDefault',
     'taxRate', 'autoGenerateVoucherNo', 'allowNegativeStock', 'notes',
+    // Pricing & Cost Parameters
+    'contingencyPercent', 'overheadPercent', 'defaultFoodCostPercent',
+    'rawMaterialPriceAdjustType', 'rawMaterialPriceAdjustValue',
   ];
 
   allowedFields.forEach((field) => {

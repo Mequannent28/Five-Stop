@@ -2,8 +2,65 @@ const asyncHandler = require('express-async-handler');
 const XLSX = require('xlsx');
 const Product = require('../models/Product');
 const RawMaterial = require('../models/RawMaterial');
+const Setting = require('../models/Setting');
 const { invalidateDashboardCache } = require('./dashboardController');
 const tg = require('../utils/telegramNotifier');
+
+// ── Pricing helper — applies settings-based adjustments to recipe cost ──
+// Returns full cost breakdown:
+//   adjustedMaterialCost  = raw material cost with price adjustment applied
+//   withContingency       = + contingency %
+//   totalCost             = + overhead %
+//   suggestedSellingPrice = totalCost / (foodCostPercent / 100)
+function calcRecipeCostBreakdown(ingredients, settings = {}) {
+  const {
+    contingencyPercent          = 10,
+    overheadPercent             = 25,
+    defaultFoodCostPercent      = 30,
+    rawMaterialPriceAdjustType  = 'percent',
+    rawMaterialPriceAdjustValue = 0,
+  } = settings;
+
+  // Step 1: raw material cost with price adjustment
+  const rawMaterialCost = (ingredients || []).reduce((sum, ing) => {
+    let unitCost = ing.material?.unitCost ?? 0;
+    // Apply global price adjustment
+    if (rawMaterialPriceAdjustValue > 0) {
+      if (rawMaterialPriceAdjustType === 'percent') {
+        unitCost = unitCost * (1 + rawMaterialPriceAdjustValue / 100);
+      } else {
+        unitCost = unitCost + rawMaterialPriceAdjustValue;
+      }
+    }
+    return sum + unitCost * (ing.quantity || 0);
+  }, 0);
+
+  // Step 2: add contingency
+  const withContingency = rawMaterialCost * (1 + contingencyPercent / 100);
+
+  // Step 3: add overhead
+  const totalCost = withContingency * (1 + overheadPercent / 100);
+
+  // Step 4: suggested selling price (back-calc from food cost %)
+  const foodCostFraction = Math.max(defaultFoodCostPercent, 1) / 100;
+  const suggestedSellingPrice = totalCost / foodCostFraction;
+
+  return {
+    rawMaterialCost:      Math.round(rawMaterialCost      * 100) / 100,
+    contingencyAmount:    Math.round((withContingency - rawMaterialCost) * 100) / 100,
+    withContingency:      Math.round(withContingency      * 100) / 100,
+    overheadAmount:       Math.round((totalCost - withContingency) * 100) / 100,
+    totalCost:            Math.round(totalCost             * 100) / 100,
+    suggestedSellingPrice:Math.round(suggestedSellingPrice * 100) / 100,
+    // Selling prices at common food cost benchmarks
+    sellingAt30pct:  Math.round((totalCost / 0.30) * 100) / 100,
+    sellingAt35pct:  Math.round((totalCost / 0.35) * 100) / 100,
+    sellingAt40pct:  Math.round((totalCost / 0.40) * 100) / 100,
+    sellingAt50pct:  Math.round((totalCost / 0.50) * 100) / 100,
+    // Settings used (for display in UI)
+    settings: { contingencyPercent, overheadPercent, defaultFoodCostPercent, rawMaterialPriceAdjustType, rawMaterialPriceAdjustValue },
+  };
+}
 
 // GET /api/products
 const getProducts = asyncHandler(async (req, res) => {
@@ -11,28 +68,37 @@ const getProducts = asyncHandler(async (req, res) => {
   const filter = { isActive: true };
   if (search) filter.name = { $regex: search, $options: 'i' };
 
-  const products = await Product.find(filter)
-    .populate('ingredients.material', 'name unit unitCost')
-    .sort({ createdAt: -1 })
-    .lean();
+  const [products, settings] = await Promise.all([
+    Product.find(filter)
+      .populate('ingredients.material', 'name unit unitCost')
+      .sort({ createdAt: -1 })
+      .lean(),
+    Setting.findOne().lean(),
+  ]);
 
-  const mapped = products.map((p) => ({
-    ...p,
-    recipeCost: (p.ingredients || []).reduce((sum, ing) => {
-      const unitCost = ing.material?.unitCost ?? 0;
-      return sum + unitCost * (ing.quantity || 0);
-    }, 0),
-  }));
+  const mapped = products.map((p) => {
+    const breakdown = calcRecipeCostBreakdown(p.ingredients, settings || {});
+    return {
+      ...p,
+      recipeCost: breakdown.rawMaterialCost, // backward-compatible: raw cost only
+      costBreakdown: breakdown,              // full breakdown for UI
+    };
+  });
 
   res.json(mapped);
 });
 
 // GET /api/products/:id
 const getProductById = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id)
-    .populate('ingredients.material', 'name unit unitCost');
+  const [product, settings] = await Promise.all([
+    Product.findById(req.params.id)
+      .populate('ingredients.material', 'name unit unitCost'),
+    Setting.findOne().lean(),
+  ]);
   if (!product) { res.status(404); throw new Error('Product not found'); }
-  res.json(product);
+  const obj = product.toJSON();
+  obj.costBreakdown = calcRecipeCostBreakdown(obj.ingredients, settings || {});
+  res.json(obj);
 });
 
 // POST /api/products

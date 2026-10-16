@@ -95,6 +95,12 @@ export default function Settings() {
     taxRate: 15,
     autoGenerateVoucherNo: true,
     allowNegativeStock: false,
+    // Pricing & Cost Parameters
+    contingencyPercent: 10,
+    overheadPercent: 25,
+    defaultFoodCostPercent: 30,
+    rawMaterialPriceAdjustType: 'percent',
+    rawMaterialPriceAdjustValue: 0,
     rolePermissions: {
       recordGoods: { storekeeper: true, manager: true, admin: true },
       checkReview: { storekeeper: false, manager: true, admin: true },
@@ -997,6 +1003,219 @@ export default function Settings() {
             <div className="pt-3 flex justify-end">
               <Button type="submit" disabled={systemSaving} className="bg-blue-600 hover:bg-blue-700 text-white">
                 <Save size={15} /> {systemSaving ? 'Saving Settings…' : 'Save Hotel Settings'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+
+        {/* ── Pricing & Cost Parameters Card ── */}
+        <Card className="mt-6">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg bg-emerald-50 p-1.5 text-emerald-600">
+                <Coins size={16} />
+              </span>
+              <h3 className="font-display text-base font-bold text-ink-900">Pricing &amp; Cost Parameters</h3>
+            </div>
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">Admin Exclusive</span>
+          </div>
+          <p className="text-xs text-ink-400 mb-6">
+            Configure contingency, overhead, food cost %, and raw material price adjustments. These are applied automatically when calculating recipe costs and suggested selling prices on all products.
+          </p>
+
+          {/* Live Preview */}
+          {(() => {
+            const adjType  = systemForm.rawMaterialPriceAdjustType;
+            const adjVal   = Number(systemForm.rawMaterialPriceAdjustValue) || 0;
+            const cont     = Number(systemForm.contingencyPercent) || 0;
+            const ovhd     = Number(systemForm.overheadPercent) || 0;
+            const fc       = Math.max(Number(systemForm.defaultFoodCostPercent) || 30, 1);
+            // Example: raw material cost = 357.90 ETB (from the screenshot)
+            const exampleRaw = 357.90;
+            const adjCost  = adjType === 'percent'
+              ? exampleRaw * (1 + adjVal / 100)
+              : exampleRaw + adjVal;
+            const withCont = adjCost * (1 + cont / 100);
+            const total    = withCont * (1 + ovhd / 100);
+            const selling  = total / (fc / 100);
+            const fmt = (n) => `ETB ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            return (
+              <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50 p-4 mb-6">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-3">Live Preview (example: {fmt(exampleRaw)} raw material cost)</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6 text-xs">
+                  {[
+                    { label: 'Adjusted Cost',        value: fmt(adjCost),   color: 'text-ink-700' },
+                    { label: `+ Contingency ${cont}%`, value: fmt(withCont - adjCost), color: 'text-amber-600' },
+                    { label: 'After Contingency',    value: fmt(withCont),  color: 'text-ink-700' },
+                    { label: `+ Overhead ${ovhd}%`,  value: fmt(total - withCont), color: 'text-violet-600' },
+                    { label: 'Total Cost',            value: fmt(total),     color: 'text-ink-900 font-black' },
+                    { label: `Selling @ ${fc}% FC`,  value: fmt(selling),   color: 'text-emerald-700 font-black' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="rounded-xl bg-white border border-emerald-100 px-3 py-2 text-center">
+                      <p className="text-[10px] text-ink-400 mb-0.5">{label}</p>
+                      <p className={`font-bold ${color}`}>{value}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Selling price at all benchmarks */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {[30, 35, 40, 50].map(pct => (
+                    <span key={pct} className="rounded-lg bg-white border border-emerald-200 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                      Food cost {pct}% → Sell at {fmt(total / (pct / 100))}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          <form onSubmit={handleSystemSubmit} className="space-y-5">
+            {/* Raw Material Price Adjustment */}
+            <div className="rounded-2xl border border-ink-100 bg-ink-50/30 p-4 space-y-3">
+              <p className="text-xs font-bold text-ink-800">Raw Material Price Adjustment</p>
+              <p className="text-[11px] text-ink-400">Apply a global adjustment to all raw material unit costs before calculating recipe costs. Use this to simulate future price increases.</p>
+              <div className="flex items-center gap-3">
+                <div className="flex rounded-xl border border-ink-200 overflow-hidden">
+                  {[
+                    { val: 'percent', label: '% Percent' },
+                    { val: 'fixed',   label: 'ETB Fixed' },
+                  ].map(opt => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => setSystemForm(p => ({ ...p, rawMaterialPriceAdjustType: opt.val }))}
+                      className={`px-4 py-2 text-xs font-semibold transition ${
+                        systemForm.rawMaterialPriceAdjustType === opt.val
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-ink-600 hover:bg-ink-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative flex-1 max-w-[160px]">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={systemForm.rawMaterialPriceAdjustValue}
+                    onChange={e => setSystemForm(p => ({ ...p, rawMaterialPriceAdjustValue: e.target.value }))}
+                    className="w-full rounded-xl border border-ink-200 py-2.5 pl-3 pr-10 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="0"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-ink-400">
+                    {systemForm.rawMaterialPriceAdjustType === 'percent' ? '%' : 'ETB'}
+                  </span>
+                </div>
+                {Number(systemForm.rawMaterialPriceAdjustValue) > 0 && (
+                  <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                    {systemForm.rawMaterialPriceAdjustType === 'percent'
+                      ? `+${systemForm.rawMaterialPriceAdjustValue}% on all material costs`
+                      : `+ETB ${systemForm.rawMaterialPriceAdjustValue} per unit`}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Contingency & Overhead */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-bold text-ink-700 mb-1.5">
+                  Contingency % <span className="font-normal text-ink-400">(waste, spoilage, price buffer)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={systemForm.contingencyPercent}
+                    onChange={e => setSystemForm(p => ({ ...p, contingencyPercent: e.target.value }))}
+                    className="w-full rounded-xl border border-ink-200 py-2.5 pl-3 pr-10 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="10"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-500">%</span>
+                </div>
+                <p className="text-[10px] text-ink-400 mt-1">Added to raw material cost. Industry standard: 5–15%</p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-ink-700 mb-1.5">
+                  Overhead % <span className="font-normal text-ink-400">(electricity, labour, equipment)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={systemForm.overheadPercent}
+                    onChange={e => setSystemForm(p => ({ ...p, overheadPercent: e.target.value }))}
+                    className="w-full rounded-xl border border-ink-200 py-2.5 pl-3 pr-10 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="25"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-violet-500">%</span>
+                </div>
+                <p className="text-[10px] text-ink-400 mt-1">Applied after contingency. Industry standard: 20–30%</p>
+              </div>
+            </div>
+
+            {/* Default Food Cost % */}
+            <div>
+              <label className="block text-xs font-bold text-ink-700 mb-1.5">
+                Default Food Cost % <span className="font-normal text-ink-400">(used to calculate suggested selling price)</span>
+              </label>
+              <div className="flex items-center gap-4">
+                <div className="relative w-48">
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={systemForm.defaultFoodCostPercent}
+                    onChange={e => setSystemForm(p => ({ ...p, defaultFoodCostPercent: e.target.value }))}
+                    className="w-full rounded-xl border border-ink-200 py-2.5 pl-3 pr-10 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="30"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600">%</span>
+                </div>
+                <div className="flex gap-2">
+                  {[25, 30, 35, 40].map(pct => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setSystemForm(p => ({ ...p, defaultFoodCostPercent: pct }))}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition border ${
+                        Number(systemForm.defaultFoodCostPercent) === pct
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-ink-600 border-ink-200 hover:border-emerald-400 hover:text-emerald-700'
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-[10px] text-ink-400 mt-1">
+                If total cost = ETB 492, at 30% food cost → suggested price = ETB 1,640. Industry standard: 28–35%
+              </p>
+            </div>
+
+            {systemSuccess && (
+              <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-700">
+                <CheckCircle2 size={14} className="flex-shrink-0" /> {systemSuccess}
+              </div>
+            )}
+            {systemError && (
+              <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-700">
+                <AlertCircle size={14} className="flex-shrink-0" /> {systemError}
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <Button type="submit" disabled={systemSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Save size={15} /> {systemSaving ? 'Saving…' : 'Save Pricing Settings'}
               </Button>
             </div>
           </form>

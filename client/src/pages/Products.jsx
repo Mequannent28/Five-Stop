@@ -797,11 +797,59 @@ const Products = () => {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={3} className="pt-2 text-right text-xs font-semibold text-ink-500">Total recipe cost</td>
-                      <td className="pt-2 text-right font-bold text-blue-700">ETB {recipeCost(selectedProduct).toFixed(2)}</td>
+                      <td colSpan={3} className="pt-2 text-right text-xs font-semibold text-ink-500">Raw Material Cost</td>
+                      <td className="pt-2 text-right font-bold text-blue-700">ETB {(selectedProduct.costBreakdown?.rawMaterialCost ?? recipeCost(selectedProduct)).toFixed(2)}</td>
                     </tr>
                   </tfoot>
                 </table>
+              )}
+
+              {/* Cost Breakdown Panel */}
+              {selectedProduct.costBreakdown && (
+                <div className="mt-4 rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-emerald-100 bg-emerald-100/50">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Full Cost Breakdown</p>
+                  </div>
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {[
+                        { label: 'Raw Material Cost',                                   value: selectedProduct.costBreakdown.rawMaterialCost,    color: 'text-ink-700' },
+                        { label: `+ Contingency (${selectedProduct.costBreakdown.settings?.contingencyPercent}%)`, value: selectedProduct.costBreakdown.contingencyAmount,   color: 'text-amber-600' },
+                        { label: 'Total after Contingency',                              value: selectedProduct.costBreakdown.withContingency,    color: 'text-ink-700 font-semibold', divider: true },
+                        { label: `+ Overhead (${selectedProduct.costBreakdown.settings?.overheadPercent}%)`,       value: selectedProduct.costBreakdown.overheadAmount,      color: 'text-violet-600' },
+                        { label: 'Total Cost (G Total Cost)',                            value: selectedProduct.costBreakdown.totalCost,          color: 'text-ink-900 font-black', divider: true },
+                        { label: `Suggested Price @ ${selectedProduct.costBreakdown.settings?.defaultFoodCostPercent}% Food Cost`, value: selectedProduct.costBreakdown.suggestedSellingPrice, color: 'text-emerald-700 font-black' },
+                      ].map(({ label, value, color, divider }) => (
+                        <tr key={label} className={divider ? 'border-t border-emerald-200' : ''}>
+                          <td className="px-4 py-1.5 text-ink-600">{label}</td>
+                          <td className={`px-4 py-1.5 text-right tabular ${color}`}>ETB {Number(value ?? 0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {/* Selling price benchmarks */}
+                  <div className="px-4 py-2.5 border-t border-emerald-200 bg-emerald-100/30">
+                    <p className="text-[10px] font-bold text-emerald-700 mb-2">Selling Price Benchmarks</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { pct: 30, val: selectedProduct.costBreakdown.sellingAt30pct },
+                        { pct: 35, val: selectedProduct.costBreakdown.sellingAt35pct },
+                        { pct: 40, val: selectedProduct.costBreakdown.sellingAt40pct },
+                        { pct: 50, val: selectedProduct.costBreakdown.sellingAt50pct },
+                      ].map(({ pct, val }) => (
+                        <div key={pct} className="rounded-lg bg-white border border-emerald-200 px-3 py-1.5 text-center">
+                          <p className="text-[9px] text-ink-400">Food cost {pct}%</p>
+                          <p className="font-black text-emerald-800 text-xs">ETB {Number(val ?? 0).toFixed(2)}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {selectedProduct.costBreakdown.settings?.rawMaterialPriceAdjustValue > 0 && (
+                      <p className="text-[10px] text-amber-600 mt-2 font-semibold">
+                        ⚡ Price adjustment applied: +{selectedProduct.costBreakdown.settings.rawMaterialPriceAdjustValue}{selectedProduct.costBreakdown.settings.rawMaterialPriceAdjustType === 'percent' ? '%' : ' ETB'} on all raw material costs
+                      </p>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
             {canEdit && (

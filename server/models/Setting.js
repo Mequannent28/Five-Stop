@@ -46,6 +46,19 @@ const settingSchema = new mongoose.Schema(
       default: [],
     },
     notes: { type: String, default: 'Five Stop Hotel Management & Stock Control System' },
+
+    // ── Pricing & Cost Parameters ─────────────────────────────────
+    // Contingency: % buffer added on top of raw material cost (waste, price fluctuation)
+    contingencyPercent:          { type: Number, default: 10,        min: 0, max: 100 },
+    // Overhead: % of total cost added for electricity, labour, etc.
+    overheadPercent:             { type: Number, default: 25,        min: 0, max: 100 },
+    // Default Food Cost %: used to back-calculate suggested selling price
+    // e.g. if food cost % = 30, selling price = totalCost / 0.30
+    defaultFoodCostPercent:      { type: Number, default: 30,        min: 1, max: 100 },
+    // Raw Material Price Adjustment: apply globally before recipe cost calculation
+    // 'percent' = add X% to every unit cost | 'fixed' = add fixed ETB amount
+    rawMaterialPriceAdjustType:  { type: String, default: 'percent', enum: ['percent', 'fixed'] },
+    rawMaterialPriceAdjustValue: { type: Number, default: 0,         min: 0 },
   },
   { timestamps: true }
 );
