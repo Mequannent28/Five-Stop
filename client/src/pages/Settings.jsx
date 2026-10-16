@@ -828,6 +828,7 @@ export default function Settings() {
 
       {/* ── Tab 3: Hotel & System Config (Admin Only) ── */}
       {currentTab === 'system' && hasRole('admin') && (
+        <div className="space-y-6">
         <Card className="max-w-3xl">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
@@ -1009,7 +1010,7 @@ export default function Settings() {
         </Card>
 
         {/* ── Pricing & Cost Parameters Card ── */}
-        <Card className="mt-6">
+        <Card className="mt-6 max-w-3xl">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <span className="rounded-lg bg-emerald-50 p-1.5 text-emerald-600">
@@ -1220,6 +1221,7 @@ export default function Settings() {
             </div>
           </form>
         </Card>
+        </div>
       )}
 
       {/* ── Tab 4: Role Privileges ── */}
